@@ -40,7 +40,7 @@ Notes:
 
 | Engine | Quant | Split | pp2048 | pp4096 | pp8192 | pp16384 | tg128 | VRAM (GPU0/GPU1) | Peak temp | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| _pending_ | | | | | | | | | | |
+| pflash | UD-Q6_K_M | layer | 188.46 | 197.11 | 198.21 | 193.38 | 9.45 | — | 65°C | `-r 3`. `none` (single-GPU reference) blocked — 21.5GB model doesn't fit one 16GB card, `failed to load model` |
 
 Cells needed: {pflash, buun, ik} × {none, layer}, plus ik × graph once
 unblocked.
