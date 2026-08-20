@@ -104,3 +104,37 @@ verifying it against the actual binaries:
 
 Also confirmed and recorded: power cap and persistence mode are correctly
 applied; both outstanding model downloads have completed.
+
+## 2026-08-20 — Phase 1 cell: pflash, layer split
+
+`phase1-pflash-layer-q6k` — pflash, `UD-Q6_K_M`, `-sm layer`, full prefill
+depth list, **`-r 3`**. First Phase 1 baseline cell.
+
+**Result: clean.** pp2048 188.46 / pp4096 197.11 / pp8192 198.21 / pp16384
+193.38 t/s, tg128 9.45 t/s. Peak 65°C (within the 63–65°C range observed in
+Phase 0; throttle 83°C). Both GPUs alternated to 100% in the layer split.
+
+Batch continued automatically, but was stopped after this cell per operator
+direction (benchmark, log, commit, stop).
+
+---
+
+## 2026-08-20 — Phase 1 cell: pflash, none split — BLOCKED
+
+`phase1-pflash-none-q6k` — pflash, `UD-Q6_K_M`, `-sm none` (single-GPU
+reference). **Failed to load model** within ~6s:
+
+```
+main: error: failed to load model '/root/Qwen3.8-27B-UD-Q6_K_M.gguf'
+```
+
+**Diagnosis:** `-sm none` is the single-GPU reference in METHODOLOGY §3.
+`-ngl 99` places the whole 21.49 GiB model on one 16 GB card, which cannot
+hold it (weights + f16 KV). This is a hardware limit, not a transient error —
+the model loaded fine immediately after in `layer` split. The `none` reference
+cell is therefore **not achievable** for Q6_K_M on this rig and is recorded as
+blocked rather than re-run.
+
+Note: this run occurred while the disk was at 100% usage (before a +25GB
+resize), but the model file was intact and loaded successfully moments later
+in layer mode, so the disk state was not the cause.
