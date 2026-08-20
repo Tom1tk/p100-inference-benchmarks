@@ -1,0 +1,12 @@
+ggml_cuda_init: found 2 CUDA devices (Total VRAM: 32538 MiB):
+  Device 0: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+  Device 1: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+| model                          |       size |     params | backend    | ngl | threads | fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | ------: | -: | --------------: | -------------------: |
+| qwen35 27B Q6_K                |  21.49 GiB |    27.32 B | CUDA       |  99 |       8 |  1 |          pp2048 |        187.99 ± 0.00 |
+| qwen35 27B Q6_K                |  21.49 GiB |    27.32 B | CUDA       |  99 |       8 |  1 |          pp4096 |        197.04 ± 0.00 |
+| qwen35 27B Q6_K                |  21.49 GiB |    27.32 B | CUDA       |  99 |       8 |  1 |          pp8192 |        198.06 ± 0.00 |
+| qwen35 27B Q6_K                |  21.49 GiB |    27.32 B | CUDA       |  99 |       8 |  1 |         pp16384 |        193.46 ± 0.00 |
+| qwen35 27B Q6_K                |  21.49 GiB |    27.32 B | CUDA       |  99 |       8 |  1 |           tg128 |          9.46 ± 0.00 |
+
+build: e05ff58b7 (9110)
