@@ -1,3 +1,5 @@
 [23:45:47] START phase1-pflash-none-q6k
 [23:45:56] DONE phase1-pflash-none-q6k rc=1
 [23:45:56] START phase1-pflash-layer-q6k
+[23:57:19] DONE phase1-pflash-layer-q6k rc=0
+[23:57:19] START phase1-buun-none-q6k
