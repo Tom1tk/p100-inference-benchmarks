@@ -1,0 +1,37 @@
+ggml_cuda_init: found 2 CUDA devices:
+  Device 0: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+  Device 1: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+ggml_cuda_op_reduce: ncclAllReduce failed with status 1
+=============================== NCCL main communicator initialized
+| model                          |       size |     params | backend    | ngl | threads |    sm | cuda        |          test |              t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | ------: | ----: | ----------- | ------------: | ---------------: |
+/root/ik_llama.cpp/ggml/src/ggml-cuda/reduce.cu:169: Fatal error
+[New LWP 52985]
+[New LWP 52984]
+[New LWP 52983]
+[New LWP 52982]
+[New LWP 52914]
+[New LWP 52911]
+[New LWP 52909]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x00007221f0f10813 in __GI___wait4 (pid=55618, stat_loc=0x7fffa3e3aac4, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+#0  0x00007221f0f10813 in __GI___wait4 (pid=55618, stat_loc=0x7fffa3e3aac4, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x00007221f16dfe82 in ggml_abort () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#2  0x00007221f18f5573 in ggml_cuda_op_reduce(ggml_backend_cuda_context&, ggml_tensor*) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#3  0x00007221f195f953 in ggml_cuda_compute_forward(ggml_backend_cuda_context&, ggml_tensor*, ggml_cgraph const*, int&) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#4  0x00007221f1969078 in ggml_backend_cuda_graph_compute(ggml_backend*, ggml_cgraph*) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#5  0x00007221f1754c90 in ggml_backend_sched_compute_splits(ggml_backend_sched*) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#6  0x0000722219aef950 in llama_decode_internal(llama_context&, llama_batch) [clone .isra.0] () from /root/ik_llama.cpp/build/src/libllama.so
+#7  0x0000722219af2d5d in llama_decode () from /root/ik_llama.cpp/build/src/libllama.so
+#8  0x00005e6797dbb706 in test_prompt(llama_context*, int, int, int, int) [clone .constprop.0] ()
+#9  0x00005e6797db4713 in main ()
+[Inferior 1 (process 52877) detached]

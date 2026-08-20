@@ -1,0 +1,6 @@
+# Models live outside the repo -- never commit multi-GB GGUFs
+*.gguf
+
+# Scratch
+*.tmp
+*.swp
