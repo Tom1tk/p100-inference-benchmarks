@@ -20,9 +20,10 @@ and the mandatory commit/push protocol. Everything else is reference.
 | Phase 4 — hypothesis tests | Not started |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 
-**Blocker 2:** DFlash2 can't run — none of the three engines supports it (they
-have DFlash **v1**; the drafter needs upstream PR #27342). Drafter checkpoints
-are downloading regardless. See H8.
+**Resolved (2026-08-24):** DFlash2 now runs. The three forks all have DFlash
+**v1**; upstream `ggml-org/llama.cpp` **PR #27342** has v2, and it builds for
+`sm_60`. Added as a fourth engine, `mainline`. Both drafters are on disk and
+metadata-verified as genuine v2. See H8.
 
 **Blocker 1:** `ik_llama` `-sm graph` aborts with `ncclAllReduce failed with
 status 1`. Fix is known and untried — rebuild with `-DGGML_NCCL=OFF`. See

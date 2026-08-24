@@ -52,7 +52,7 @@ cd /root/p100-benchmarks
 ./scripts/run-bench.sh <engine> <model-path> <split-mode> <label> [extra args...]
 ```
 
-- `<engine>` — `pflash` | `buun` | `ik`
+- `<engine>` — `pflash` | `buun` | `ik` | `mainline`
 - `<split-mode>` — see the support matrix in [METHODOLOGY.md](METHODOLOGY.md).
   **They differ per engine.** `ik` has `graph` but not `row`/`tensor`;
   `pflash`/`buun` have `row`/`tensor` but not `graph`.
@@ -169,6 +169,8 @@ Do not just retry. Failures are results.
 | Web-bench: `port N already in use` | Index reused, or a previous site is still hosted (by design) | Pick an unused index; check WEB_BENCH.md §5 |
 | Server OOMs on load in Phase 5 | `CTX=32768` leaves too little VRAM beside a 21.5 GiB model | `CTX=16384 ./scripts/run-web-bench.sh ...` and note it in RUNLOG.md |
 | Tool calls malformed / ignored in Phase 5 | `--jinja` missing, or a genuinely bad drafter | The script passes `--jinja`. If it's there, this is a **result** — see H8 |
+| DFlash2 run shows poor acceptance instead of an error | A **v1** engine (`buun`/`ik`) silently ran the v1 path — same `draft-dflash` flag, no selector | Use `mainline`. Confirm the selector loaded in `logs/<label>.server.log` before recording. See H8 |
+| `failed to load model` on `-sm none` | Target too big for one 16 GiB card | Only `UD-IQ3_S` (~11 GiB) fits a single P100 with usable KV |
 
 ---
 
@@ -211,6 +213,8 @@ recorded reason it couldn't produce one.
 No MTP, no TurboQuant. Establishes the apples-to-apples comparison.
 
 - 3 engines × `UD-Q6_K_M` × {`none` (single-GPU reference), `layer`}
+- The `none` leg needs `UD-IQ3_S`, not `Q6_K_M` — 21.5 GiB does not fit one
+  card. Record it as a separate quant row, not as a `Q6_K_M` single-GPU number
 - Plus `graph` for `ik` only — **blocked until the NCCL rebuild**
 - Full prefill depth list + tg128, `-r 3`
 
@@ -227,9 +231,16 @@ decoding. Per-engine flags are in METHODOLOGY.md and **differ meaningfully**
 **Done when:** H1 has a verdict with an acceptance rate to support it.
 
 ### Phase 3 — quant sweep
-Winning engine/split from Phases 1–2 × `Q4_K_M` / `Q5_K_M` / `Q6_K_M` ×
-tg128 + pp16384 only. Not the full depth sweep — this phase is about quant
+Winning engine/split from Phases 1–2 × `IQ3_S` / `Q4_K_M` / `Q5_K_M` / `Q6_K_M`
+× tg128 + pp16384 only. Not the full depth sweep — this phase is about quant
 choice, not re-confirming depth scaling.
+
+Run `IQ3_S` **twice**: once on `-sm layer` for the quant-curve row, and once on
+`-sm none` (single card, `CUDA_VISIBLE_DEVICES=0`) for the single-GPU reference
+that H6 needs and that every other quant is too large to provide. Expect its
+prefill to trail the K-quants — IQ dequantization is compute-heavy and sm_60 has
+no dp4a — so read it as the cost of single-GPU, not as a like-for-like quant
+comparison.
 
 ### Phase 4 — targeted hypothesis tests
 H2 (XL split-stall), H3 (stock quant quality), H4 (TurboQuant KV), H5 (NCCL),
@@ -246,9 +257,12 @@ running, the port scheme and quality scoring are not obvious from the script.
 ```
 
 Matrix: the winning engine/split from Phases 1–3 × each **drafter arm** —
-none (control), MTP, DFlash2-Q4, DFlash2-Q8. The DFlash2 arms are blocked on
-H8 (no engine here can load that drafter yet); run the first two arms
-meanwhile rather than waiting.
+none (control), MTP, DFlash2-Q4, DFlash2-Q8. All four are runnable as of
+2026-08-24; the DFlash2 arms require `engine = mainline` (see H8).
+
+Because `mainline` is a different engine, run its **own** no-drafter control as
+an arm. Comparing DFlash2-on-mainline against MTP-on-buun would confound drafter
+with engine, which is the one thing this repo exists to avoid.
 
 Each run claims an index and leaves its site hosted at `4000 + index`, so at
 the end every model version is browsable side by side.

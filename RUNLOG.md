@@ -218,3 +218,93 @@ rate comparison. Recorded in METHODOLOGY §4.
 
 Drafter arms for Phase 5 are now: none (control), MTP, DFlash2-Q4, DFlash2-Q8.
 The first two are runnable today; the DFlash2 arms are gated on H8.
+
+---
+
+## 2026-08-24 — DFlash2 unblocked: mainline PR #27342 added as a fourth engine
+
+The previous entry recorded DFlash2 as blocked because none of the three forks
+supports it. That was right about the forks and wrong to stop there — the
+operator pushed back, correctly. Upstream **`ggml-org/llama.cpp` PR #27342**
+("spec : add DFlash2 support (local convolution + candidate selector)") is the
+engine, and it builds for Pascal.
+
+PR state when checked (2026-08-24): **open**, `mergeable: MERGEABLE`, base
+`master`, branch `dflash2`, 16 files, +563/−7, last updated the same day. Not
+merged, so this is a PR build and must be re-checked before any `mainline`
+number is called reproducible from a release.
+
+Set up as a worktree so `master` stays clean and the PR can be refreshed:
+
+```bash
+cd /root/mainline-llama.cpp
+git fetch origin pull/27342/head:pr-27342
+git worktree add /root/dflash2-llama.cpp pr-27342     # 64f765f5
+cmake -B build-cuda-p100 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60 \
+      -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
+```
+
+`LLAMA_CURL=OFF` because there are no libcurl dev headers here and every model
+is local. OpenSSL is likewise absent — cpp-httplib warns and drops HTTPS, which
+is irrelevant for a loopback server.
+
+**Pascal risk assessed before building, not after.** mainline still documents
+`60 == P100, FP16 CUDA intrinsics` in `ggml/src/ggml-cuda/CMakeLists.txt`, and
+CUDA 12.0 takes the `VERSION_LESS "13"` branch. The PR's only new CUDA kernel,
+`ggml/src/ggml-cuda/top-k.cu` (a two-stage tiled top-k), uses shared memory and
+`__syncthreads()` and nothing else — no sm_70 warp reductions, no tensor cores,
+no async copy, no bf16. It compiled clean for `sm_60`.
+
+### The v1-silently-runs risk is now confirmed, not hypothetical
+
+PR #27342 adds **no new `--spec-type` value**. The same `draft-dflash` runs v1 or
+v2, decided by draft metadata in `common/speculative.cpp`:
+
+```cpp
+selector_top_k = llama_model_dflash_selector_top_k(model_dft);
+is_dflash2     = selector_top_k > 0;
+```
+
+So a `buun`/`ik` run with a v2 drafter takes the v1 path on an identical command
+line and reports plausible-looking numbers. Recorded as a failure mode in
+RUNBOOK §5: confirm the selector loaded before recording anything as DFlash2.
+
+Both drafters were verified as genuine v2 by metadata rather than filename:
+`dflash.selector_rank = 256`, `dflash.selector_top_k = 16`, plus
+`selector_hidden` / `selector_predecessor` / `selector_successor` tensors — the
+exact tensors the PR adds mappings for. Actual sizes 1.06 GiB (Q4_K_M) and
+1.92 GiB (Q8_0), smaller than the ~1.1/2.0 GB first assumed.
+
+### The dual-GPU concern does not apply here
+
+Flagged earlier as a possible blocker on the strength of `buun`'s
+`n_devices() > 1` guard. That guard is `buun`-specific — it disables
+`parent_ids_gpu` **tree** verification. Mainline has no tree-verify path at all
+(`parent_ids` appears nowhere in `src/` or `common/`), and the PR's selector
+emits a **linear** draft: it walks a predecessor chain and `push_back`s a flat
+sequence, verified the ordinary way with no device restriction. The only
+`n_devices() > 1` in mainline's context is the unrelated pipeline-parallelism
+check.
+
+Conclusion: DFlash2 should run on `-sm layer` across both cards. This is a code
+reading and still needs an empirical load check — H8 step 1.
+
+## 2026-08-24 — `UD-IQ3_S` added to the quant sweep
+
+Operator downloaded `Qwen3.8-27B-UD-IQ3_S.gguf` (~11 GiB) to make single-GPU
+DFlash2 testing possible if the dual-GPU path misbehaves.
+
+It earns a permanent place in Phase 3 for a second reason: **it is the only
+target that fits one 16 GiB P100 with a usable KV cache.** The Phase 1 `none`
+leg is currently recorded as blocked — "21.5 GB model doesn't fit one 16 GB
+card, `failed to load model`" — which also blocks the single-vs-dual comparison
+H6 needs. `IQ3_S` unblocks it. Phase 3 now runs it twice: `-sm layer` for the
+quant-curve row, `-sm none` for the single-GPU reference.
+
+Caveat recorded in METHODOLOGY: expect its prefill to trail the K-quants. IQ
+dequantization is compute-heavy and sm_60 has no dp4a, so its numbers measure
+the cost of single-GPU operation, not a like-for-like quant comparison.
+
+**Disk pressure.** `/` hit 94% during this work (11 GiB free) with five 15–22 GiB
+targets, the IQ3_S download, and the new build all resident. Not yet a failure,
+but the next large download needs space cleared first.

@@ -14,10 +14,10 @@ run label so the evidence is traceable.
 | H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
 | H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
 | H5 | NCCL is harmful for split inference | **Partly confirmed — worse than claimed** |
-| H6 | `-sm graph` is the best split mode | Untested (blocked by H5) |
+| H6 | `-sm graph` is the best split mode | Untested (`graph` blocked by H5; single-GPU leg unblocked by IQ3_S) |
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
-| H8 | DFlash2 is worth using on this rig | **Blocked — no engine supports it** |
-| H9 | Q8 drafter beats Q4 by more than it costs | Untested |
+| H8 | DFlash2 is worth using on this rig | Untested — **unblocked**, `mainline` engine built |
+| H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
 
 ---
 
@@ -171,42 +171,70 @@ fork and may not apply to all three.
 **Context:** DFlash v1 and PFlash were excluded from testing after the operator
 found both too lossy on these cards — v1 also regularly mangled tool calls.
 **DFlash2 is a different drafter** (separate checkpoint, separate upstream PR,
-adds a candidate-path selector v1 lacks), so that verdict is being re-opened for
-it specifically. The v1/PFlash exclusion still stands.
+adds a candidate selector v1 lacks), so that verdict is being re-opened for it
+specifically. The v1/PFlash exclusion still stands.
 
 **Claim:** DFlash2 gives a materially better decode speedup than the MTP head on
 Qwen3.8-27B, without breaking tool calls.
 
-**Status: blocked — none of the three engines can load it.**
+**Status: unblocked and ready to test.** The earlier "no engine supports it"
+verdict was right about the three forks and wrong to stop there — upstream
+`ggml-org/llama.cpp` **PR #27342** is the engine, and it builds for `sm_60`.
+Now the fourth engine `mainline` (METHODOLOGY §3).
+
+### Why the forks can't do this
 
 | Engine | DFlash support | Verdict |
 |---|---|---|
 | `pflash` | none (`--spec-type` offers only `mtp`, `ngram-*`) | Can't |
 | `buun` | DFlash **v1** (`draft-dflash`) + DSpark; docs cite PR #22105 | Wrong version |
 | `ik` | `dflash`, `dspark` | Wrong version (same lineage) |
+| `mainline` | PR #27342 — v1 **and** v2, auto-detected | ✅ |
 
-The `z-lab/Qwen3.8-27B-DFlash2-GGUF` model card requires **llama.cpp PR
-#27342**. `buun` has no commit referencing #27342, and no candidate-path
-selector in `common/speculative.cpp` — searched, absent. The v1 loader may
-accept the v2 GGUF and silently draft without the selector, which would look
-like poor acceptance rather than a clean error. **Don't report a v1-loader
-number as a DFlash2 result.**
+The v1-silently-runs risk identified earlier is now concrete and confirmed. PR
+#27342 adds **no new `--spec-type` value**: the same `draft-dflash` selects v1 or
+v2, and `common/speculative.cpp` branches on draft metadata —
 
-**Remaining work:**
-1. Try loading a DFlash2 GGUF on `buun` with `--spec-type draft-dflash`. Cheap,
-   and settles whether it errors or silently degrades. Record which.
-2. If it doesn't work: build upstream llama.cpp at PR #27342 for `sm_60` as a
-   fourth engine. Unknown whether that branch still compiles for Pascal — that
-   is the real risk, not the drafter.
-3. Only then run the Phase 5 drafter matrix.
+```cpp
+selector_top_k = llama_model_dflash_selector_top_k(model_dft);
+is_dflash2     = selector_top_k > 0;
+```
 
-**Also relevant:** `buun`'s `CLAUDE.md` notes DFlash tree verify
-(`parent_ids_gpu`) is **GPU-0 only and auto-disabled when `n_devices() > 1`**
-(`src/llama-context.cpp:3343`). On this dual-GPU rig the tree path is off by
-construction. If DFlash2's selector depends on it, DFlash2 may be
-single-GPU-only here — which would make it a `-sm none` configuration and put it
-in direct conflict with using both cards. Worth checking before investing in the
-build.
+Our drafters carry `dflash.selector_top_k = 16`, so mainline takes the v2 path.
+A v1 loader reads no such key, takes the v1 path, and the command line looks
+identical. **Confirm from the log that the selector loaded before recording any
+number as DFlash2.**
+
+### The multi-GPU concern does not apply to mainline
+
+This was flagged as a possible blocker; it isn't. The GPU-0-only restriction is
+`buun`-specific — its `parent_ids_gpu` **tree** verification, auto-disabled at
+`n_devices() > 1` (`src/llama-context.cpp:3343`). Mainline has no tree-verify
+path at all: `parent_ids` does not appear anywhere in its `src/` or `common/`,
+and PR #27342's selector emits a **linear** draft, walking a predecessor chain
+one token at a time and `push_back`-ing a flat sequence. That is verified the
+ordinary way and carries no device restriction. The only `n_devices() > 1` guard
+in mainline's context is the unrelated pipeline-parallelism check.
+
+So DFlash2 should work on `-sm layer` across both cards. **Still verify it
+empirically** — that is a code reading, not a run.
+
+### Test
+
+1. Load check on `mainline` with `-sm layer` — confirm the selector is picked up
+   and both cards are used. Cheap; do it first.
+2. Phase 2-style decode comparison: none / MTP / DFlash2-Q4 / DFlash2-Q8, same
+   target and split, acceptance rate recorded alongside t/s.
+3. Phase 5 web-bench for the tool-calling stress test — where v1's mangling
+   showed up, and the reason this hypothesis matters beyond throughput.
+4. **Single-GPU leg** (operator's request): if dual-GPU DFlash2 misbehaves
+   despite the above, re-run on one card with `UD-IQ3_S` and `-sm none`. That
+   quant exists precisely to make this possible.
+
+**Note:** `mainline` is a different engine from the three in Phases 1–3, so its
+numbers are not directly comparable to theirs. Run the none-drafter control
+*on mainline* as the baseline for H8/H9 — comparing DFlash2-on-mainline against
+MTP-on-buun would confound drafter with engine.
 
 ---
 
@@ -229,6 +257,13 @@ The VRAM side matters here specifically: at `UD-Q6_K_M` (21.5 GiB of a 32 GiB
 pool) the drafter competes with KV cache for what's left, so the comparison is
 decode t/s *at equal context*, not decode t/s alone.
 
-**Status:** Untested, and gated on H8 — there is no engine to run it on yet.
-Phase 5 is where it gets stress-tested against real tool-calling work, which is
-where DFlash v1's mangling showed up and where a bad drafter will show up again.
+**Status:** Untested. **No longer gated** — both drafters are on disk, verified
+as genuine v2, and `mainline` can load them. Phase 5 is where it gets
+stress-tested against real tool-calling work, which is where DFlash v1's mangling
+showed up and where a bad drafter will show up again.
+
+Note the VRAM figures are smaller than first assumed: 1.06 GiB (Q4_K_M) vs
+1.92 GiB (Q8_0), a 0.86 GiB difference. Beside a 21.5 GiB target in a 32 GiB
+pool that is a real but modest KV trade; beside an 11 GiB `IQ3_S` target on a
+single 16 GiB card it is the difference that may decide whether the config fits
+at all.

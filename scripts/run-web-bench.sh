@@ -2,7 +2,7 @@
 # Phase 5: agentic web-build benchmark for one model version.
 #
 # Usage: ./scripts/run-web-bench.sh <engine> <model-path> <split-mode> <label> <index> [extra llama-server args...]
-#   engine      pflash | buun | ik
+#   engine      pflash | buun | ik | mainline
 #   split-mode  see METHODOLOGY.md -- support differs per engine
 #   label       e.g. p5-buun-layer-q6k-mtp   (folder, systemd unit, and commit message all key off this)
 #   index       0,1,2,... unique per model version. Every port derives from it, so
@@ -47,7 +47,8 @@ case "$ENGINE" in
     pflash) BIN=/root/pflash-llama.cpp/build-cuda-p100/bin/llama-server ;;
     buun)   BIN=/root/buun-llama-cpp/build-cuda-p100/bin/llama-server ;;
     ik)     BIN=/root/ik_llama.cpp/build/bin/llama-server ;;
-    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik)" >&2; exit 2 ;;
+    mainline) BIN=/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-server ;;
+    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|mainline)" >&2; exit 2 ;;
 esac
 
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }
