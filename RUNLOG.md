@@ -459,3 +459,75 @@ already selects F16 for quantized mat-muls on fast-FP16 hardware, which P100 is.
 of record for proving H2 numerically.
 
 Added as **Phase 6** in RUNBOOK §7, ordered cheapest-and-most-applicable first.
+
+---
+
+## 2026-08-24 — H11 (drafter placement) run: refuted, plus an upstream abort
+
+10 arms on `mainline`, target `UD-Q4_K_M`, `-sm layer`, `-c 4096`, 400 tokens,
+temp 0, seed 42, 3 reps: {MTP-Q4_0, DFlash2-Q4_K_M, DFlash2-Q8_0} x {default,
+`-devd CUDA0`, `-devd CUDA1`} plus a no-drafter control. 8 arms produced data,
+2 aborted. New harness: `scripts/run-spec-placement.sh` + `scripts/run-h11-matrix.sh`.
+
+**H11 is refuted.** Decode spread within a drafter is <=0.15% — MTP
+14.11/14.12/14.11 t/s across its three placements, DFlash2-Q4 14.46/14.48.
+Acceptance was identical across placements of the same drafter to the exact
+draft-token count (MTP 228/513 in all three), which is what makes this a real
+null and not a noisy one: had anything but locality moved, acceptance would have
+moved with it. VRAM did shift between cards (GPU0 8647-10291 MiB), so the flag
+demonstrably works — decode just does not care. `-devd`/`-otd` come out of the
+Phase 5 matrix.
+
+I had predicted `-devd CUDA1` would win, on the reasoning that the last target
+layers and sampling live there under `-sm layer`. It did not; nothing did.
+
+### `-devd CUDA0` aborts with any DFlash2 drafter
+
+Reproducible on both quants, at load, before a single token:
+
+```
+llama_init_from_model: failed to initialize the context: dflash requires ctx_other to be set
+srv load_model: [spec] failed to measure draft model memory
+ggml-backend.cpp:930: pre-allocated tensor (output.weight) in a buffer (CUDA1)
+                      that cannot run the operation (NONE)   -> ggml_abort
+```
+
+The DFlash2 drafter GGUF ships **neither `output.weight` nor
+`token_embd.weight`** (checked with `gguf.GGUFReader`; it has 81 tensors and
+only `output_norm.weight` of that group) and borrows the target's through
+`cparams.ctx_other`. Under `-sm layer` the target's `output.weight` is on the
+last device, CUDA1. `-devd CUDA0` restricts the draft context to CUDA0, the
+borrowed tensor is then in a buffer the draft scheduler may not use, ggml aborts.
+
+That single fact predicts the whole matrix: MTP carries its own copies of both
+tensors, so all three of its placements load; DFlash2 survives `default` (both
+devices permitted) and `CUDA1` (where the tensor already is) and fails only on
+`CUDA0`. Not a VRAM limit — GPU0 had ~6 GiB free. Upstream bug in PR #27342.
+
+### First controlled speculative-decoding speedups
+
+The no-drafter control on the same engine/tool/context is **12.79 t/s**, so:
+MTP **+10.3%**, DFlash2 **+13.0%**. The earlier uncontrolled 9.45 -> 16.10 t/s
+pairing implied ~70%; it differed in engine, tool *and* context depth and should
+not be quoted. Also worth noting acceptance does not translate proportionally —
+DFlash2 accepts 45.8% of drafted tokens and returns 13%, because the verify pass
+is not cheap on P100.
+
+### H9 evidence, unplanned
+
+DFlash2-Q8_0 accepted **228/513 = 44.4%**; DFlash2-Q4_K_M accepted
+**231/504 = 45.8%**, ran fractionally faster (14.48 vs 14.46 t/s) and used
+**0.87 GiB less VRAM**. One prompt at temp 0 — exact, but not general. The Q8
+drafter currently has no measured advantage to justify its footprint.
+
+### Process notes
+
+- **`prefill_tps` in this CSV is not usable.** `cache_prompt: false` did not
+  defeat the server's slot-level LCP prefix reuse (`f_sim_best = 1.000` in the
+  logs), so reps 2-3 skip most of prefill — rep 1 read 22.40 t/s and rep 2
+  43.72. Decode and acceptance are unaffected. Any future prefill measurement
+  needs a distinct prompt per rep, not a cache flag.
+- **Rep 1 is a cold-cache outlier** and is excluded from the means; the reported
+  figure is the rep 2-3 mean. First load took 182s at ~112 MB/s disk-bound;
+  subsequent loads of the same target hit page cache and took 10-35s.
+- Peak temp across all 10 arms was 60°C, 23°C under the 83°C limit.

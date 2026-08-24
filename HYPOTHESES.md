@@ -380,7 +380,27 @@ default (split), `-devd CUDA0`, `-devd CUDA1`. Record decode t/s **and
 acceptance rate**; placement should not change acceptance, so a change there
 means something else moved.
 
-**Status:** Untested. Cheap — same load, three short runs.
+**Status: REFUTED** (2026-08-24, `results/h11-placement.csv`).
+
+Ran all three drafters x three placements plus a no-drafter control, 3 reps each.
+Decode spread within a drafter is <=0.15% — 14.11/14.12/14.11 t/s for MTP,
+14.46/14.48 for DFlash2-Q4. Acceptance was identical across placements of the
+same drafter down to the exact draft-token count, confirming placement was the
+only thing that moved. VRAM did shift between cards (GPU0 8647-10291 MiB), so
+the flag works; decode simply does not care.
+
+Consequence: `-devd`/`-otd` are **not** a tuning knob on this rig and can be
+dropped from the Phase 5 matrix. Use `default` and spend the runs elsewhere.
+
+Two things fell out that H11 was not looking for:
+
+- **`-devd CUDA0` aborts with any DFlash2 drafter** at load. The drafter GGUF
+  has no `output.weight`/`token_embd.weight` and borrows the target's via
+  `ctx_other`; under `-sm layer` that tensor is on CUDA1, so restricting the
+  draft context to CUDA0 makes it unreachable and ggml aborts. Upstream bug in
+  PR #27342. MTP is immune — it ships its own copies. See RESULTS.md Phase 6.
+- **H9 evidence:** the Q8 drafter accepted *less* than the Q4 (44.4% vs 45.8%)
+  for +0.87 GiB. Recorded there rather than here.
 
 ---
 

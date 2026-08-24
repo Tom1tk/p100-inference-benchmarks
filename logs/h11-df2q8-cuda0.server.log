@@ -1,0 +1,76 @@
+0.00.064.682 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.351.297 W srv  llama_server: -----------------
+0.00.351.302 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.351.303 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.351.303 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.351.304 W srv  llama_server: -----------------
+0.00.352.715 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+0.01.042.292 E llama_init_from_model: failed to initialize the context: dflash requires ctx_other to be set (this warning is normal during memory fitting)
+0.01.105.709 W srv    load_model: [spec] failed to measure draft model memory: failed to create llama_context from model
+0.02.614.152 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.02.614.171 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.02.614.206 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.02.614.222 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.02.614.238 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.02.614.272 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.02.614.288 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.02.614.303 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.02.614.319 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.02.614.333 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.02.614.350 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.02.614.365 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.02.614.382 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.02.614.402 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.02.614.435 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+0.32.867.493 I cmn          init: llama threadpool init, n_threads = 8
+0.33.016.637 I common_speculative_init_result: loading draft model '/root/Qwen3.8-27B-DFlash2-Q8_0.gguf'
+/root/dflash2-llama.cpp/ggml/src/ggml-backend.cpp:930: pre-allocated tensor (output.weight) in a buffer (CUDA1) that cannot run the operation (NONE)
+[New LWP 31735]
+[New LWP 31734]
+[New LWP 31733]
+[New LWP 31732]
+[New LWP 31731]
+[New LWP 31730]
+[New LWP 31729]
+[New LWP 31728]
+[New LWP 31727]
+[New LWP 31726]
+[New LWP 31725]
+[New LWP 31724]
+[New LWP 31723]
+[New LWP 31722]
+[New LWP 31721]
+[New LWP 31720]
+[New LWP 31719]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x0000771c54910813 in __GI___wait4 (pid=31781, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+#0  0x0000771c54910813 in __GI___wait4 (pid=31781, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x0000771c54f4d6c3 in ggml_print_backtrace () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#2  0x0000771c54f4d86b in ggml_abort () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#3  0x0000771c54f6729c in ggml_backend_sched_backend_id_from_cur(ggml_backend_sched*, ggml_tensor*) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#4  0x0000771c54f69274 in ggml_backend_sched_split_graph () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#5  0x0000771c53f0083b in llama_context::graph_reserve(unsigned int, unsigned int, unsigned int, llama_memory_context_i const*, bool, unsigned long*) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#6  0x0000771c53f00db2 in llama_context::resolve_fused_ops(llama_memory_context_i const*, unsigned int) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#7  0x0000771c53f01d53 in llama_context::sched_reserve() () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#8  0x0000771c53f02fc9 in llama_context::llama_context(llama_model const&, llama_context_params) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#9  0x0000771c53f042a4 in llama_init_from_model () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#10 0x0000771c544ec55d in common_speculative_init_result::common_speculative_init_result(common_params&, llama_model*, llama_context*) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-common.so.0
+#11 0x0000771c544ec7e6 in common_speculative_init_from_params(common_params&, llama_model*, llama_context*) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-common.so.0
+#12 0x0000771c551c37d4 in server_context_impl::load_model(common_params&) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-server-impl.so
+#13 0x0000771c550f411f in llama_server(common_params&, int, char**) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-server-impl.so
+#14 0x0000771c550f5626 in llama_server(int, char**) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-server-impl.so
+#15 0x0000771c5482a1ca in __libc_start_call_main (main=main@entry=0x58272385c270 <main>, argc=argc@entry=27, argv=argv@entry=0x7ffc79ae6568) at ../sysdeps/nptl/libc_start_call_main.h:58
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+#16 0x0000771c5482a28b in __libc_start_main_impl (main=0x58272385c270 <main>, argc=27, argv=0x7ffc79ae6568, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffc79ae6558) at ../csu/libc-start.c:360
+warning: 360	../csu/libc-start.c: No such file or directory
+#17 0x000058272385c2a5 in _start ()
+[Inferior 1 (process 31707) detached]
