@@ -308,3 +308,68 @@ the cost of single-GPU operation, not a like-for-like quant comparison.
 **Disk pressure.** `/` hit 94% during this work (11 GiB free) with five 15–22 GiB
 targets, the IQ3_S download, and the new build all resident. Not yet a failure,
 but the next large download needs space cleared first.
+
+---
+
+## 2026-08-24 — DFlash2 confirmed working on dual P100s
+
+`h8-loadcheck-df2q4`. First DFlash2 inference on this rig, and the answer to the
+dual-GPU question that was flagged as a possible blocker.
+
+Command:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 /root/dflash2-llama.cpp/build-cuda-p100/bin/llama-server \
+  -m /root/Qwen3.8-27B-UD-Q6_K_M.gguf \
+  -md /root/Qwen3.8-27B-DFlash2-Q4_K_M.gguf \
+  --spec-type draft-dflash --spec-draft-n-max 7 \
+  -ngl 99 -ngld 99 -fa 1 -t 8 -c 4096 -sm layer --jinja
+```
+
+Result: loaded in 4m40s, **13.8 GiB on GPU0 and 15.0 GiB on GPU1**, decode
+**16.10 t/s** at **57.0% acceptance** (239 of 419 drafted), output correct and
+unmangled. Peak 49°C.
+
+**Dual-GPU works.** The `buun` `n_devices() > 1` tree-verify restriction does not
+apply to mainline, exactly as the code reading predicted. The single-GPU `IQ3_S`
+path remains valuable as a quant row and the H6 single-GPU reference, but is not
+needed to rescue DFlash2.
+
+**Do not quote 16.10 t/s as "the" DFlash2 number.** One prompt, 300 tokens,
+greedy, 4k context, via the server rather than `llama-bench`. Comparing it to the
+Phase 1 tg128 of 9.45 t/s suggests ~1.7× but confounds drafter with engine, tool,
+and context depth — the exact mistake this repo exists to avoid. mainline's own
+no-drafter control is the next run.
+
+### Two useful findings
+
+**Acceptance rate is free.** The response `timings` object carries `draft_n` and
+`draft_n_accepted`. `scripts/web_bench_metrics.py` already records the full
+timings object, so Phase 5 gets per-request acceptance with no code change and no
+log parsing — and it sidesteps the v1/v2 verification problem entirely, since the
+startup log prints the shared dflash params but not the branch taken.
+
+**Benign-looking startup lines that are not failures**, now that a successful run
+is on record to compare against:
+
+- `dflash requires ctx_other to be set (this warning is normal during memory
+  fitting)` — self-labelled, appears on a healthy load.
+- `[spec] failed to measure draft model memory` — follow-on from the above.
+- `common_fit_params: failed to fit params ... n_gpu_layers already set by user
+  to 99, abort` — auto-fit declining because `-ngl` was pinned. Note the
+  consequence: **mainline will not shed layers to make a too-large config fit**;
+  a genuine VRAM overflow fails hard.
+- `model has unused tensor blk.64.*` — the target's own MTP head being ignored
+  because an external drafter was supplied. Correct, and a useful confirmation
+  that DFlash2 rather than `nextn` is driving speculation.
+
+### Process note
+
+A health poll of `curl -s .../health` reported success against an HTTP 503
+`{"error":"Loading model"}` and produced a false "server up". `run-web-bench.sh`
+was checked and is **not** affected — it uses `curl -sf`, where `-f` makes 5xx
+non-zero. Recorded because the failure mode is silent: the ad-hoc check looked
+like it had worked.
+
+**Disk:** operator added 25 GB mid-session; `/` now 197 GB total, 30 GB free
+(85%). The earlier 97% pressure is resolved.
