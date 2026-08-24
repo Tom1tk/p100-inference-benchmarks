@@ -18,6 +18,9 @@ run label so the evidence is traceable.
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
 | H8 | DFlash2 is worth using on this rig | **Runs on both GPUs, 57% acceptance** — speedup unquantified |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
+| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | Untested |
+| H11 | Drafter placement across the two cards matters | Untested |
+| H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (blocked by H5) |
 
 ---
 
@@ -303,3 +306,96 @@ Note the VRAM figures are smaller than first assumed: 1.06 GiB (Q4_K_M) vs
 pool that is a real but modest KV trade; beside an 11 GiB `IQ3_S` target on a
 single 16 GiB card it is the difference that may decide whether the config fits
 at all.
+
+---
+
+## H10 — Inter-GPU transport is leaving performance on the table
+
+**Claim:** the default inter-GPU data path is not the best one available on this
+rig, and two runtime switches can change it without a rebuild.
+
+**Two specific findings behind this** (mainline, read from
+`ggml/src/ggml-cuda/ggml-cuda.cu`):
+
+1. **Peer access is off by default.** `cudaDeviceEnablePeerAccess` is called only
+   when `GGML_CUDA_P2P` is set in the environment. These cards *can* peer —
+   verified with a direct `cudaDeviceCanAccessPeer` probe: `1` in both
+   directions, PHB topology, single NUMA node. So every cross-GPU copy currently
+   staged through host memory could plausibly go card-to-card instead.
+
+2. **The AllReduce backend is selectable at runtime.**
+
+   ```cpp
+   const char * env = getenv("GGML_CUDA_ALLREDUCE");
+   if (!env) { /* Linux default */ ggml_backend_cuda_comm_init_nccl(ret); }
+   // else: "nccl" | "internal" | "none"
+   ```
+
+   `internal` is a **dedicated two-device pipeline** — it warns
+   `internal AllReduce init failed (n_devices != 2?)` and falls back, meaning
+   the fast path is written for exactly this rig's shape. `none` is a
+   meta-backend butterfly.
+
+**This is H5's other half.** H5 established that NCCL AllReduce *fails outright*
+on `ik` (`ncclAllReduce failed with status 1`) and required a rebuild with
+`-DGGML_NCCL=OFF`. Mainline is different in two ways worth recording:
+`GGML_CUDA_NCCL:BOOL=ON` was auto-detected in our build (NCCL **is** linked, and
+is the Linux default), **but** it is switchable per-run by env var rather than by
+rebuild. The `h8-loadcheck-df2q4` run succeeded on `-sm layer` because layer
+split needs no AllReduce — the NCCL path is not exercised there. A `-sm row`
+run on mainline may well hit the same failure `ik` did.
+
+**Test:**
+
+1. `-sm row` on mainline with `GGML_CUDA_ALLREDUCE` unset (NCCL, default) —
+   does it reproduce `ik`'s abort? Cheap and settles whether H5 is
+   engine-specific or rig-wide.
+2. Same, with `GGML_CUDA_ALLREDUCE=internal`, then `=none`. Three-way.
+3. `GGML_CUDA_P2P=1` vs unset on `-sm layer` at fixed everything else. This one
+   applies to the *current* working config, so it is the highest-value cheap
+   test in this hypothesis.
+
+Record `nvidia-smi` per-GPU utilization alongside throughput — the mechanism
+claim is about transfer stalls, so utilization is the evidence, not just t/s.
+
+---
+
+## H11 — Drafter placement matters
+
+**Claim:** where the draft model lives changes decode throughput on a two-card
+split.
+
+**Reasoning:** with `-sm layer` the target's layers are spread across both cards,
+so every draft/verify cycle crosses the PCIe link. The drafter is small
+(1.06–1.92 GiB) and could sit entirely on one card via `-devd`, or be placed
+per-tensor with `-otd`. Whether pinning it helps (locality, no split overhead) or
+hurts (contention with the target's layers on that card, and it is then remote
+from half the target) is genuinely unclear.
+
+This interacts with H9: the Q8 drafter is 0.86 GiB larger, so placement and
+quantisation trade against each other for VRAM on whichever card holds it.
+
+**Test:** fixed target/split/context, DFlash2-Q4, varying only placement —
+default (split), `-devd CUDA0`, `-devd CUDA1`. Record decode t/s **and
+acceptance rate**; placement should not change acceptance, so a change there
+means something else moved.
+
+**Status:** Untested. Cheap — same load, three short runs.
+
+---
+
+## H12 — `ik`'s graph-split knobs change the `-sm graph` verdict
+
+**Claim:** `-sm graph` was the prior known-good baseline for this rig, and `ik`
+ships tuning flags for it that have never been exercised:
+
+| Flag | Default | Hypothesis |
+|---|---|---|
+| `-smf16` / `-smf32` / `-grt` | f16 | Inter-GPU exchange precision. P100 has native 2:1 FP16 and no NVLink, so f16 exchange should already be the right default — but `-grt` allows other types and this has never been checked |
+| `-gap` | f16 | Flash-attn precision under graph split |
+| `-smgs` | 0 | Force graph scheduling |
+| `-sas` | 0 | Async compute-graph evaluation — the most likely to matter for overlapping PCIe transfer with compute |
+
+**Status:** Untested and **blocked by H5** — `-sm graph` aborts on the current
+NCCL-linked `ik` build. Rebuild with `-DGGML_NCCL=OFF` first; these knobs are
+only reachable once graph split runs at all.

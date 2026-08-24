@@ -161,6 +161,7 @@ Do not just retry. Failures are results.
 |---|---|---|
 | `ncclAllReduce failed with status 1`, abort at `reduce.cu:169` | `ik_llama` built with NCCL (`GGML_NCCL` defaults **ON**); no NVLink on this rig | Rebuild ik_llama with `-DGGML_NCCL=OFF` |
 | `error: invalid parameter for argument: -sm` | Split mode not supported by that engine | Check the per-engine matrix in METHODOLOGY.md |
+| `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'` | `-sm tensor` is arch-gated and `qwen35` isn't on the list — in any engine | Not a bug and not fixable here. Usable split modes for this model are `none`/`layer`/`row`, plus `graph` on `ik` |
 | Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
 | No `pp0` row in output | `-p 0` is a no-op prefill and is silently omitted | Expected, not a bug |
 | Load appears hung, GPUs idle | Normal model load, or disk contention | See §2 timing table |
@@ -270,6 +271,27 @@ the end every model version is browsable side by side.
 **Done when:** every drafter arm has a total task time, token count, and
 prefill/decode avg/min/max, plus a hand-scored quality verdict — or a recorded
 reason it couldn't produce one. Answers H9 and the practical half of H1/H8.
+
+### Phase 6 — dual-GPU transport and placement (H10–H12)
+Added 2026-08-24 after a survey found several untouched inter-GPU controls.
+These are cheap, mostly runtime-switchable, and apply to whichever config wins
+Phases 1–3. Full knob list in METHODOLOGY §3.
+
+Highest value first:
+
+1. `GGML_CUDA_P2P=1` vs unset on the current working `-sm layer` config. Peer
+   access is **off by default** in mainline and these cards can peer.
+2. `GGML_CUDA_ALLREDUCE` three-way (`nccl` default / `internal` / `none`) on
+   `-sm row`, which is the mode that actually exercises AllReduce.
+3. Drafter placement: default vs `-devd CUDA0` vs `-devd CUDA1`.
+4. `ik` graph knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) — **after** the
+   `-DGGML_NCCL=OFF` rebuild unblocks `-sm graph`.
+
+Record per-GPU utilization from the temps log alongside throughput. These
+hypotheses are about transfer stalls, so utilization is the evidence.
+
+**Trap:** any `-ot` override silently disables pipeline parallelism. Compare
+`-ot` runs against a no-`-ot` control, never against the Phase 1 baseline.
 
 ### Deferred
 Context depths beyond 16k; power-limit experiment (175W vs 200W+ — log as a
