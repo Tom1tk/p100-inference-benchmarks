@@ -138,3 +138,83 @@ blocked rather than re-run.
 Note: this run occurred while the disk was at 100% usage (before a +25GB
 resize), but the model file was intact and loaded successfully moments later
 in layer mode, so the disk state was not the cause.
+
+---
+
+## 2026-08-24 — Phase 5 added: agentic web-build benchmark
+
+Added a final phase that measures **usability** rather than throughput: `pi`
+drives each model version through a three-stage one-shot task (build an Express
+site about itself, restyle it with a working JS interactive, add a canvas
+mini-game in a separate static file). Procedure in
+[WEB_BENCH.md](WEB_BENCH.md).
+
+Per-request prefill/decode t/s are captured by a recording proxy
+(`scripts/web_bench_metrics.py`) between the agent and `llama-server`. A proxy
+rather than log-scraping because all three engines emit the same `timings`
+object in their OpenAI-compatible responses but their log formats differ —
+verified in `tools/server/server-task.cpp` (pflash, buun) and
+`examples/server/server-task.cpp` (ik).
+
+**Port scheme changed from the original prompt.** The prompt hardcoded
+`localhost:4000`, so only one site could be hosted at a time. Every port now
+derives from a per-run index: site `4000+i`, server `8100+i`, proxy `8200+i`.
+Sites are deliberately left running, so at the end of the phase every model
+version is browsable side by side. The prompt also now pins the systemd unit
+name to the run label, which the original didn't — without that the units
+collide even with distinct ports.
+
+Verified before wiring anything up, against a mock OpenAI server:
+
+- `pi` resolves a local provider from `models.json` with
+  `api: "openai-completions"`, and uses **streaming** at
+  `/v1/chat/completions`.
+- **`PI_OFFLINE=1` is required.** Without it `pi` blocks on startup network
+  operations in this environment and never issues a request — it looks exactly
+  like a model hang. The script sets it; recorded in RUNBOOK §5.
+- The proxy records correct per-stage timings through both the streaming and
+  non-streaming paths, and `summarize` reduces them to avg/min/max.
+
+The agent's `pi` config is written per-run under `sites/<label>/.pi-agent/`;
+the operator's `~/.pi/agent` is never modified.
+
+---
+
+## 2026-08-24 — DFlash2 re-opened, and blocked
+
+The operator asked to revisit DFlash2 after previously writing off DFlash as
+too lossy and prone to mangling tool calls. **The exclusion is correctly
+re-opened** — DFlash2 is a different drafter, not a newer build of the same one:
+separate checkpoint, separate upstream PR (#27342 vs #22105), and a
+candidate-path selector v1 doesn't have. The PFlash / DFlash-v1 exclusion still
+stands. METHODOLOGY §5 amended accordingly.
+
+**It cannot run here yet.** Engine survey:
+
+| Engine | `--spec-type` offers | DFlash2? |
+|---|---|---|
+| `pflash` | `mtp`, `ngram-*` only | No DFlash at all |
+| `buun` | `draft-dflash`, `draft-dspark`, `dflash` | v1 — docs cite #22105 |
+| `ik` | `dflash`, `dspark` | v1, same lineage |
+
+No commit in `buun` references #27342, and `common/speculative.cpp` has no
+candidate-path selector. Risk noted in H8: the v1 loader may *accept* a v2 GGUF
+and silently draft without the selector, which would present as poor acceptance
+rather than a clean error. A v1-loader number must not be recorded as a DFlash2
+result.
+
+Second concern, from `buun`'s own `CLAUDE.md` and `src/llama-context.cpp:3343`:
+DFlash tree verify (`parent_ids_gpu`) is GPU-0 only and **auto-disabled when
+`n_devices() > 1`**. On this dual-GPU rig that path is off by construction. If
+DFlash2's selector depends on it, DFlash2 may be single-GPU-only here.
+
+Also established while answering a drafter-pairing question, and worth keeping:
+**speculative decoding on these engines is output-preserving.** The target
+verifies every drafted token over its full vocabulary, and none of the three
+engines exposes a lenient-acceptance flag (`--spec-draft-p-min` gates drafting,
+not acceptance). So drafter choice and drafter quantisation are speed/VRAM
+variables, not quality ones — which makes H9 (Q4 vs Q8 drafter) an acceptance
+rate comparison. Recorded in METHODOLOGY §4.
+
+Drafter arms for Phase 5 are now: none (control), MTP, DFlash2-Q4, DFlash2-Q8.
+The first two are runnable today; the DFlash2 arms are gated on H8.

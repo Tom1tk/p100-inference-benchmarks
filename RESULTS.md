@@ -63,6 +63,30 @@ unblocked.
 
 ---
 
+## Phase 5 — agentic web-build benchmark
+
+Real one-shot agentic work, not synthetic prompts. Procedure and quality
+criteria in [WEB_BENCH.md](WEB_BENCH.md). Machine-readable: `results/web-bench.csv`.
+
+### Throughput and cost
+
+| Label | Idx | Engine | Model | Drafter | Total time | Tokens gen | Prefill avg/min/max | Decode avg/min/max | Peak temp |
+|---|---|---|---|---|---|---|---|---|---|
+| _pending_ | | | | | | | | | |
+
+Drafter arms per config: none (control) · MTP · DFlash2-Q4 · DFlash2-Q8.
+The DFlash2 arms are blocked — see H8.
+
+### Quality
+
+Hand-scored after each run. A model can be fast and still fail here.
+
+| Label | Stage 1 | Stage 2 | Stage 3 | One-shot? | Tool calls | Verdict |
+|---|---|---|---|---|---|---|
+| _pending_ | | | | | | |
+
+---
+
 ## Phase 4 — hypothesis tests
 
 | Hypothesis | Evidence | Verdict |
@@ -72,3 +96,5 @@ unblocked.
 | H4 (TurboQuant KV penalty) | _pending_ | |
 | H5 (NCCL harmful) | `phase0-ik-graph-q6k` | **Partly confirmed** — fails outright, not merely slower. See HYPOTHESES.md |
 | H7 (dispatch bug) | _pending_ | |
+| H8 (DFlash2 usable) | Engine survey — none of the three supports it | **Blocked.** Needs upstream PR #27342 built for sm_60. See HYPOTHESES.md |
+| H9 (Q8 vs Q4 drafter) | _pending_ | Gated on H8 |

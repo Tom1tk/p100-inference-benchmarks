@@ -120,6 +120,34 @@ All files present on disk under `/root/`:
 | `Qwen3.8-27B-Uncensored-noMTP-Q4_K_M.gguf` | non-Unsloth ("stock") | 15.41 GiB | H3 stock-quant degradation test. Filename implies no MTP head — confirm before use |
 | `mtp-Qwen3.8-27B-Q4_0.gguf` | — | 1.28 GiB | MTP draft head. Verified: `qwen35.nextn_predict_layers = 1`, arch matches base |
 
+### Drafters (speculative decoding)
+
+Three drafters are under test, plus a no-drafter control. All target
+Qwen3.8-27B and pair with **any** quantisation of it — a drafter is trained
+against a base model, not against a target quant.
+
+| Drafter | Source | Engines that can drive it | Status |
+|---|---|---|---|
+| _(none)_ | — | all | Control |
+| MTP head | `mtp-Qwen3.8-27B-Q4_0.gguf` (on disk, verified) | pflash, buun, ik | Ready |
+| DFlash2 Q4_K_M | `z-lab/Qwen3.8-27B-DFlash2-GGUF` (~1.1 GB) | **none yet** — see H8 | Downloading |
+| DFlash2 Q8_0 | `z-lab/Qwen3.8-27B-DFlash2-GGUF` (~2.0 GB) | **none yet** — see H8 | Downloading |
+
+**Speculative decoding here is output-preserving.** The target model verifies
+every drafted token over its full vocabulary, so drafter choice and drafter
+quantisation affect *acceptance rate* — i.e. speed — and cannot change what the
+target emits. Verified against the engines' flags: none of them expose a
+relaxed/lenient acceptance mode. `--spec-draft-p-min` gates *drafting*, not
+acceptance.
+
+Consequence for the Q4-vs-Q8 drafter comparison (H9): it is a **speed and VRAM**
+comparison, not a quality one. A worse drafter proposes worse tokens, the target
+rejects more of them, and throughput drops — output does not degrade.
+
+The one caveat: DFlash drafters read the *target's hidden states*. Those differ
+between target quants, so a heavily quantised target can lower acceptance. Still
+a speed effect, not a correctness one.
+
 Verify MTP head compatibility without loading the full model:
 
 ```bash
@@ -139,16 +167,21 @@ Verify MTP head compatibility without loading the full model:
 
 ## 5. Explicitly out of scope
 
-**PFlash and DFlash are excluded from all testing.** Both have already been
-evaluated on these cards and found too lossy to be useful. This is an
-empirical finding, not a theoretical concern, and is not being re-litigated.
+**PFlash and DFlash v1 are excluded from all testing.** Both have already been
+evaluated on these cards and found too lossy to be useful — DFlash v1 also
+regularly mangled tool calls. This is an empirical finding, not a theoretical
+concern, and is not being re-litigated for those two.
 
 `pflash` and `buun` bundle these schemes alongside TurboQuant/MTP in the same
 binary — this means don't pass the `--spec-type` values that select them
 (`dflash`, `draft-dspark`, etc.), not that the repos are off-limits.
 
-**In scope:** TurboQuant (KV-cache quantization) and MTP (multi-token
-prediction) only.
+**DFlash2 is explicitly back in scope** (2026-08-24, operator's call). It is a
+different drafter from DFlash v1 — a separate checkpoint, a separate upstream PR
+(#27342 vs #22105), and a candidate-path selector v1 doesn't have. The v1
+verdict does not transfer to it. No engine here can load it yet; see H8.
+
+**In scope:** TurboQuant (KV-cache quantization), MTP, and DFlash2.
 
 ---
 

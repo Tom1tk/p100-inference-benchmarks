@@ -130,9 +130,14 @@ After each run:
 3. **[RUNLOG.md](RUNLOG.md)** — add an entry only if something notable
    happened (a crash, a parameter deviation, a surprising number). Routine
    successful runs don't need narrative.
-4. **[HYPOTHESES.md](HYPOTHESES.md)** — if the run bears on H1–H7, update that
+4. **[HYPOTHESES.md](HYPOTHESES.md)** — if the run bears on H1–H9, update that
    hypothesis's status. This is easy to forget and is the main reason to run
    these benchmarks at all.
+
+For Phase 5 web-bench runs there are two extra steps: claim the index in
+[WEB_BENCH.md](WEB_BENCH.md) §5's port registry, and score the generated site
+by hand against the quality checklist in WEB_BENCH.md §4. Throughput alone does
+not decide that phase.
 
 ---
 
@@ -159,6 +164,11 @@ Do not just retry. Failures are results.
 | Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
 | No `pp0` row in output | `-p 0` is a no-op prefill and is silently omitted | Expected, not a bug |
 | Load appears hung, GPUs idle | Normal model load, or disk contention | See §2 timing table |
+| `pi` hangs at startup, no request reaches the server | `pi` blocks on startup network operations in this environment | `PI_OFFLINE=1` — `run-web-bench.sh` sets it. Verified, not guesswork |
+| Web-bench stage exits 124 | Hit `STAGE_TIMEOUT` (default 3600s) | Legitimate result — record it. Raise the env var only if the config is known-slow |
+| Web-bench: `port N already in use` | Index reused, or a previous site is still hosted (by design) | Pick an unused index; check WEB_BENCH.md §5 |
+| Server OOMs on load in Phase 5 | `CTX=32768` leaves too little VRAM beside a 21.5 GiB model | `CTX=16384 ./scripts/run-web-bench.sh ...` and note it in RUNLOG.md |
+| Tool calls malformed / ignored in Phase 5 | `--jinja` missing, or a genuinely bad drafter | The script passes `--jinja`. If it's there, this is a **result** — see H8 |
 
 ---
 
@@ -225,6 +235,27 @@ choice, not re-confirming depth scaling.
 H2 (XL split-stall), H3 (stock quant quality), H4 (TurboQuant KV), H5 (NCCL),
 H7 (dispatch bug). Each is a small targeted run, not a matrix pass. See
 [HYPOTHESES.md](HYPOTHESES.md) for the specific test each needs.
+
+### Phase 5 — agentic web-build benchmark
+The final phase, and the only one that measures *usability* rather than
+throughput. Full procedure in **[WEB_BENCH.md](WEB_BENCH.md)** — read it before
+running, the port scheme and quality scoring are not obvious from the script.
+
+```bash
+./scripts/run-web-bench.sh <engine> <model-path> <split-mode> <label> <index> [server args...]
+```
+
+Matrix: the winning engine/split from Phases 1–3 × each **drafter arm** —
+none (control), MTP, DFlash2-Q4, DFlash2-Q8. The DFlash2 arms are blocked on
+H8 (no engine here can load that drafter yet); run the first two arms
+meanwhile rather than waiting.
+
+Each run claims an index and leaves its site hosted at `4000 + index`, so at
+the end every model version is browsable side by side.
+
+**Done when:** every drafter arm has a total task time, token count, and
+prefill/decode avg/min/max, plus a hand-scored quality verdict — or a recorded
+reason it couldn't produce one. Answers H9 and the practical half of H1/H8.
 
 ### Deferred
 Context depths beyond 16k; power-limit experiment (175W vs 200W+ — log as a

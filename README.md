@@ -14,12 +14,17 @@ and the mandatory commit/push protocol. Everything else is reference.
 | | |
 |---|---|
 | Phase 0 — smoke tests | **Done** (cooling validated, one engine blocked) |
-| Phase 1 — engine baseline | **Not started** |
-| Phase 2 — MTP on/off | Not started |
+| Phase 1 — engine baseline | **In progress** (pflash/layer done) |
+| Phase 2 — drafters on/off | Not started |
 | Phase 3 — quant sweep | Not started |
 | Phase 4 — hypothesis tests | Not started |
+| Phase 5 — agentic web build | Not started (tooling ready) |
 
-**Blocker:** `ik_llama` `-sm graph` aborts with `ncclAllReduce failed with
+**Blocker 2:** DFlash2 can't run — none of the three engines supports it (they
+have DFlash **v1**; the drafter needs upstream PR #27342). Drafter checkpoints
+are downloading regardless. See H8.
+
+**Blocker 1:** `ik_llama` `-sm graph` aborts with `ncclAllReduce failed with
 status 1`. Fix is known and untried — rebuild with `-DGGML_NCCL=OFF`. See
 [RUNLOG.md](RUNLOG.md) and H5 in [HYPOTHESES.md](HYPOTHESES.md).
 
@@ -35,12 +40,15 @@ confirmed applied.
 |---|---|
 | [RUNBOOK.md](RUNBOOK.md) | **Start here.** How to run a benchmark, safety limits, failure handling, git protocol, phase completion criteria |
 | [METHODOLOGY.md](METHODOLOGY.md) | Hardware, engines, models, fixed parameters, and why each was chosen |
-| [HYPOTHESES.md](HYPOTHESES.md) | H1–H7 — the open questions each run is meant to answer, with current status |
+| [HYPOTHESES.md](HYPOTHESES.md) | H1–H9 — the open questions each run is meant to answer, with current status |
+| [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 — the agentic web-build benchmark: port scheme, metrics, quality scoring |
 | [RESULTS.md](RESULTS.md) | Curated result tables, one section per phase |
 | [RUNLOG.md](RUNLOG.md) | Chronological log — what ran, what broke, what changed |
 | `results/all-results.csv` | Machine-readable aggregate of every run |
 | `logs/` | Raw stdout/stderr and GPU telemetry per run |
-| `scripts/` | `run-bench.sh` (run + log + commit + push), `gpu-monitor.sh` (telemetry) |
+| `results/web-bench.csv` | Machine-readable aggregate of every Phase 5 run |
+| `sites/` | Websites the models built in Phase 5 — quality evidence |
+| `scripts/` | `run-bench.sh` (Phases 1–4), `run-web-bench.sh` (Phase 5), `web_bench_metrics.py` (per-request timings), `gpu-monitor.sh` (telemetry) |
 
 ---
 
@@ -51,9 +59,17 @@ cd /root/p100-benchmarks
 ./scripts/run-bench.sh pflash /root/Qwen3.8-27B-UD-Q6_K_M.gguf layer phase1-pflash-layer-q6k
 ```
 
-The script handles preflight checks, telemetry, logging, and the commit/push.
-Read [RUNBOOK.md](RUNBOOK.md) before running it — there are real gotchas
-(model loads take 4–8 minutes and look like hangs).
+Phase 5, the agentic web-build benchmark:
+
+```bash
+./scripts/run-web-bench.sh buun /root/Qwen3.8-27B-UD-Q6_K_M.gguf layer p5-buun-layer-q6k 0
+```
+
+Both scripts handle preflight checks, telemetry, logging, and the commit/push.
+Read [RUNBOOK.md](RUNBOOK.md) before running either — there are real gotchas
+(model loads take 4–8 minutes and look like hangs). For Phase 5 also read
+[WEB_BENCH.md](WEB_BENCH.md): every run claims an index that fixes its ports,
+and indices must not be reused.
 
 ---
 
