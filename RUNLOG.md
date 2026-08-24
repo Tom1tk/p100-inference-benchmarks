@@ -373,3 +373,89 @@ like it had worked.
 
 **Disk:** operator added 25 GB mid-session; `/` now 197 GB total, 30 GB free
 (85%). The earlier 97% pressure is resolved.
+
+---
+
+## 2026-08-24 — Dual-GPU capability survey: what we haven't been testing
+
+Prompted by "cover everything available to us." Surveyed all four engines'
+`--help` and source rather than trusting the existing table. Three corrections
+and one new phase.
+
+### Correction: `-sm tensor` is unusable for this model, on every engine
+
+The split-mode table listed `tensor` as supported on `pflash`/`buun`/`mainline`
+because the argument parser accepts it. It is gated per-architecture, and
+`qwen35` is not on the list in **any** of the three trees — checked
+`llm_arch_supports_sm_tensor()` in each. Mainline lists 30 architectures (Grok,
+MPT, Deepseek2/32/4, Mamba/Mamba2, Jamba, Nemotron-H, MiniMax, LFM2, …); the
+only Qwen entry is `QWEN3TTS`, a different architecture. It throws at load:
+
+```
+LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'
+```
+
+Table now marks it ⚠️ with the explanation. **The real matrix for this model is
+`none` / `layer` / `row`, plus `graph` on `ik` only** — four cells fewer than
+previously implied. `-sm graph` remains `ik`-exclusive; `mainline` does not have
+it.
+
+### Finding: peer access is off by default in mainline
+
+`cudaDeviceEnablePeerAccess` is called only when `GGML_CUDA_P2P` is set
+(`ggml/src/ggml-cuda/ggml-cuda.cu`). Probed the hardware directly with
+`cudaDeviceCanAccessPeer`: **1 in both directions**, PHB topology, single NUMA
+node. So the cards can talk directly and, by default, don't. Now H10 — and it
+applies to the config that already works, which makes it the cheapest
+outstanding test in the project.
+
+### Finding: mainline's AllReduce backend is runtime-switchable
+
+```cpp
+const char * env = getenv("GGML_CUDA_ALLREDUCE");   // "nccl" | "internal" | "none"
+if (!env) { /* Linux default */ ggml_backend_cuda_comm_init_nccl(ret); }
+```
+
+`internal` is a dedicated **two-device** pipeline — it warns
+`internal AllReduce init failed (n_devices != 2?)` on fallback, so the fast path
+is written for exactly this rig's shape.
+
+This is H5's other half, and it changes that hypothesis's practical advice.
+`GGML_CUDA_NCCL:BOOL=ON` was auto-detected in our mainline build, so NCCL *is*
+linked and *is* the Linux default — the same configuration that aborts on `ik`.
+`h8-loadcheck-df2q4` passed only because `-sm layer` never invokes AllReduce.
+**A `-sm row` run on mainline may reproduce `ik`'s abort** — worth knowing before
+it looks like a new bug. Unlike `ik`, the fix needs no rebuild: set the env var.
+
+### Trap worth recording: `-ot` silently disables pipeline parallelism
+
+```cpp
+bool pipeline_parallel =
+    model.n_devices() > 1 && model.n_gpu_layers() > model.hparams.n_layer_all &&
+    model.split_mode() == LLAMA_SPLIT_MODE_LAYER && cparams.offload_kqv &&
+    !model.has_tensor_overrides();
+```
+
+Pipeline parallelism is off under `-sm none`, `-sm row`, `--no-kv-offload`, or
+any `-ot`. Since `-ot` is the obvious tool for H2's XL split-stall problem, an
+`-ot` experiment that appears to help or hurt may just be measuring the loss of
+pipeline parallelism. Any `-ot` run needs a no-`-ot` control.
+
+### Also catalogued (untested)
+
+`ik` ships graph-split tuning that has never been exercised: `-smf16`/`-smf32`/
+`-grt` (inter-GPU exchange precision — plausibly meaningful given 2:1 FP16 and
+no NVLink), `-gap` (FA precision under graph split), `-smgs`, `-sas` (async
+graph eval). All blocked behind the H5 rebuild. Now H12.
+
+Draft-model placement (`-devd`, `-otd`) exists on all three llama.cpp-descended
+engines and is untested — now H11, and it interacts with H9 since the Q8 drafter
+is 0.86 GiB larger than the Q4.
+
+`GGML_CUDA_CUBLAS_COMPUTE_TYPE` was checked and is **not** an opportunity: auto
+already selects F16 for quantized mat-muls on fast-FP16 hardware, which P100 is.
+`GGML_CUDA_PDL` is Hopper-era and irrelevant on sm_60.
+`GGML_SCHED_DEBUG=1` prints graph split assignment — adopted as the diagnostic
+of record for proving H2 numerically.
+
+Added as **Phase 6** in RUNBOOK §7, ordered cheapest-and-most-applicable first.

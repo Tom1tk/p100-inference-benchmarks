@@ -76,14 +76,86 @@ table was wrong about `ik`.
 
 | Engine | `none` | `layer` | `row` | `tensor` | `graph` |
 |---|---|---|---|---|---|
-| `pflash` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `buun` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `pflash` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| `buun` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
 | `ik` | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `mainline` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `mainline` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
 
-`-sm graph` exists **only** in `ik_llama`. `row`/`tensor` exist only in
-`pflash`/`buun`. Passing an unsupported value gives
-`error: invalid parameter for argument: -sm`.
+`-sm graph` exists **only** in `ik_llama`. Passing a value the binary doesn't
+know gives `error: invalid parameter for argument: -sm`.
+
+⚠️ **`-sm tensor` is accepted by the parser but unusable for our model.** It is
+gated per-architecture, and `qwen35` is not on the list in any of the three
+engines that offer the flag — verified by reading
+`llm_arch_supports_sm_tensor()` in each tree (30 architectures in mainline:
+Grok, MPT, Deepseek2/32/4, Mamba/Mamba2, Jamba, Nemotron-H, MiniMax, LFM2…;
+the only Qwen entry is `QWEN3TTS`, a different arch). It fails at load with:
+
+```
+LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'
+```
+
+So the real split-mode matrix for **this model** is `none` / `layer` / `row`,
+plus `graph` on `ik` only. Don't spend a run on `-sm tensor`.
+
+### Dual-GPU tuning knobs — surveyed 2026-08-24
+
+Beyond `-sm`, each engine exposes inter-GPU controls that this project has not
+yet touched. Surveyed directly from `--help` and source; **none of these are
+tested yet** — see H10–H12.
+
+**Common to `pflash` / `buun` / `mainline`** (all llama.cpp-descended):
+
+| Flag | What it does | Why it matters here |
+|---|---|---|
+| `-ts, --tensor-split` | Fraction of model per GPU | Both cards are identical, but the drafter and KV sit unevenly — an asymmetric split may beat 50/50 |
+| `-mg, --main-gpu` | Which GPU holds non-split tensors | Relevant to H2's XL split-stall — the embedding/output head land here |
+| `-ot, --override-tensor` | Pin tensor-name patterns to a device/buffer | Manual placement of the tensors XL can't split. **Also silently disables pipeline parallelism** — see below |
+| `-dev, --device` | Restrict which devices are used | Single-GPU runs without `CUDA_VISIBLE_DEVICES` |
+| `-devd, --device-draft` | **Device for the draft model** | Drafter on one card vs split across both — directly relevant to DFlash2/MTP |
+| `-otd, --override-tensor-draft` | Per-tensor placement for the drafter | Finer version of the above |
+
+**`mainline`-only, runtime env vars** (no rebuild needed):
+
+| Env var | Default | Note |
+|---|---|---|
+| `GGML_CUDA_P2P` | **unset = peer access OFF** | These two cards *can* peer (verified `cudaDeviceCanAccessPeer = 1` both ways, PHB topology, same NUMA node). Mainline does not enable it unless asked |
+| `GGML_CUDA_ALLREDUCE` | `nccl` on Linux | Also accepts `internal` (a dedicated **2-GPU** pipeline) and `none` (meta-backend butterfly). See H10 |
+| `GGML_CUDA_CUBLAS_COMPUTE_TYPE` | `auto` | Auto already picks F16 for quantized mat-muls on fast-FP16 hardware, which P100 is. Forcing `f32` is a quality-vs-speed probe, not a win |
+| `GGML_CUDA_DISABLE_GRAPHS` / `GGML_CUDA_GRAPH_OPT` | graphs on | `n_past` changes per decode step, so graph capture may not help — `ik`'s known-good baseline passed `-cuda graphs=0` |
+| `GGML_CUDA_ENABLE_UNIFIED_MEMORY` | off | Would allow oversubscribing VRAM at PCIe speed. Escape hatch for models that don't fit, not a speed knob |
+| `GGML_CUDA_REGISTER_HOST` / `GGML_CUDA_NO_PINNED` | pinned on | Host-transfer tuning; matters most during load |
+| `GGML_CUDA_DISABLE_FUSION` | fusion on | Diagnostic |
+| `GGML_CUDA_PDL` | off | Programmatic dependent launch — Hopper-era, irrelevant on sm_60 |
+| `GGML_SCHED_DEBUG=1` | off | Prints the graph split assignment. **Diagnostic of record** for proving H2 |
+
+**`ik`-only, graph-split tuning** — these exist because `-sm graph` needs
+inter-GPU data exchange, and are unexplored:
+
+| Flag | Default | Note |
+|---|---|---|
+| `-smf16` / `-smf32` / `-grt` | f16 | Precision of data exchanged between GPUs. P100 has 2:1 FP16 and no NVLink, so halving PCIe traffic is plausibly a real win |
+| `-gap` | f16 | Flash-attn precision under `-sm graph` |
+| `-smgs` | 0 | Force split-mode graph scheduling |
+| `-sas` | 0 | Async evaluation of compute graphs |
+
+**Pipeline parallelism (mainline/pflash/buun) is automatic and easy to lose.**
+From `src/llama-context.cpp`:
+
+```cpp
+bool pipeline_parallel =
+    model.n_devices() > 1 &&
+    model.n_gpu_layers() > model.hparams.n_layer_all &&
+    model.split_mode() == LLAMA_SPLIT_MODE_LAYER &&
+    cparams.offload_kqv &&
+    !model.has_tensor_overrides();
+```
+
+So it is **off** under `-sm none`, `-sm row`, `--no-kv-offload`, or *any* `-ot`
+override. That last one is a trap: adding `-ot` to hand-place a tensor silently
+costs pipeline parallelism, and the log doesn't shout about it. Any `-ot`
+experiment must be compared against a no-`-ot` control, not against the Phase 1
+baseline.
 
 ### MTP flag syntax — differs per engine
 

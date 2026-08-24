@@ -19,6 +19,7 @@ and the mandatory commit/push protocol. Everything else is reference.
 | Phase 3 — quant sweep | Not started |
 | Phase 4 — hypothesis tests | Not started |
 | Phase 5 — agentic web build | Not started (tooling ready) |
+| Phase 6 — dual-GPU transport (H10–H12) | Not started |
 
 **Resolved (2026-08-24):** DFlash2 now runs. The three forks all have DFlash
 **v1**; upstream `ggml-org/llama.cpp` **PR #27342** has v2, and it builds for
@@ -41,7 +42,7 @@ confirmed applied.
 |---|---|
 | [RUNBOOK.md](RUNBOOK.md) | **Start here.** How to run a benchmark, safety limits, failure handling, git protocol, phase completion criteria |
 | [METHODOLOGY.md](METHODOLOGY.md) | Hardware, engines, models, fixed parameters, and why each was chosen |
-| [HYPOTHESES.md](HYPOTHESES.md) | H1–H9 — the open questions each run is meant to answer, with current status |
+| [HYPOTHESES.md](HYPOTHESES.md) | H1–H12 — the open questions each run is meant to answer, with current status |
 | [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 — the agentic web-build benchmark: port scheme, metrics, quality scoring |
 | [RESULTS.md](RESULTS.md) | Curated result tables, one section per phase |
 | [RUNLOG.md](RUNLOG.md) | Chronological log — what ran, what broke, what changed |
