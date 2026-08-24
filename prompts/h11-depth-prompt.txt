@@ -1,0 +1,1013 @@
+Below is the documentation for a GPU benchmarking project.
+
+===== METHODOLOGY.md =====
+# Methodology
+
+Hardware, engines, models, and fixed parameters. Change nothing here without
+recording why in [RUNLOG.md](RUNLOG.md).
+
+---
+
+## 1. Objective
+
+Compare three llama.cpp-family inference engines on identical hardware, model,
+and quants to find the fastest stable configuration for serving Qwen3.8-27B on
+the dual-P100 rig.
+
+Primary metrics: prefill (pp) throughput across context depths up to 16k, and
+decode (tg) throughput, with and without MTP speculative decoding.
+
+This supersedes informal numbers from the prior single-GPU P100 session
+(`Qwen3.5-27B-UD-Q3_K_XL`, 10.36 tok/s) and the claude.ai handover doc — those
+are prior knowledge to verify, not baselines to assume.
+
+---
+
+## 2. Hardware
+
+| | |
+|---|---|
+| Host | HP Z640, Proxmox, inference in an LXC |
+| GPUs | 2× Tesla P100-PCIE-16GB (16269 MiB each, 32GB total), device 0 + 1 |
+| Arch | GP100, compute capability 6.0 (sm_60) |
+| Bandwidth | 732.2 GB/s HBM2 per card (the widely-quoted 549 GB/s figure is the 12GB variant) |
+| Interconnect | PCIe 3.0, **no NVLink** — this is why NCCL AllReduce loses to direct P2P here |
+| Power | 175W/card cap, confirmed applied. Persistence mode enabled. Neither survives a host reboot |
+| Cooling | Passive cards, custom 3D-printed shroud + Arduino Nano PWM controller |
+| Thermal limits | Idle ≤45°C · load 70–80°C · throttle 83°C · hard shutdown 87°C |
+
+### sm_60 constraints — the dominant architectural fact
+
+No dp4a, no tensor cores, no async copy instructions. Most modern quantized MMQ
+kernels assume sm_61+ and fall back to slow generic paths or fail to compile.
+
+GP100 does have a native **2:1 FP16 rate (~19 TFLOPS)**, unusual for Pascal.
+Paths that dequantize to f16 and hit cuBLAS perform well here; integer-quant
+paths generally do not. This asymmetry underlies several hypotheses.
+
+---
+
+## 3. Engines under test
+
+| Engine | Lineage | Commit | Binary directory |
+|---|---|---|---|
+| `pflash` | `Tom1tk/mtp-pflash-turboquant-hip` (HIP-descended, CUDA-capable) | `e05ff58b7` (build 9110) | `/root/pflash-llama.cpp/build-cuda-p100/bin/` |
+| `buun` | `spiritbuun/buun-llama-cpp` (CUDA-native turboquant lineage) | `39d97a876` (build 11260) | `/root/buun-llama-cpp/build-cuda-p100/bin/` |
+| `ik` | `ikawrakow/ik_llama.cpp` | `8337e4c` ("Fix Qwen35+ MTP") | `/root/ik_llama.cpp/build/bin/` |
+| `mainline` | `ggml-org/llama.cpp` **PR #27342** (`dflash2` branch) | `64f765f5` | `/root/dflash2-llama.cpp/build-cuda-p100/bin/` |
+
+`mainline` was added on 2026-08-24 specifically to run DFlash2, which none of
+the three forks can (see H8). It is a `git worktree` of `/root/mainline-llama.cpp`
+on the fetched PR branch, so `master` stays clean and the PR can be refreshed
+with a plain `git fetch`:
+
+```bash
+cd /root/mainline-llama.cpp
+git fetch origin pull/27342/head:pr-27342
+git worktree add /root/dflash2-llama.cpp pr-27342
+```
+
+The PR is **open, not merged** (checked 2026-08-24: `state: OPEN`,
+`mergeable: MERGEABLE`, base `master`, 16 files, +563/−7). It is small and
+self-contained. Re-check before treating any `mainline` number as reproducible
+from a released build — if it merges, pin the merge commit here instead.
+
+### Split-mode support — verified, differs per engine
+
+Checked directly against each binary's argument parser. The handover doc's
+table was wrong about `ik`.
+
+| Engine | `none` | `layer` | `row` | `tensor` | `graph` |
+|---|---|---|---|---|---|
+| `pflash` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| `buun` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| `ik` | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `mainline` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+
+`-sm graph` exists **only** in `ik_llama`. Passing a value the binary doesn't
+know gives `error: invalid parameter for argument: -sm`.
+
+⚠️ **`-sm tensor` is accepted by the parser but unusable for our model.** It is
+gated per-architecture, and `qwen35` is not on the list in any of the three
+engines that offer the flag — verified by reading
+`llm_arch_supports_sm_tensor()` in each tree (30 architectures in mainline:
+Grok, MPT, Deepseek2/32/4, Mamba/Mamba2, Jamba, Nemotron-H, MiniMax, LFM2…;
+the only Qwen entry is `QWEN3TTS`, a different arch). It fails at load with:
+
+```
+LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'
+```
+
+So the real split-mode matrix for **this model** is `none` / `layer` / `row`,
+plus `graph` on `ik` only. Don't spend a run on `-sm tensor`.
+
+### Dual-GPU tuning knobs — surveyed 2026-08-24
+
+Beyond `-sm`, each engine exposes inter-GPU controls that this project has not
+yet touched. Surveyed directly from `--help` and source; **none of these are
+tested yet** — see H10–H12.
+
+**Common to `pflash` / `buun` / `mainline`** (all llama.cpp-descended):
+
+| Flag | What it does | Why it matters here |
+|---|---|---|
+| `-ts, --tensor-split` | Fraction of model per GPU | Both cards are identical, but the drafter and KV sit unevenly — an asymmetric split may beat 50/50 |
+| `-mg, --main-gpu` | Which GPU holds non-split tensors | Relevant to H2's XL split-stall — the embedding/output head land here |
+| `-ot, --override-tensor` | Pin tensor-name patterns to a device/buffer | Manual placement of the tensors XL can't split. **Also silently disables pipeline parallelism** — see below |
+| `-dev, --device` | Restrict which devices are used | Single-GPU runs without `CUDA_VISIBLE_DEVICES` |
+| `-devd, --device-draft` | **Device for the draft model** | Drafter on one card vs split across both — directly relevant to DFlash2/MTP |
+| `-otd, --override-tensor-draft` | Per-tensor placement for the drafter | Finer version of the above |
+
+**`mainline`-only, runtime env vars** (no rebuild needed):
+
+| Env var | Default | Note |
+|---|---|---|
+| `GGML_CUDA_P2P` | **unset = peer access OFF** | These two cards *can* peer (verified `cudaDeviceCanAccessPeer = 1` both ways, PHB topology, same NUMA node). Mainline does not enable it unless asked |
+| `GGML_CUDA_ALLREDUCE` | `nccl` on Linux | Also accepts `internal` (a dedicated **2-GPU** pipeline) and `none` (meta-backend butterfly). See H10 |
+| `GGML_CUDA_CUBLAS_COMPUTE_TYPE` | `auto` | Auto already picks F16 for quantized mat-muls on fast-FP16 hardware, which P100 is. Forcing `f32` is a quality-vs-speed probe, not a win |
+| `GGML_CUDA_DISABLE_GRAPHS` / `GGML_CUDA_GRAPH_OPT` | graphs on | `n_past` changes per decode step, so graph capture may not help — `ik`'s known-good baseline passed `-cuda graphs=0` |
+| `GGML_CUDA_ENABLE_UNIFIED_MEMORY` | off | Would allow oversubscribing VRAM at PCIe speed. Escape hatch for models that don't fit, not a speed knob |
+| `GGML_CUDA_REGISTER_HOST` / `GGML_CUDA_NO_PINNED` | pinned on | Host-transfer tuning; matters most during load |
+| `GGML_CUDA_DISABLE_FUSION` | fusion on | Diagnostic |
+| `GGML_CUDA_PDL` | off | Programmatic dependent launch — Hopper-era, irrelevant on sm_60 |
+| `GGML_SCHED_DEBUG=1` | off | Prints the graph split assignment. **Diagnostic of record** for proving H2 |
+
+**`ik`-only, graph-split tuning** — these exist because `-sm graph` needs
+inter-GPU data exchange, and are unexplored:
+
+| Flag | Default | Note |
+|---|---|---|
+| `-smf16` / `-smf32` / `-grt` | f16 | Precision of data exchanged between GPUs. P100 has 2:1 FP16 and no NVLink, so halving PCIe traffic is plausibly a real win |
+| `-gap` | f16 | Flash-attn precision under `-sm graph` |
+| `-smgs` | 0 | Force split-mode graph scheduling |
+| `-sas` | 0 | Async evaluation of compute graphs |
+
+**Pipeline parallelism (mainline/pflash/buun) is automatic and easy to lose.**
+From `src/llama-context.cpp`:
+
+```cpp
+bool pipeline_parallel =
+    model.n_devices() > 1 &&
+    model.n_gpu_layers() > model.hparams.n_layer_all &&
+    model.split_mode() == LLAMA_SPLIT_MODE_LAYER &&
+    cparams.offload_kqv &&
+    !model.has_tensor_overrides();
+```
+
+So it is **off** under `-sm none`, `-sm row`, `--no-kv-offload`, or *any* `-ot`
+override. That last one is a trap: adding `-ot` to hand-place a tensor silently
+costs pipeline parallelism, and the log doesn't shout about it. Any `-ot`
+experiment must be compared against a no-`-ot` control, not against the Phase 1
+baseline.
+
+### MTP flag syntax — differs per engine
+
+Verified from each engine's `--help`. Do not assume a shared syntax:
+
+| Engine | Flag |
+|---|---|
+| `pflash` | `--spec-type mtp --spec-draft-n-max N` |
+| `buun` | `--spec-type draft-mtp --spec-draft-n-max N` (enum value is `draft-mtp`, **not** `mtp`) |
+| `ik` | `--spec-type mtp:n_max=N,p_min=P` |
+| `mainline` | `--spec-type draft-mtp` (same enum as `buun`) |
+
+### DFlash2 flag syntax (`mainline` only)
+
+```bash
+--model-draft /root/Qwen3.8-27B-DFlash2-Q4_K_M.gguf \
+--spec-type draft-dflash --spec-draft-n-max 7
+```
+
+**The flag is the same `draft-dflash` used for v1.** PR #27342 does not add a
+new `--spec-type` value — it auto-detects v2 from the draft GGUF's
+`dflash.selector_top_k` metadata key (`common/speculative.cpp`:
+`is_dflash2 = selector_top_k > 0`).
+
+This is exactly why a v1 engine cannot be trusted to report a DFlash2 result:
+the same command line runs a different algorithm depending on whether the loader
+understands the selector. Verify from the server log that the selector was
+picked up before recording any number.
+
+### Other per-engine differences
+
+- `buun`'s `-fa` is documented as `<on\|off\|auto>` but accepts `1`/`0` as
+  well — verified, so `-fa 1` is portable across all three.
+- `ik`'s `-fa` defaults to `1`; `pflash`/`buun` default to `0`/`auto`. Always
+  pass it explicitly.
+- `ik` accepts `-cuda graphs=0`, which the handover doc's known-good baseline
+  used for graph split (`n_past` changes every decode step, so graph capture
+  doesn't apply).
+
+### Build commands
+
+```bash
+# pflash, buun
+cmake -B build-cuda-p100 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60 -DCMAKE_BUILD_TYPE=Release
+cmake --build build-cuda-p100 --config Release -j12
+
+# ik_llama — NOTE: GGML_NCCL defaults ON and breaks graph split on this rig
+cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60 -DCMAKE_BUILD_TYPE=Release -DGGML_NCCL=OFF
+cmake --build build --config Release -j12
+
+# mainline PR #27342 (DFlash2). LLAMA_CURL=OFF — no libcurl dev headers here,
+# and models are all local anyway.
+cd /root/dflash2-llama.cpp
+cmake -B build-cuda-p100 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60 \
+      -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
+cmake --build build-cuda-p100 --config Release -j12
+```
+
+**Pascal is still first-class in mainline.** `ggml/src/ggml-cuda/CMakeLists.txt`
+documents `60 == P100, FP16 CUDA intrinsics` in its architecture list, and the
+CUDA-12 branch of that list is what our toolkit (12.0) takes. The only new CUDA
+kernel the PR adds (`ggml/src/ggml-cuda/top-k.cu`, a two-stage tiled top-k) uses
+nothing newer than shared memory and `__syncthreads()` — no warp-level
+reductions requiring sm_70, no tensor cores, no async copy, no bf16. Reviewed
+before building, and it configured for `sm_60` without complaint.
+
+The current `ik` build was made **without** `-DGGML_NCCL=OFF` and therefore
+has NCCL linked in. This is the open blocker — see H5.
+
+---
+
+## 4. Models
+
+Target: **Qwen3.8-27B** — 27.32B dense params, 262k native context,
+architecture string `qwen35`, multimodal.
+
+All files present on disk under `/root/`:
+
+| File | Quantizer | Size | Role |
+|---|---|---|---|
+| `Qwen3.8-27B-UD-IQ3_S.gguf` | Unsloth Dynamic (IQ) | ~11 GiB (downloading) | **Single-GPU quant** — the only one that fits one 16 GiB P100 with room for KV |
+| `Qwen3.8-27B-UD-Q4_K_M.gguf` | Unsloth Dynamic | 15.33 GiB | Split-friendly, large KV budget |
+| `Qwen3.8-27B-UD-Q5_K_M.gguf` | Unsloth Dynamic | 18.41 GiB | Midpoint |
+| `Qwen3.8-27B-UD-Q6_K_M.gguf` | Unsloth Dynamic | 21.50 GiB | **Primary test quant** — handover doc's recommended split target |
+| `Qwen3.8-27B-UD-Q4_K_XL.gguf` | Unsloth Dynamic (XL) | 16.35 GiB | **H2 split-stall test only** — not a general split candidate |
+| `Qwen3.8-27B-Uncensored-noMTP-Q4_K_M.gguf` | non-Unsloth ("stock") | 15.41 GiB | H3 stock-quant degradation test. Filename implies no MTP head — confirm before use |
+| `mtp-Qwen3.8-27B-Q4_0.gguf` | — | 1.28 GiB | MTP draft head. Verified: `qwen35.nextn_predict_layers = 1`, arch matches base |
+| `Qwen3.8-27B-DFlash2-Q4_K_M.gguf` | — | 1.06 GiB | DFlash2 drafter. Verified v2 — see below |
+| `Qwen3.8-27B-DFlash2-Q8_0.gguf` | — | 1.92 GiB | DFlash2 drafter. Verified v2 — see below |
+
+**`UD-IQ3_S` is not just another point on the quant curve.** At ~11 GiB it is
+the only target that fits a *single* 16 GiB card alongside a usable KV cache, so
+it is the model that makes `-sm none` measurable at all. Every other quant on
+this list fails to load on one card (`Q6_K_M` at 21.5 GiB is what produced the
+`failed to load model` in the Phase 1 table). It therefore does double duty:
+a row in the Phase 3 quant sweep, and the single-GPU reference that H6 needs.
+
+Expect it to be the slowest per-token of the dynamic quants on prefill — IQ
+quants are more compute-heavy to dequantize, and sm_60 has no dp4a — so read its
+Phase 3 numbers as "what single-GPU costs," not as a like-for-like quant
+comparison against the K-quants.
+
+### Drafters (speculative decoding)
+
+Three drafters are under test, plus a no-drafter control. All target
+Qwen3.8-27B and pair with **any** quantisation of it — a drafter is trained
+against a base model, not against a target quant.
+
+| Drafter | Source | Engines that can drive it | Status |
+|---|---|---|---|
+| _(none)_ | — | all | Control |
+| MTP head | `mtp-Qwen3.8-27B-Q4_0.gguf` (verified) | pflash, buun, ik, mainline | Ready |
+| DFlash2 Q4_K_M | `z-lab/Qwen3.8-27B-DFlash2` (1.06 GiB) | **`mainline` only** | On disk, v2 verified |
+| DFlash2 Q8_0 | `z-lab/Qwen3.8-27B-DFlash2` (1.92 GiB) | **`mainline` only** | On disk, v2 verified |
+
+Both DFlash2 files were confirmed to be genuine v2 by metadata, not by filename:
+
+```
+dflash.selector_rank  = 256
+dflash.selector_top_k = 16
+selector_hidden.weight / selector_predecessor.weight / selector_successor.weight
+```
+
+Those three tensors are exactly what PR #27342 adds mappings for
+(`LLM_TENSOR_DFLASH_SELECTOR_{HIDDEN,PREV,NEXT}`). A v1 engine has no mapping
+for them.
+
+**Speculative decoding here is output-preserving.** The target model verifies
+every drafted token over its full vocabulary, so drafter choice and drafter
+quantisation affect *acceptance rate* — i.e. speed — and cannot change what the
+target emits. Verified against the engines' flags: none of them expose a
+relaxed/lenient acceptance mode. `--spec-draft-p-min` gates *drafting*, not
+acceptance.
+
+Consequence for the Q4-vs-Q8 drafter comparison (H9): it is a **speed and VRAM**
+comparison, not a quality one. A worse drafter proposes worse tokens, the target
+rejects more of them, and throughput drops — output does not degrade.
+
+The one caveat: DFlash drafters read the *target's hidden states*. Those differ
+between target quants, so a heavily quantised target can lower acceptance. Still
+a speed effect, not a correctness one.
+
+Verify MTP head compatibility without loading the full model:
+
+```bash
+/root/benchmarks/benchvenv/bin/gguf-dump --no-tensors <model>.gguf | grep -i nextn
+```
+
+### Quant rules carried from prior work (unverified — see H2, H3)
+
+- **Don't use `-XL` quants on the dual-GPU split.** XL upcasts the embedding
+  and output head to Q8_0; those can't be split, so they land on one GPU and
+  stall the other during prefill. XL is claimed *better* on a single GPU.
+- **If Qwen3.8 retains Gated Delta Network layers, don't drop below Q6 with
+  stock quants** — `ssm_out` degrades disproportionately. Unsloth Dynamic
+  quants are claimed exempt.
+
+---
+
+## 5. Explicitly out of scope
+
+**PFlash and DFlash v1 are excluded from all testing.** Both have already been
+evaluated on these cards and found too lossy to be useful — DFlash v1 also
+regularly mangled tool calls. This is an empirical finding, not a theoretical
+concern, and is not being re-litigated for those two.
+
+`pflash` and `buun` bundle these schemes alongside TurboQuant/MTP in the same
+binary — this means don't pass the `--spec-type` values that select them
+(`dflash`, `draft-dspark`, etc.), not that the repos are off-limits.
+
+**DFlash2 is explicitly back in scope** (2026-08-24, operator's call). It is a
+different drafter from DFlash v1 — a separate checkpoint, a separate upstream PR
+(#27342 vs #22105), and a candidate-path selector v1 doesn't have. The v1
+verdict does not transfer to it. It is now runnable via the `mainline` engine
+built from that PR; see H8.
+
+**In scope:** TurboQuant (KV-cache quantization), MTP, and DFlash2.
+
+---
+
+## 6. Fixed parameters
+
+Tool: each engine's built-in `llama-bench`. Not the server — avoids HTTP/JSON
+overhead noise, and all three trees ship it. (Phase 2 MTP runs are the
+exception; `llama-bench` can't drive speculative decoding.)
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| `-ngl` | `99` | Full offload |
+| `-fa` | `1` | `-fa 0` aborts on sm_60 in graph-split mode. Used everywhere for consistency |
+| `-t` | `8` | Thread count found irrelevant in prior work (6/8/10/12 within noise — fully GPU-bound). Fixed, not re-tuned |
+| `-ctk` / `-ctv` | `f16` | f16 KV was previously "mandatory" (q4_0 cost 31–58%). TurboQuant KV types tested separately per H4 |
+| `-r` | `3` | Mean ± stddev as `llama-bench` reports natively. Smoke tests used `-r 1` and are marked as such |
+| `-p` | `0,2048,4096,8192,16384` | Prefill depths to 16k. `-p 0` yields no output row — expected |
+| `-n` | `128` | tg128, standard comparison point |
+| `-o` | `csv` | Machine-readable. Aggregated into `results/all-results.csv` |
+| `CUDA_VISIBLE_DEVICES` | `0,1` | Both P100s. Re-confirm enumeration each session — the chassis has been reconfigured before |
+
+Canonical command:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 <engine-bin>/llama-bench \
+  -m <model>.gguf \
+  -ngl 99 -fa 1 -t 8 \
+  -ctk f16 -ctv f16 \
+  -sm <split-mode> \
+  -p 0,2048,4096,8192,16384 -n 128 -r 3
+```
+
+`scripts/run-bench.sh` wraps this — prefer it over running by hand, since it
+also handles telemetry, logging, and the commit/push protocol.
+
+### MTP measurement (Phase 2)
+
+Effective tg t/s = tokens generated ÷ wall time. **Also record the acceptance
+rate** where the engine reports it — the comparison target is a community
+reference of ~1.7× on Qwen3.6-27B on a 3090, and acceptance rate is what
+explains a difference from it.
+
+
+===== HYPOTHESES.md =====
+# Open hypotheses
+
+Each is a claim to verify, mostly carried from
+`/root/p100_inference_knowledge_handover.md`, which predates the current engine
+builds. **Treat every one as unproven until a run in this repo confirms it.**
+
+Update the Status line when a run bears on a hypothesis, and reference the
+run label so the evidence is traceable.
+
+| ID | Claim | Status |
+|---|---|---|
+| H1 | MTP wins bigger on P100 than on a 3090 | Untested |
+| H2 | XL quants stall one GPU on the split | Untested |
+| H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
+| H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
+| H5 | NCCL is harmful for split inference | **Partly confirmed — worse than claimed** |
+| H6 | `-sm graph` is the best split mode | Untested (`graph` blocked by H5; single-GPU leg unblocked by IQ3_S) |
+| H7 | `(turbo*, F16)` KV combo aborts | Untested |
+| H8 | DFlash2 is worth using on this rig | **Runs on both GPUs, 57% acceptance** — speedup unquantified |
+| H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
+| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | Untested |
+| H11 | Drafter placement across the two cards matters | Untested |
+| H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (blocked by H5) |
+
+---
+
+## H1 — MTP win size
+
+**Claim:** MTP should give a *larger* relative speedup on P100 than the ~1.7×
+reported for Qwen3.6-27B on a 3090 (38 → 65 t/s).
+
+**Reasoning:** MTP trades compute for bandwidth — N draft tokens verified per
+weight read. The P100 is severely bandwidth-bound and has a 2:1 FP16 rate that
+the batched verification path exercises well.
+
+**Test:** tg128 with vs without MTP, same engine/quant/split. Record acceptance
+rate alongside throughput — a speedup without a plausible acceptance rate is a
+measurement error, not a win.
+
+**Status:** Untested. Requires Phase 2. MTP draft head is on disk and verified
+(`nextn_predict_layers = 1`).
+
+---
+
+## H2 — XL quant split-stall
+
+**Claim:** `-XL` quants upcast the embedding and output head to Q8_0. Those
+tensors can't be split, so they land entirely on one GPU and stall the other
+during prefill. XL is claimed to be *strictly better* on a single GPU.
+
+**Why it matters:** determines whether XL quants are usable at all in the
+dual-GPU configuration, which is the whole point of this rig.
+
+**Test:** `Qwen3.8-27B-UD-Q4_K_XL.gguf` on `-sm layer` and `-sm row` with
+telemetry running. Look for one device sitting at low utilization during the
+prefill phase while the other saturates. Compare against `UD-Q4_K_M` on the
+same split as the control.
+
+The evidence should be numeric — per-GPU utilization from
+`logs/<label>.temps.log`, not an impression. Explicitly requested as
+"proof, not trust me."
+
+**Status:** Untested. Model on disk.
+
+---
+
+## H3 — Stock quant degradation below Q6
+
+**Claim:** Non-dynamic ("stock") quants below Q6 degrade disproportionately on
+Gated Delta Network / `ssm_out` layers. Unsloth Dynamic quants are claimed
+exempt.
+
+**Test:** `Qwen3.8-27B-Uncensored-noMTP-Q4_K_M.gguf` (stock) vs
+`Qwen3.8-27B-UD-Q4_K_M.gguf` (dynamic). **This is a quality comparison, not a
+speed one** — throughput will be near-identical and is not the question.
+
+Needs a coherence/perplexity measure, not `llama-bench`. Define the measure
+before running, and note that the two models differ in more than quantizer
+(one is an "Uncensored" fine-tune), so this is suggestive rather than clean.
+
+**Status:** Untested. Confounded comparison — see caveat above.
+
+---
+
+## H4 — TurboQuant KV penalty
+
+**Claim (open question, not an assertion):** f16 KV was previously mandatory on
+these cards — q4_0 KV cost 31–58%. But TurboQuant computes directly on
+quantized values rather than dequantizing per access, so it may not inherit
+that penalty.
+
+**Test:** same engine/quant/split, sweeping `-ctk`/`-ctv` across `f16`,
+`q8_0`, and the turbo types. Watch for the H7 dispatch bug when choosing
+combinations.
+
+**Status:** Untested.
+
+---
+
+## H5 — NCCL harmful for split inference
+
+**Claim:** NCCL is actively harmful (−14% on a MoE model) for `ik_llama`'s
+split path. No NVLink means direct CUDA peer-to-peer beats AllReduce over
+PCIe. Original guidance: "do not build with NCCL."
+
+**Status: partly confirmed, and the reality is worse than the claim.**
+
+On the current build (`8337e4c`), NCCL doesn't merely cost performance — it
+**fails outright**:
+
+```
+ggml_cuda_op_reduce: ncclAllReduce failed with status 1
+/root/ik_llama.cpp/ggml/src/ggml-cuda/reduce.cu:169: Fatal error
+```
+
+Aborts on the first prefill test, before producing any throughput number.
+`GGML_NCCL` defaults to **ON** in ik_llama's CMake, so this is the default
+build's behaviour on this rig.
+
+Evidence: `logs/phase0-ik-graph-q6k.log` (run `phase0-ik-graph-q6k`).
+
+**Remaining work:**
+1. Rebuild ik_llama with `-DGGML_NCCL=OFF` and confirm `-sm graph` runs.
+2. Quantify the performance claim properly — that needs a working NCCL build
+   to compare against, which may not be achievable if NCCL simply doesn't
+   function here. If so, record that the −14% figure is untestable on this rig
+   and the operative guidance is "NCCL is unusable," which is stronger.
+3. Check whether this affects `pflash`/`buun` at all — the original finding was
+   specific to `ik`'s graph mode, and those engines don't offer graph split.
+
+---
+
+## H6 — Best split mode overall
+
+**Claim:** `ik_llama`'s `-sm graph` was the prior known-good baseline for this
+rig (on the much older build `286ce324`).
+
+**Question:** does graph split still win on current builds once MTP is factored
+in? `pflash`/`buun` don't have graph split at all, so if MTP is the bigger
+lever, the engine choice may flip.
+
+**Test:** Phase 1 establishes the no-MTP baseline across engines and split
+modes; Phase 2 re-tests with MTP. The comparison that matters is the
+*combination*, not either axis alone.
+
+**Status:** Untested — `-sm graph` is blocked by H5. `none`/`layer` comparisons
+can proceed on all three engines meanwhile.
+
+---
+
+## H7 — Known FATTN dispatch bug
+
+**Claim:** the `FATTN_VEC_CASE` dispatch table has `(F16, turbo*)` but not the
+reverse `(turbo*, F16)`. So asymmetric KV types abort:
+
+```bash
+--cache-type-k turbo3 --cache-type-v f16     # aborts at fattn.cu:348
+--cache-type-k turbo3 --cache-type-v turbo3  # works
+--cache-type-k turbo3 --cache-type-v q8_0    # works
+```
+
+**Test:** confirm present or absent on each of the three current trees before
+relying on any asymmetric turbo KV configuration. This is a cheap check — the
+abort happens early, so it doesn't need a full benchmark run.
+
+**Status:** Untested on current builds. The claim was made against a different
+fork and may not apply to all three.
+
+
+---
+
+## H8 — DFlash2 is worth using on this rig
+
+**Context:** DFlash v1 and PFlash were excluded from testing after the operator
+found both too lossy on these cards — v1 also regularly mangled tool calls.
+**DFlash2 is a different drafter** (separate checkpoint, separate upstream PR,
+adds a candidate selector v1 lacks), so that verdict is being re-opened for it
+specifically. The v1/PFlash exclusion still stands.
+
+**Claim:** DFlash2 gives a materially better decode speedup than the MTP head on
+Qwen3.8-27B, without breaking tool calls.
+
+**Status: it runs, on both cards, and the output is clean.** The earlier "no
+engine supports it" verdict was right about the three forks and wrong to stop
+there — upstream `ggml-org/llama.cpp` **PR #27342** is the engine, it builds for
+`sm_60`, and it works. Now the fourth engine `mainline` (METHODOLOGY §3).
+
+### First result — `h8-loadcheck-df2q4` (2026-08-24)
+
+`mainline` · `UD-Q6_K_M` · `DFlash2-Q4_K_M` · `-sm layer` · `-c 4096` ·
+`--spec-draft-n-max 7` · one prompt, 300 tokens, `temperature 0`.
+
+| | |
+|---|---|
+| Load time | 4m40s |
+| VRAM | 13.8 GiB (GPU0) / 15.0 GiB (GPU1) — **both cards** |
+| Decode | **16.10 t/s** |
+| Draft tokens / accepted | 419 / 239 — **57.0% acceptance** |
+| Output | Correct iterative linked-list reversal, no mangling |
+| Peak temp | 49°C |
+
+**This is a load check, not a benchmark.** One prompt, short context, greedy
+sampling. Do not quote 16.10 t/s as the DFlash2 figure.
+
+The tempting comparison — 16.10 vs the Phase 1 `llama-bench` tg128 of 9.45 t/s
+(pflash/layer/Q6_K_M, no drafter) — is **confounded**: different engine,
+different tool, different context depth. It hints at ~1.7× but proves nothing.
+The honest measurement is mainline's own no-drafter control, which is the next
+run.
+
+**The dual-GPU question is settled empirically.** 13.8/15.0 GiB resident across
+both cards while generating at 57% acceptance. The `buun` tree-verify
+restriction does not apply to mainline, as the code reading predicted. The
+single-GPU `IQ3_S` leg is still worth running as a quant and single-GPU
+reference, but it is no longer a DFlash2 rescue path.
+
+**Verifying v2 turned out to be easier than expected.** The startup log prints
+the shared dflash parameters (`n_max=7, block_size=8, n_extract=5`) but not the
+v1/v2 branch. It doesn't need to: the response `timings` object carries
+`draft_n` and `draft_n_accepted` directly, so acceptance is measurable per
+request. `scripts/web_bench_metrics.py` already records the whole timings object,
+so Phase 5 captures acceptance rate for free — no log parsing, and no reliance on
+a version banner.
+
+### Why the forks can't do this
+
+| Engine | DFlash support | Verdict |
+|---|---|---|
+| `pflash` | none (`--spec-type` offers only `mtp`, `ngram-*`) | Can't |
+| `buun` | DFlash **v1** (`draft-dflash`) + DSpark; docs cite PR #22105 | Wrong version |
+| `ik` | `dflash`, `dspark` | Wrong version (same lineage) |
+| `mainline` | PR #27342 — v1 **and** v2, auto-detected | ✅ |
+
+The v1-silently-runs risk identified earlier is now concrete and confirmed. PR
+#27342 adds **no new `--spec-type` value**: the same `draft-dflash` selects v1 or
+v2, and `common/speculative.cpp` branches on draft metadata —
+
+```cpp
+selector_top_k = llama_model_dflash_selector_top_k(model_dft);
+is_dflash2     = selector_top_k > 0;
+```
+
+Our drafters carry `dflash.selector_top_k = 16`, so mainline takes the v2 path.
+A v1 loader reads no such key, takes the v1 path, and the command line looks
+identical. **Confirm from the log that the selector loaded before recording any
+number as DFlash2.**
+
+### The multi-GPU concern does not apply to mainline
+
+This was flagged as a possible blocker; it isn't. The GPU-0-only restriction is
+`buun`-specific — its `parent_ids_gpu` **tree** verification, auto-disabled at
+`n_devices() > 1` (`src/llama-context.cpp:3343`). Mainline has no tree-verify
+path at all: `parent_ids` does not appear anywhere in its `src/` or `common/`,
+and PR #27342's selector emits a **linear** draft, walking a predecessor chain
+one token at a time and `push_back`-ing a flat sequence. That is verified the
+ordinary way and carries no device restriction. The only `n_devices() > 1` guard
+in mainline's context is the unrelated pipeline-parallelism check.
+
+So DFlash2 should work on `-sm layer` across both cards. **Still verify it
+empirically** — that is a code reading, not a run.
+
+### Test
+
+1. ~~Load check on `mainline` with `-sm layer`~~ — **done**, see above.
+2. Phase 2-style decode comparison: none / MTP / DFlash2-Q4 / DFlash2-Q8, same
+   target and split, acceptance rate recorded alongside t/s.
+3. Phase 5 web-bench for the tool-calling stress test — where v1's mangling
+   showed up, and the reason this hypothesis matters beyond throughput.
+4. **Single-GPU leg** (operator's request): if dual-GPU DFlash2 misbehaves
+   despite the above, re-run on one card with `UD-IQ3_S` and `-sm none`. That
+   quant exists precisely to make this possible.
+
+**Note:** `mainline` is a different engine from the three in Phases 1–3, so its
+numbers are not directly comparable to theirs. Run the none-drafter control
+*on mainline* as the baseline for H8/H9 — comparing DFlash2-on-mainline against
+MTP-on-buun would confound drafter with engine.
+
+---
+
+## H9 — Drafter quantisation: Q8 vs Q4
+
+**Claim:** the Q8_0 DFlash2 drafter accepts enough more tokens than the Q4_K_M
+one to be worth its extra ~0.9 GB of VRAM.
+
+**This is a speed and VRAM question, not a quality one.** The target verifies
+every drafted token over its full vocabulary, so a worse drafter lowers
+acceptance and therefore throughput — it cannot change what the target emits.
+None of the three engines exposes a lenient-acceptance mode (checked their
+flags; `--spec-draft-p-min` gates drafting, not acceptance).
+
+**Test:** identical engine/target/split, three drafter arms plus a control —
+none, MTP, DFlash2-Q4, DFlash2-Q8. Record acceptance rate alongside decode t/s;
+a speedup without a plausible acceptance rate is a measurement error.
+
+The VRAM side matters here specifically: at `UD-Q6_K_M` (21.5 GiB of a 32 GiB
+pool) the drafter competes with KV cache for what's left, so the comparison is
+decode t/s *at equal context*, not decode t/s alone.
+
+**Status:** Untested. **No longer gated** — both drafters are on disk, verified
+as genuine v2, and `mainline` can load them. Phase 5 is where it gets
+stress-tested against real tool-calling work, which is where DFlash v1's mangling
+showed up and where a bad drafter will show up again.
+
+Note the VRAM figures are smaller than first assumed: 1.06 GiB (Q4_K_M) vs
+1.92 GiB (Q8_0), a 0.86 GiB difference. Beside a 21.5 GiB target in a 32 GiB
+pool that is a real but modest KV trade; beside an 11 GiB `IQ3_S` target on a
+single 16 GiB card it is the difference that may decide whether the config fits
+at all.
+
+---
+
+## H10 — Inter-GPU transport is leaving performance on the table
+
+**Claim:** the default inter-GPU data path is not the best one available on this
+rig, and two runtime switches can change it without a rebuild.
+
+**Two specific findings behind this** (mainline, read from
+`ggml/src/ggml-cuda/ggml-cuda.cu`):
+
+1. **Peer access is off by default.** `cudaDeviceEnablePeerAccess` is called only
+   when `GGML_CUDA_P2P` is set in the environment. These cards *can* peer —
+   verified with a direct `cudaDeviceCanAccessPeer` probe: `1` in both
+   directions, PHB topology, single NUMA node. So every cross-GPU copy currently
+   staged through host memory could plausibly go card-to-card instead.
+
+2. **The AllReduce backend is selectable at runtime.**
+
+   ```cpp
+   const char * env = getenv("GGML_CUDA_ALLREDUCE");
+   if (!env) { /* Linux default */ ggml_backend_cuda_comm_init_nccl(ret); }
+   // else: "nccl" | "internal" | "none"
+   ```
+
+   `internal` is a **dedicated two-device pipeline** — it warns
+   `internal AllReduce init failed (n_devices != 2?)` and falls back, meaning
+   the fast path is written for exactly this rig's shape. `none` is a
+   meta-backend butterfly.
+
+**This is H5's other half.** H5 established that NCCL AllReduce *fails outright*
+on `ik` (`ncclAllReduce failed with status 1`) and required a rebuild with
+`-DGGML_NCCL=OFF`. Mainline is different in two ways worth recording:
+`GGML_CUDA_NCCL:BOOL=ON` was auto-detected in our build (NCCL **is** linked, and
+is the Linux default), **but** it is switchable per-run by env var rather than by
+rebuild. The `h8-loadcheck-df2q4` run succeeded on `-sm layer` because layer
+split needs no AllReduce — the NCCL path is not exercised there. A `-sm row`
+run on mainline may well hit the same failure `ik` did.
+
+**Test:**
+
+1. `-sm row` on mainline with `GGML_CUDA_ALLREDUCE` unset (NCCL, default) —
+   does it reproduce `ik`'s abort? Cheap and settles whether H5 is
+   engine-specific or rig-wide.
+2. Same, with `GGML_CUDA_ALLREDUCE=internal`, then `=none`. Three-way.
+3. `GGML_CUDA_P2P=1` vs unset on `-sm layer` at fixed everything else. This one
+   applies to the *current* working config, so it is the highest-value cheap
+   test in this hypothesis.
+
+Record `nvidia-smi` per-GPU utilization alongside throughput — the mechanism
+claim is about transfer stalls, so utilization is the evidence, not just t/s.
+
+---
+
+## H11 — Drafter placement matters
+
+**Claim:** where the draft model lives changes decode throughput on a two-card
+split.
+
+**Reasoning:** with `-sm layer` the target's layers are spread across both cards,
+so every draft/verify cycle crosses the PCIe link. The drafter is small
+(1.06–1.92 GiB) and could sit entirely on one card via `-devd`, or be placed
+per-tensor with `-otd`. Whether pinning it helps (locality, no split overhead) or
+hurts (contention with the target's layers on that card, and it is then remote
+from half the target) is genuinely unclear.
+
+This interacts with H9: the Q8 drafter is 0.86 GiB larger, so placement and
+quantisation trade against each other for VRAM on whichever card holds it.
+
+**Test:** fixed target/split/context, DFlash2-Q4, varying only placement —
+default (split), `-devd CUDA0`, `-devd CUDA1`. Record decode t/s **and
+acceptance rate**; placement should not change acceptance, so a change there
+means something else moved.
+
+**Status: REFUTED** (2026-08-24, `results/h11-placement.csv`).
+
+Ran all three drafters x three placements plus a no-drafter control, 3 reps each.
+Decode spread within a drafter is <=0.15% — 14.11/14.12/14.11 t/s for MTP,
+14.46/14.48 for DFlash2-Q4. Acceptance was identical across placements of the
+same drafter down to the exact draft-token count, confirming placement was the
+only thing that moved. VRAM did shift between cards (GPU0 8647-10291 MiB), so
+the flag works; decode simply does not care.
+
+Consequence: `-devd`/`-otd` are **not** a tuning knob on this rig and can be
+dropped from the Phase 5 matrix. Use `default` and spend the runs elsewhere.
+
+Two things fell out that H11 was not looking for:
+
+- **`-devd CUDA0` aborts with any DFlash2 drafter** at load. The drafter GGUF
+  has no `output.weight`/`token_embd.weight` and borrows the target's via
+  `ctx_other`; under `-sm layer` that tensor is on CUDA1, so restricting the
+  draft context to CUDA0 makes it unreachable and ggml aborts. Upstream bug in
+  PR #27342. MTP is immune — it ships its own copies. See RESULTS.md Phase 6.
+- **H9 evidence:** the Q8 drafter accepted *less* than the Q4 (44.4% vs 45.8%)
+  for +0.87 GiB. Recorded there rather than here.
+
+---
+
+## H12 — `ik`'s graph-split knobs change the `-sm graph` verdict
+
+**Claim:** `-sm graph` was the prior known-good baseline for this rig, and `ik`
+ships tuning flags for it that have never been exercised:
+
+| Flag | Default | Hypothesis |
+|---|---|---|
+| `-smf16` / `-smf32` / `-grt` | f16 | Inter-GPU exchange precision. P100 has native 2:1 FP16 and no NVLink, so f16 exchange should already be the right default — but `-grt` allows other types and this has never been checked |
+| `-gap` | f16 | Flash-attn precision under graph split |
+| `-smgs` | 0 | Force graph scheduling |
+| `-sas` | 0 | Async compute-graph evaluation — the most likely to matter for overlapping PCIe transfer with compute |
+
+**Status:** Untested and **blocked by H5** — `-sm graph` aborts on the current
+NCCL-linked `ik` build. Rebuild with `-DGGML_NCCL=OFF` first; these knobs are
+only reachable once graph split runs at all.
+
+
+===== RUNBOOK.md =====
+# Runbook — operating procedure
+
+This is the procedure for executing benchmark runs on this rig. Follow it in
+order. It assumes no prior context beyond what's in this repo.
+
+---
+
+## 0. Non-negotiables
+
+1. **Never let a card exceed 83°C.** Abort the run if it does. Hard shutdown
+   is 87°C and these are passively cooled cards behind a custom fan shroud.
+2. **Commit and push after every test run** — pass or fail. See §6. A failed
+   run is data; losing it wastes 5–20 minutes of load time to rediscover.
+3. **Don't change two variables at once.** One engine, one quant, one split
+   mode per run. The whole point is attributable comparison.
+4. **Don't silently change fixed parameters** in [METHODOLOGY.md](METHODOLOGY.md).
+   If a run needs different parameters, record why in [RUNLOG.md](RUNLOG.md).
+
+---
+
+## 1. Preflight
+
+Run before the first benchmark of any session:
+
+```bash
+nvidia-smi -L                       # expect exactly 2× Tesla P100-PCIE-16GB
+nvidia-smi --query-gpu=index,temperature.gpu,power.limit,persistence_mode \
+           --format=csv             # expect ~45-50°C idle, 175W cap, persistence Enabled
+df -h /root                         # models are 15-22GB each; check headroom
+```
+
+Expected baseline: idle 45–50°C, power limit 175.00 W on both cards,
+persistence mode Enabled.
+
+If persistence or the power cap is missing (they don't survive a host reboot):
+
+```bash
+nvidia-smi -pm 1
+nvidia-smi -pl 175 -i 0 && nvidia-smi -pl 175 -i 1
+```
+
+**Check for competing disk I/O.** Model loads are disk-bound. If a download or
+copy is running, loads take 2–3× longer. Either wait or note it in the run log
+— it does not affect GPU-phase numbers, only wall-clock.
+
+---
+
+## 2. Running one benchmark
+
+```bash
+cd /root/p100-benchmarks
+./scripts/run-bench.sh <engine> <model-path> <split-mode> <label> [extra args...]
+```
+
+- `<engine>` — `pflash` | `buun` | `ik` | `mainline`
+- `<split-mode>` — see the support matrix in [METHODOLOGY.md](METHODOLOGY.md).
+  **They differ per engine.** `ik` has `graph` but not `row`/`tensor`;
+  `pflash`/`buun` have `row`/`tensor` but not `graph`.
+- `<label>` — used for filenames and the commit message. Use
+  `phase<N>-<engine>-<splitmode>-<quant>`, e.g. `phase1-buun-layer-q6k`.
+
+Example:
+
+```bash
+./scripts/run-bench.sh ik /root/Qwen3.8-27B-UD-Q6_K_M.gguf graph \
+  phase1-ik-graph-q6k -cuda graphs=0
+```
+
+The script does preflight temp checks, starts telemetry, runs the benchmark,
+stops telemetry, writes logs and CSV, then commits and pushes.
+
+### Expected timing — read this before assuming a hang
+
+| Phase | Duration | What it looks like |
+|---|---|---|
+| Model load | **4–8 min** (longer under disk contention) | Process in `D` state, GPUs at 0% and idle temps, no output past the CUDA device banner |
+| Prefill sweep | 3–6 min | GPUs alternating to 100%, temps climbing to ~60°C |
+| tg128 | ~30 s | One GPU at a time under `layer` split |
+
+**A 21.5GB model takes minutes to load and produces no output while it does.**
+This is the single most common false alarm. Confirm progress rather than
+killing it:
+
+```bash
+cat /proc/<pid>/io      # read_bytes should be climbing toward the file size
+```
+
+### Don't poll with sleep loops
+
+Launch long runs in the background and wait for completion notification rather
+than chaining sleeps. `run-bench.sh` is designed to be launched in the
+background and to be self-contained.
+
+---
+
+## 3. Thermal safety
+
+`run-bench.sh` starts `scripts/gpu-monitor.sh`, which samples every 5s into
+`logs/<label>.temps.log` (format: `HH:MM:SS idx, tempC, watts, util%` per card).
+
+Watch a live run:
+
+```bash
+tail -f logs/<label>.temps.log
+```
+
+Thresholds:
+
+| Temp | Action |
+|---|---|
+| ≤ 80°C | Normal. Observed peak so far is 63°C under full load. |
+| 80–82°C | Warn, finish the current run, don't start another until cooled |
+| ≥ 83°C | **Abort immediately** (`pkill -f llama-bench`), record in RUNLOG.md |
+| 87°C | Hardware shutdown — must never be reached |
+
+Brief power readings slightly above 175W are normal sampling overshoot; the
+cap is enforced on a rolling average. Sustained draw well above it is not
+normal and is worth investigating.
+
+---
+
+## 4. Recording results
+
+After each run:
+
+1. **`results/all-results.csv`** — appended automatically by the script. This
+   is the machine-readable source of truth. Don't hand-edit it.
+2. **[RESULTS.md](RESULTS.md)** — add a curated row to the relevant phase
+   table. Include split mode, peak temp, and anything anomalous.
+3. **[RUNLOG.md](RUNLOG.md)** — add an entry only if something notable
+   happened (a crash, a parameter deviation, a surprising number). Routine
+   successful runs don't need narrative.
+4. **[HYPOTHESES.md](HYPOTHESES.md)** — if the run bears on H1–H9, update that
+   hypothesis's status. This is easy to forget and is the main reason to run
+   these benchmarks at all.
+
+For Phase 5 web-bench runs there are two extra steps: claim the index in
+[WEB_BENCH.md](WEB_BENCH.md) §5's port registry, and score the generated site
+by hand against the quality checklist in WEB_BENCH.md §4. Throughput alone does
+not decide that phase.
+
+---
+
+## 5. When a run fails
+
+Do not just retry. Failures are results.
+
+1. Capture the error — `logs/<label>.log` holds full stdout+stderr including
+   any stack trace.
+2. Record it in [RUNLOG.md](RUNLOG.md) with the exact error string and the
+   command that produced it.
+3. Check whether it bears on a hypothesis — the NCCL crash resolved most of H5
+   before a single timing number was collected.
+4. **Commit and push the failure** before attempting a fix.
+5. Only then diagnose. If the fix is a rebuild, record the new commit hash and
+   build flags in [METHODOLOGY.md](METHODOLOGY.md).
+
+### Known failure modes
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `ncclAllReduce failed with status 1`, abort at `reduce.cu:169` | `ik_llama` built with NCCL (`GGML_NCCL` defaults **ON**); no NVLink on this rig | Rebuild ik_llama with `-DGGML_NCCL=OFF` |
+| `error: invalid parameter for argument: -sm` | Split mode not supported by that engine | Check the per-engine matrix in METHODOLOGY.md |
+| `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'` | `-sm tensor` is arch-gated and `qwen35` isn't on the list — in any engine | Not a bug and not fixable here. Usable split modes for this model are `none`/`layer`/`row`, plus `graph` on `ik` |
+| Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
+| No `pp0` row in output | `-p 0` is a no-op prefill and is silently omitted | Expected, not a bug |
+| Load appears hung, GPUs idle | Normal model load, or disk contention | See §2 timing table |
+| `pi` hangs at startup, no request reaches the server | `pi` blocks on startup network operations in this environment | `PI_OFFLINE=1` — `run-web-bench.sh` sets it. Verified, not guesswork |
+| Web-bench stage exits 124 | Hit `STAGE_TIMEOUT` (default 3600s) | Legitimate result — record it. Raise the env var only if the config is known-slow |
+| Web-bench: `port N already in use` | Index reused, or a previous site is still hosted (by design) | Pick an unused index; check WEB_BENCH.md §5 |
+| Server OOMs on load in Phase 5 | `CTX=32768` leaves too little VRAM beside a 21.5 GiB model | `CTX=16384 ./scripts/run-web-bench.sh ...` and note it in RUNLOG.md |
+| Tool calls malformed / ignored in Phase 5 | `--jinja` missing, or a genuinely bad drafter | The script passes `--jinja`. If it's there, this is a **result** — see H8 |
+| DFlash2 run shows poor acceptance instead of an error | A **v1** engine (`buun`/`ik`) silently ran the v1 path — same `draft-dflash` flag, no selector | Use `mainline`. Confirm the selector loaded in `logs/<label>.server.log` before recording. See H8 |
+| `failed to load model` on `-sm none` | Target too big for one 16 GiB card | Only `UD-IQ3_S` (~11 GiB) fits a single P100 with usable KV |
+
+---
+
+## 6. Git protocol — commit and push every run
+
+**This is mandatory and applies to failed runs too.**
+
+`run-bench.sh` does this automatically at the end of each run. If you run a
+benchmark by hand, or edit any document, do it manually:
+
+```bash
+cd /root/p100-benchmarks
+git add -A
+git commit -m "bench: <label> — <one-line outcome>"
+git push
+```
+
+Commit message conventions:
+
+| Prefix | Use for |
+|---|---|
+| `bench:` | A benchmark run (pass or fail) |
+| `docs:` | Documentation changes with no new data |
+| `build:` | Engine rebuilds, flag changes |
+| `fix:` | Corrections to previously recorded data or claims |
+
+Remote: `https://github.com/Tom1tk/p100-inference-benchmarks.git` (private).
+
+If a push fails, do not discard the commit — the local history
+
+===== END OF DOCUMENTS =====
+
+Summarise the project's current findings and list the open hypotheses in order of how cheap they would be to test. Be specific and thorough.

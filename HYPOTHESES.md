@@ -389,8 +389,17 @@ same drafter down to the exact draft-token count, confirming placement was the
 only thing that moved. VRAM did shift between cards (GPU0 8647-10291 MiB), so
 the flag works; decode simply does not care.
 
-Consequence: `-devd`/`-otd` are **not** a tuning knob on this rig and can be
-dropped from the Phase 5 matrix. Use `default` and spend the runs elsewhere.
+Re-tested at depth (`-c 16384`, 14.5k-token prompt), since `-c 4096` with a
+short prompt only decodes at ~450 tokens and placement is a locality question:
+`default` 17.10 t/s vs `-devd CUDA1` 17.06 t/s, acceptance identical at
+263/406 in both. **The null holds at both depths.**
+
+Consequence: `-devd`/`-otd` are **not** a tuning knob on this rig and are
+dropped from the Phase 5 matrix. **Use `default` — do not pass `-devd` at all.**
+Pinning is not merely neutral, it costs headroom on the fuller card (at 16k,
+`CUDA1` leaves 4382 MiB free on GPU1 vs 5182 for `default`) and the penalty
+grows with context. `CUDA1` also has no compatibility argument: `default` runs
+every drafter too, and only `CUDA0` aborts.
 
 Two things fell out that H11 was not looking for:
 

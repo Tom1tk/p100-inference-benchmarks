@@ -23,7 +23,7 @@ SPLIT=layer
 NGL=99
 THREADS=8
 FA=1
-CTX=4096
+CTX="${CTX:-4096}"
 N_PREDICT=400
 REPS=3
 PORT=8300
@@ -31,7 +31,15 @@ LOAD_TIMEOUT=900
 ABORT_TEMP=83
 PREFLIGHT_TEMP=70
 
-PROMPT='Write a detailed technical explanation of how HTTP/2 multiplexing works. Cover streams, frames, flow control, and HPACK header compression, and explain how it differs from HTTP/1.1 pipelining.'
+# PROMPT_FILE lets a run decode at real context depth. -c alone only sizes the
+# KV allocation; depth comes from how many tokens are actually in the cache.
+PROMPT_FILE="${PROMPT_FILE:-}"
+if [[ -n "$PROMPT_FILE" ]]; then
+    [[ -f "$PROMPT_FILE" ]] || { echo "ERROR: PROMPT_FILE not found: $PROMPT_FILE" >&2; exit 2; }
+    PROMPT=$(cat "$PROMPT_FILE")
+else
+    PROMPT='Write a detailed technical explanation of how HTTP/2 multiplexing works. Cover streams, frames, flow control, and HPACK header compression, and explain how it differs from HTTP/1.1 pipelining.'
+fi
 
 # --- Arguments --------------------------------------------------------------
 [[ $# -eq 4 ]] || { sed -n '2,14p' "$0" >&2; exit 2; }
@@ -132,19 +140,27 @@ for rep in $(seq 1 "$REPS"); do
         exit 1
     fi
 
-    RESP=$(curl -sf -m 900 "http://127.0.0.1:${PORT}/v1/chat/completions" \
+    # -s not -sf: on an HTTP error we want the body, which carries the reason.
+    RESP=$(curl -s -m 900 "http://127.0.0.1:${PORT}/v1/chat/completions" \
         -H 'Content-Type: application/json' \
         -d "$(python3 -c '
 import json,sys
 print(json.dumps({"messages":[{"role":"user","content":sys.argv[1]}],
  "temperature":0,"top_k":1,"seed":42,"max_tokens":int(sys.argv[2]),"cache_prompt":False,
  "timings_per_token":False}))' "$PROMPT" "$N_PREDICT")") || {
-        echo "ERROR: request rep $rep failed" >&2
+        echo "ERROR: request rep $rep failed (curl)" >&2
         row "$rep" "" "" "" "" "" "" "$GPU0" "$GPU1" "" "$LOAD_S" "FAILED(request)"
         continue
     }
 
     echo "$RESP" >> "$RAW"
+    if ! grep -q '"timings"' <<<"$RESP"; then
+        echo "ERROR: rep $rep returned no timings - server said:" >&2
+        python3 -c 'import json,sys; print("  "+str(json.loads(sys.argv[1]).get("error","<unparseable>")))' "$RESP" >&2 2>/dev/null \
+            || echo "  ${RESP:0:400}" >&2
+        row "$rep" "" "" "" "" "" "" "$GPU0" "$GPU1" "" "$LOAD_S" "FAILED(request)"
+        continue
+    fi
     PEAK=$(awk -F'[ ,|]+' '{for(i=3;i<=NF;i+=4) if($i+0>m) m=$i+0} END{print m+0}' "$TEMPS")
     eval "$(python3 - "$RESP" <<'PY'
 import json,sys

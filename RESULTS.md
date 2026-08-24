@@ -135,6 +135,39 @@ same drafter, to the exact draft-token count (MTP 228/513 in all three arms).
 That is what makes this a real null rather than a noisy one — had placement
 perturbed anything but locality, acceptance would have moved too.
 
+### Depth check — does the null survive a real context?
+
+The table above decodes at ~450 tokens of actual depth: `-c 4096` only sizes the
+KV *allocation*, and a short prompt plus 400 generated tokens never fills it.
+Since placement is a locality question and inter-GPU traffic scales with depth,
+the null was re-tested at `-c 16384` driven by a **14.5k-token prompt** (the
+repo's own docs — real varied text, deterministic), DFlash2-Q4, 3 reps.
+
+| Placement | Decode t/s (mean 3) | Prefill t/s | Acceptance | VRAM 0/1 (MiB) | GPU1 free | Peak |
+|---|---|---|---|---|---|---|
+| `default` | **17.10** | 160.0 | 64.8% (263/406) | 10201 / 11087 | 5182 | 63°C |
+| `-devd CUDA1` | 17.06 | 160.1 | 64.8% (263/406) | 9079 / 11887 | **4382** | 63°C |
+
+**The null holds at depth** — 0.2% apart, with `default` fractionally ahead, and
+acceptance identical to the token (263/406 in both). H11 is refuted at both
+~450 and ~14.5k tokens of context.
+
+Note the VRAM column: at this depth `-devd CUDA1` gives up **800 MiB of headroom
+on the card that is already fullest** (2808 MiB imbalance vs 886 for `default`)
+in exchange for nothing measurable. That is the argument against pinning, and it
+grows with context.
+
+Two incidental observations, neither part of H11:
+
+- **Decode is *faster* at 14.5k depth than at 450** (17.10 vs 14.46 t/s),
+  because acceptance rose from 45.8% to 64.8%. Summarising a supplied document
+  is far more predictable than free-form generation, and the drafter wins more
+  often. Depth cost less than predictability gained — worth remembering when
+  reading any single-prompt acceptance figure, including this one.
+- **Prefill is measurable here**: ~160 t/s over 14.5k tokens, stable across all
+  six runs. Unlike the short-prompt rows, these numbers look like genuine
+  reprocessing rather than prefix reuse.
+
 ### Two findings that were not what H11 was looking for
 
 **1. `-devd CUDA0` aborts with any DFlash2 drafter.** Reproducible on both
