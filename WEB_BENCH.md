@@ -49,7 +49,24 @@ cd /root/p100-benchmarks
 # same config with MTP, for the usable-speed delta
 ./scripts/run-web-bench.sh buun /root/Qwen3.8-27B-UD-Q6_K_M.gguf layer p5-buun-layer-q6k-mtp 1 \
   -md /root/mtp-Qwen3.8-27B-Q4_0.gguf --spec-type draft-mtp --spec-draft-n-max 3
+
+# DFlash2 — mainline engine only, and needs its own no-drafter control run
+./scripts/run-web-bench.sh mainline /root/Qwen3.8-27B-UD-Q6_K_M.gguf layer p5-main-layer-q6k 2
+./scripts/run-web-bench.sh mainline /root/Qwen3.8-27B-UD-Q6_K_M.gguf layer p5-main-layer-q6k-df2q4 3 \
+  -md /root/Qwen3.8-27B-DFlash2-Q4_K_M.gguf --spec-type draft-dflash --spec-draft-n-max 7
+./scripts/run-web-bench.sh mainline /root/Qwen3.8-27B-UD-Q6_K_M.gguf layer p5-main-layer-q6k-df2q8 4 \
+  -md /root/Qwen3.8-27B-DFlash2-Q8_0.gguf --spec-type draft-dflash --spec-draft-n-max 7
+
+# single-GPU leg, if dual-GPU DFlash2 turns out to misbehave
+CUDA_VISIBLE_DEVICES=0 ./scripts/run-web-bench.sh mainline \
+  /root/Qwen3.8-27B-UD-IQ3_S.gguf none p5-main-none-iq3s-df2q4 5 \
+  -md /root/Qwen3.8-27B-DFlash2-Q4_K_M.gguf --spec-type draft-dflash --spec-draft-n-max 7
 ```
+
+**`--spec-type draft-dflash` selects v1 or v2 depending on the drafter**, not on
+the flag. On `mainline` with a v2 drafter you get v2; on `buun`/`ik` the same
+line silently runs v1. Check the server log before recording a DFlash2 number —
+see H8.
 
 `<index>` must be unique per model version and is the whole port scheme:
 

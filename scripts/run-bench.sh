@@ -2,7 +2,7 @@
 # Run one benchmark cell: preflight -> telemetry -> benchmark -> log -> commit+push.
 #
 # Usage: ./scripts/run-bench.sh <engine> <model-path> <split-mode> <label> [extra llama-bench args...]
-#   engine      pflash | buun | ik
+#   engine      pflash | buun | ik | mainline
 #   split-mode  see METHODOLOGY.md -- support differs per engine
 #   label       e.g. phase1-pflash-layer-q6k  (used for filenames and commit message)
 #
@@ -39,7 +39,8 @@ case "$ENGINE" in
     pflash) BIN=/root/pflash-llama.cpp/build-cuda-p100/bin/llama-bench ;;
     buun)   BIN=/root/buun-llama-cpp/build-cuda-p100/bin/llama-bench ;;
     ik)     BIN=/root/ik_llama.cpp/build/bin/llama-bench ;;
-    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik)" >&2; exit 2 ;;
+    mainline) BIN=/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench ;;
+    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|mainline)" >&2; exit 2 ;;
 esac
 
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }

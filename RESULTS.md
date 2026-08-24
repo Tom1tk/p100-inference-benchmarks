@@ -40,7 +40,7 @@ Notes:
 
 | Engine | Quant | Split | pp2048 | pp4096 | pp8192 | pp16384 | tg128 | VRAM (GPU0/GPU1) | Peak temp | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| pflash | UD-Q6_K_M | layer | 188.46 | 197.11 | 198.21 | 193.38 | 9.45 | — | 65°C | `-r 3`. `none` (single-GPU reference) blocked — 21.5GB model doesn't fit one 16GB card, `failed to load model` |
+| pflash | UD-Q6_K_M | layer | 188.46 | 197.11 | 198.21 | 193.38 | 9.45 | — | 65°C | `-r 3`. `none` (single-GPU reference) blocked — 21.5GB model doesn't fit one 16GB card, `failed to load model`. Superseded: use `UD-IQ3_S` for the single-GPU leg |
 
 Cells needed: {pflash, buun, ik} × {none, layer}, plus ik × graph once
 unblocked.
@@ -59,7 +59,10 @@ unblocked.
 
 | Engine | Split | Quant | pp16384 | tg128 | VRAM | Notes |
 |---|---|---|---|---|---|---|
-| _pending_ | | | | | | |
+| _pending_ | | `IQ3_S` | | | | Run on both `layer` and `none` — the only single-GPU-capable target |
+| _pending_ | | `Q4_K_M` | | | | |
+| _pending_ | | `Q5_K_M` | | | | |
+| _pending_ | | `Q6_K_M` | | | | |
 
 ---
 
@@ -75,7 +78,8 @@ criteria in [WEB_BENCH.md](WEB_BENCH.md). Machine-readable: `results/web-bench.c
 | _pending_ | | | | | | | | | |
 
 Drafter arms per config: none (control) · MTP · DFlash2-Q4 · DFlash2-Q8.
-The DFlash2 arms are blocked — see H8.
+The DFlash2 arms require `engine = mainline`, which needs its own no-drafter
+control row so the drafter comparison isn't confounded with the engine. See H8.
 
 ### Quality
 
@@ -96,5 +100,5 @@ Hand-scored after each run. A model can be fast and still fail here.
 | H4 (TurboQuant KV penalty) | _pending_ | |
 | H5 (NCCL harmful) | `phase0-ik-graph-q6k` | **Partly confirmed** — fails outright, not merely slower. See HYPOTHESES.md |
 | H7 (dispatch bug) | _pending_ | |
-| H8 (DFlash2 usable) | Engine survey — none of the three supports it | **Blocked.** Needs upstream PR #27342 built for sm_60. See HYPOTHESES.md |
-| H9 (Q8 vs Q4 drafter) | _pending_ | Gated on H8 |
+| H8 (DFlash2 usable) | `mainline` (PR #27342) built for sm_60; drafters verified v2 | **Unblocked, untested.** Forks have v1 only. See HYPOTHESES.md |
+| H9 (Q8 vs Q4 drafter) | _pending_ | No longer gated |

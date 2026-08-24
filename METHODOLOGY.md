@@ -51,6 +51,23 @@ paths generally do not. This asymmetry underlies several hypotheses.
 | `pflash` | `Tom1tk/mtp-pflash-turboquant-hip` (HIP-descended, CUDA-capable) | `e05ff58b7` (build 9110) | `/root/pflash-llama.cpp/build-cuda-p100/bin/` |
 | `buun` | `spiritbuun/buun-llama-cpp` (CUDA-native turboquant lineage) | `39d97a876` (build 11260) | `/root/buun-llama-cpp/build-cuda-p100/bin/` |
 | `ik` | `ikawrakow/ik_llama.cpp` | `8337e4c` ("Fix Qwen35+ MTP") | `/root/ik_llama.cpp/build/bin/` |
+| `mainline` | `ggml-org/llama.cpp` **PR #27342** (`dflash2` branch) | `64f765f5` | `/root/dflash2-llama.cpp/build-cuda-p100/bin/` |
+
+`mainline` was added on 2026-08-24 specifically to run DFlash2, which none of
+the three forks can (see H8). It is a `git worktree` of `/root/mainline-llama.cpp`
+on the fetched PR branch, so `master` stays clean and the PR can be refreshed
+with a plain `git fetch`:
+
+```bash
+cd /root/mainline-llama.cpp
+git fetch origin pull/27342/head:pr-27342
+git worktree add /root/dflash2-llama.cpp pr-27342
+```
+
+The PR is **open, not merged** (checked 2026-08-24: `state: OPEN`,
+`mergeable: MERGEABLE`, base `master`, 16 files, +563/−7). It is small and
+self-contained. Re-check before treating any `mainline` number as reproducible
+from a released build — if it merges, pin the merge commit here instead.
 
 ### Split-mode support — verified, differs per engine
 
@@ -62,6 +79,7 @@ table was wrong about `ik`.
 | `pflash` | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `buun` | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `ik` | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `mainline` | ✅ | ✅ | ✅ | ✅ | ❌ |
 
 `-sm graph` exists **only** in `ik_llama`. `row`/`tensor` exist only in
 `pflash`/`buun`. Passing an unsupported value gives
@@ -76,6 +94,24 @@ Verified from each engine's `--help`. Do not assume a shared syntax:
 | `pflash` | `--spec-type mtp --spec-draft-n-max N` |
 | `buun` | `--spec-type draft-mtp --spec-draft-n-max N` (enum value is `draft-mtp`, **not** `mtp`) |
 | `ik` | `--spec-type mtp:n_max=N,p_min=P` |
+| `mainline` | `--spec-type draft-mtp` (same enum as `buun`) |
+
+### DFlash2 flag syntax (`mainline` only)
+
+```bash
+--model-draft /root/Qwen3.8-27B-DFlash2-Q4_K_M.gguf \
+--spec-type draft-dflash --spec-draft-n-max 7
+```
+
+**The flag is the same `draft-dflash` used for v1.** PR #27342 does not add a
+new `--spec-type` value — it auto-detects v2 from the draft GGUF's
+`dflash.selector_top_k` metadata key (`common/speculative.cpp`:
+`is_dflash2 = selector_top_k > 0`).
+
+This is exactly why a v1 engine cannot be trusted to report a DFlash2 result:
+the same command line runs a different algorithm depending on whether the loader
+understands the selector. Verify from the server log that the selector was
+picked up before recording any number.
 
 ### Other per-engine differences
 
@@ -97,7 +133,22 @@ cmake --build build-cuda-p100 --config Release -j12
 # ik_llama — NOTE: GGML_NCCL defaults ON and breaks graph split on this rig
 cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60 -DCMAKE_BUILD_TYPE=Release -DGGML_NCCL=OFF
 cmake --build build --config Release -j12
+
+# mainline PR #27342 (DFlash2). LLAMA_CURL=OFF — no libcurl dev headers here,
+# and models are all local anyway.
+cd /root/dflash2-llama.cpp
+cmake -B build-cuda-p100 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60 \
+      -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
+cmake --build build-cuda-p100 --config Release -j12
 ```
+
+**Pascal is still first-class in mainline.** `ggml/src/ggml-cuda/CMakeLists.txt`
+documents `60 == P100, FP16 CUDA intrinsics` in its architecture list, and the
+CUDA-12 branch of that list is what our toolkit (12.0) takes. The only new CUDA
+kernel the PR adds (`ggml/src/ggml-cuda/top-k.cu`, a two-stage tiled top-k) uses
+nothing newer than shared memory and `__syncthreads()` — no warp-level
+reductions requiring sm_70, no tensor cores, no async copy, no bf16. Reviewed
+before building, and it configured for `sm_60` without complaint.
 
 The current `ik` build was made **without** `-DGGML_NCCL=OFF` and therefore
 has NCCL linked in. This is the open blocker — see H5.
@@ -113,12 +164,27 @@ All files present on disk under `/root/`:
 
 | File | Quantizer | Size | Role |
 |---|---|---|---|
+| `Qwen3.8-27B-UD-IQ3_S.gguf` | Unsloth Dynamic (IQ) | ~11 GiB (downloading) | **Single-GPU quant** — the only one that fits one 16 GiB P100 with room for KV |
 | `Qwen3.8-27B-UD-Q4_K_M.gguf` | Unsloth Dynamic | 15.33 GiB | Split-friendly, large KV budget |
 | `Qwen3.8-27B-UD-Q5_K_M.gguf` | Unsloth Dynamic | 18.41 GiB | Midpoint |
 | `Qwen3.8-27B-UD-Q6_K_M.gguf` | Unsloth Dynamic | 21.50 GiB | **Primary test quant** — handover doc's recommended split target |
 | `Qwen3.8-27B-UD-Q4_K_XL.gguf` | Unsloth Dynamic (XL) | 16.35 GiB | **H2 split-stall test only** — not a general split candidate |
 | `Qwen3.8-27B-Uncensored-noMTP-Q4_K_M.gguf` | non-Unsloth ("stock") | 15.41 GiB | H3 stock-quant degradation test. Filename implies no MTP head — confirm before use |
 | `mtp-Qwen3.8-27B-Q4_0.gguf` | — | 1.28 GiB | MTP draft head. Verified: `qwen35.nextn_predict_layers = 1`, arch matches base |
+| `Qwen3.8-27B-DFlash2-Q4_K_M.gguf` | — | 1.06 GiB | DFlash2 drafter. Verified v2 — see below |
+| `Qwen3.8-27B-DFlash2-Q8_0.gguf` | — | 1.92 GiB | DFlash2 drafter. Verified v2 — see below |
+
+**`UD-IQ3_S` is not just another point on the quant curve.** At ~11 GiB it is
+the only target that fits a *single* 16 GiB card alongside a usable KV cache, so
+it is the model that makes `-sm none` measurable at all. Every other quant on
+this list fails to load on one card (`Q6_K_M` at 21.5 GiB is what produced the
+`failed to load model` in the Phase 1 table). It therefore does double duty:
+a row in the Phase 3 quant sweep, and the single-GPU reference that H6 needs.
+
+Expect it to be the slowest per-token of the dynamic quants on prefill — IQ
+quants are more compute-heavy to dequantize, and sm_60 has no dp4a — so read its
+Phase 3 numbers as "what single-GPU costs," not as a like-for-like quant
+comparison against the K-quants.
 
 ### Drafters (speculative decoding)
 
@@ -129,9 +195,21 @@ against a base model, not against a target quant.
 | Drafter | Source | Engines that can drive it | Status |
 |---|---|---|---|
 | _(none)_ | — | all | Control |
-| MTP head | `mtp-Qwen3.8-27B-Q4_0.gguf` (on disk, verified) | pflash, buun, ik | Ready |
-| DFlash2 Q4_K_M | `z-lab/Qwen3.8-27B-DFlash2-GGUF` (~1.1 GB) | **none yet** — see H8 | Downloading |
-| DFlash2 Q8_0 | `z-lab/Qwen3.8-27B-DFlash2-GGUF` (~2.0 GB) | **none yet** — see H8 | Downloading |
+| MTP head | `mtp-Qwen3.8-27B-Q4_0.gguf` (verified) | pflash, buun, ik, mainline | Ready |
+| DFlash2 Q4_K_M | `z-lab/Qwen3.8-27B-DFlash2` (1.06 GiB) | **`mainline` only** | On disk, v2 verified |
+| DFlash2 Q8_0 | `z-lab/Qwen3.8-27B-DFlash2` (1.92 GiB) | **`mainline` only** | On disk, v2 verified |
+
+Both DFlash2 files were confirmed to be genuine v2 by metadata, not by filename:
+
+```
+dflash.selector_rank  = 256
+dflash.selector_top_k = 16
+selector_hidden.weight / selector_predecessor.weight / selector_successor.weight
+```
+
+Those three tensors are exactly what PR #27342 adds mappings for
+(`LLM_TENSOR_DFLASH_SELECTOR_{HIDDEN,PREV,NEXT}`). A v1 engine has no mapping
+for them.
 
 **Speculative decoding here is output-preserving.** The target model verifies
 every drafted token over its full vocabulary, so drafter choice and drafter
@@ -179,7 +257,8 @@ binary — this means don't pass the `--spec-type` values that select them
 **DFlash2 is explicitly back in scope** (2026-08-24, operator's call). It is a
 different drafter from DFlash v1 — a separate checkpoint, a separate upstream PR
 (#27342 vs #22105), and a candidate-path selector v1 doesn't have. The v1
-verdict does not transfer to it. No engine here can load it yet; see H8.
+verdict does not transfer to it. It is now runnable via the `mainline` engine
+built from that PR; see H8.
 
 **In scope:** TurboQuant (KV-cache quantization), MTP, and DFlash2.
 
