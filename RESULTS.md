@@ -100,6 +100,85 @@ Hand-scored after each run. A model can be fast and still fail here.
 
 ---
 
+## Phase 6 — H11: drafter placement
+
+Target `UD-Q4_K_M`, `-sm layer`, `-c 4096`, `-fa 1`, `-ngl 99`, 400 tokens,
+temp 0, seed 42, 3 reps. Only the drafter and its `-devd` placement vary.
+Raw: `results/h11-placement.csv`, `results/h11/*.jsonl`.
+
+`decode` is the mean of reps 2-3; rep 1 is discarded because a cold page cache
+depresses it (see the mtp-default 13.91 outlier). **Ignore the `prefill_tps`
+column** — `cache_prompt: false` did not defeat the server's slot-level LCP
+prefix reuse (`f_sim_best = 1.000` in the logs), so reps 2-3 skip most of
+prefill. Decode and acceptance are unaffected, and they are what H11 turns on.
+
+| Arm | Placement | Decode t/s | vs control | Acceptance | VRAM 0/1 (MiB) | Peak |
+|---|---|---|---|---|---|---|
+| no drafter | — | **12.79** | — | — | 7693 / 8769 | 59°C |
+| MTP-Q4_0 | default | 14.11 | +10.3% | 44.9% | 8647 / 10997 | 59°C |
+| MTP-Q4_0 | `-devd CUDA0` | 14.12 | +10.4% | 44.9% | 9569 / 9983 | 58°C |
+| MTP-Q4_0 | `-devd CUDA1` | 14.11 | +10.3% | 44.9% | 8647 / 10905 | 60°C |
+| DFlash2-Q4_K_M | default | 14.46 | +13.0% | 45.8% | 9679 / 10619 | 59°C |
+| DFlash2-Q4_K_M | `-devd CUDA0` | — | — | — | — | ❌ **abort** |
+| DFlash2-Q4_K_M | `-devd CUDA1` | **14.48** | **+13.2%** | 45.8% | 8647 / 11361 | 60°C |
+| DFlash2-Q8_0 | default | 14.44 | +12.9% | 44.4% | 10291 / 10879 | 59°C |
+| DFlash2-Q8_0 | `-devd CUDA0` | — | — | — | — | ❌ **abort** |
+| DFlash2-Q8_0 | `-devd CUDA1` | 14.46 | +13.1% | 44.4% | 8647 / 12233 | 60°C |
+
+**Placement does not affect decode throughput.** Within each drafter the spread
+is 0.01-0.02 t/s (≤0.15%), far inside run-to-run noise, while VRAM demonstrably
+moved between cards (GPU0 ranges 8647-10291 MiB). The flag works; decode does
+not care. **H11 is refuted.**
+
+The control variable behaved: acceptance is identical across placements of the
+same drafter, to the exact draft-token count (MTP 228/513 in all three arms).
+That is what makes this a real null rather than a noisy one — had placement
+perturbed anything but locality, acceptance would have moved too.
+
+### Two findings that were not what H11 was looking for
+
+**1. `-devd CUDA0` aborts with any DFlash2 drafter.** Reproducible on both
+quants, at load, before any token:
+
+```
+llama_init_from_model: failed to initialize the context: dflash requires ctx_other to be set
+srv load_model: [spec] failed to measure draft model memory
+ggml-backend.cpp:930: pre-allocated tensor (output.weight) in a buffer (CUDA1)
+                      that cannot run the operation (NONE)   -> ggml_abort
+```
+
+Cause: the DFlash2 drafter GGUF ships **neither `output.weight` nor
+`token_embd.weight`** — it borrows the target's through `cparams.ctx_other`.
+Under `-sm layer` the target's `output.weight` lives on the last device, CUDA1.
+`-devd CUDA0` restricts the draft context to CUDA0, so the borrowed tensor sits
+in a buffer the draft scheduler may not use, and ggml aborts.
+
+This explains every cell: MTP carries its own `output.weight` and
+`token_embd.weight`, so all three of its placements load; DFlash2 survives
+`default` (both devices permitted) and `CUDA1` (where the tensor already is),
+and only ever fails on `CUDA0`. It is an upstream bug in PR #27342, not a P100
+or VRAM limit — GPU0 had ~6 GiB free at the time.
+
+**2. The Q8 drafter is not better than the Q4 drafter** (H9 evidence).
+DFlash2-Q8_0 accepted 228/513 = 44.4%; DFlash2-Q4_K_M accepted 231/504 = 45.8%,
+and was fractionally faster (14.48 vs 14.46 t/s) while using **0.87 GiB less
+VRAM**. One prompt at temp 0, so this is exact but not yet general — it needs
+more prompts before H9 is called. It does mean the Q8 drafter has no measured
+advantage to justify its footprint.
+
+### First honest speculative-decoding speedups
+
+With mainline's own no-drafter control at 12.79 t/s, the real numbers are
+**+10.3% (MTP)** and **+13.0% (DFlash2)** — not the ~70% the earlier
+uncontrolled 9.45 → 16.10 t/s comparison implied. That older pair differed in
+engine, tool, and context depth; this one differs only in the drafter.
+
+Note the gap between acceptance and speedup: DFlash2 accepts 45.8% of drafted
+tokens and returns 13%. On P100 the verify pass is not cheap enough for
+acceptance to translate proportionally.
+
+---
+
 ## Phase 4 — hypothesis tests
 
 | Hypothesis | Evidence | Verdict |
@@ -110,4 +189,5 @@ Hand-scored after each run. A model can be fast and still fail here.
 | H5 (NCCL harmful) | `phase0-ik-graph-q6k` | **Partly confirmed** — fails outright, not merely slower. See HYPOTHESES.md |
 | H7 (dispatch bug) | _pending_ | |
 | H8 (DFlash2 usable) | `h8-loadcheck-df2q4` — runs on both GPUs, 57.0% acceptance, clean output | **Works.** Speedup not yet quantified — needs mainline's own no-drafter control |
-| H9 (Q8 vs Q4 drafter) | _pending_ | No longer gated |
+| H9 (Q8 vs Q4 drafter) | `h11-df2q8-*` vs `h11-df2q4-*` | **Leaning no** — Q8 accepted 44.4% vs Q4's 45.8%, no faster, +0.87 GiB. One prompt; needs more |
+| H11 (drafter placement) | `results/h11-placement.csv` | **Refuted** — ≤0.15% spread across placements. Found a `-devd CUDA0` abort with DFlash2 instead |
