@@ -4,3 +4,7 @@
 # Scratch
 *.tmp
 *.swp
+
+# Generated sites: keep the source (it's quality evidence), never the deps
+sites/*/*/node_modules/
+sites/*/.pi-agent/sessions/
