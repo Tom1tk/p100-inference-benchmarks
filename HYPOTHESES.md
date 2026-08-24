@@ -16,7 +16,7 @@ run label so the evidence is traceable.
 | H5 | NCCL is harmful for split inference | **Partly confirmed — worse than claimed** |
 | H6 | `-sm graph` is the best split mode | Untested (`graph` blocked by H5; single-GPU leg unblocked by IQ3_S) |
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
-| H8 | DFlash2 is worth using on this rig | Untested — **unblocked**, `mainline` engine built |
+| H8 | DFlash2 is worth using on this rig | **Runs on both GPUs, 57% acceptance** — speedup unquantified |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
 
 ---
@@ -177,10 +177,47 @@ specifically. The v1/PFlash exclusion still stands.
 **Claim:** DFlash2 gives a materially better decode speedup than the MTP head on
 Qwen3.8-27B, without breaking tool calls.
 
-**Status: unblocked and ready to test.** The earlier "no engine supports it"
-verdict was right about the three forks and wrong to stop there — upstream
-`ggml-org/llama.cpp` **PR #27342** is the engine, and it builds for `sm_60`.
-Now the fourth engine `mainline` (METHODOLOGY §3).
+**Status: it runs, on both cards, and the output is clean.** The earlier "no
+engine supports it" verdict was right about the three forks and wrong to stop
+there — upstream `ggml-org/llama.cpp` **PR #27342** is the engine, it builds for
+`sm_60`, and it works. Now the fourth engine `mainline` (METHODOLOGY §3).
+
+### First result — `h8-loadcheck-df2q4` (2026-08-24)
+
+`mainline` · `UD-Q6_K_M` · `DFlash2-Q4_K_M` · `-sm layer` · `-c 4096` ·
+`--spec-draft-n-max 7` · one prompt, 300 tokens, `temperature 0`.
+
+| | |
+|---|---|
+| Load time | 4m40s |
+| VRAM | 13.8 GiB (GPU0) / 15.0 GiB (GPU1) — **both cards** |
+| Decode | **16.10 t/s** |
+| Draft tokens / accepted | 419 / 239 — **57.0% acceptance** |
+| Output | Correct iterative linked-list reversal, no mangling |
+| Peak temp | 49°C |
+
+**This is a load check, not a benchmark.** One prompt, short context, greedy
+sampling. Do not quote 16.10 t/s as the DFlash2 figure.
+
+The tempting comparison — 16.10 vs the Phase 1 `llama-bench` tg128 of 9.45 t/s
+(pflash/layer/Q6_K_M, no drafter) — is **confounded**: different engine,
+different tool, different context depth. It hints at ~1.7× but proves nothing.
+The honest measurement is mainline's own no-drafter control, which is the next
+run.
+
+**The dual-GPU question is settled empirically.** 13.8/15.0 GiB resident across
+both cards while generating at 57% acceptance. The `buun` tree-verify
+restriction does not apply to mainline, as the code reading predicted. The
+single-GPU `IQ3_S` leg is still worth running as a quant and single-GPU
+reference, but it is no longer a DFlash2 rescue path.
+
+**Verifying v2 turned out to be easier than expected.** The startup log prints
+the shared dflash parameters (`n_max=7, block_size=8, n_extract=5`) but not the
+v1/v2 branch. It doesn't need to: the response `timings` object carries
+`draft_n` and `draft_n_accepted` directly, so acceptance is measurable per
+request. `scripts/web_bench_metrics.py` already records the whole timings object,
+so Phase 5 captures acceptance rate for free — no log parsing, and no reliance on
+a version banner.
 
 ### Why the forks can't do this
 
@@ -221,8 +258,7 @@ empirically** — that is a code reading, not a run.
 
 ### Test
 
-1. Load check on `mainline` with `-sm layer` — confirm the selector is picked up
-   and both cards are used. Cheap; do it first.
+1. ~~Load check on `mainline` with `-sm layer`~~ — **done**, see above.
 2. Phase 2-style decode comparison: none / MTP / DFlash2-Q4 / DFlash2-Q8, same
    target and split, acceptance rate recorded alongside t/s.
 3. Phase 5 web-bench for the tool-calling stress test — where v1's mangling

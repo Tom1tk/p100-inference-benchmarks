@@ -47,11 +47,20 @@ unblocked.
 
 ---
 
-## Phase 2 — MTP on/off
+## Phase 2 — drafters on/off
 
-| Engine | Quant | MTP | tg128 | Speedup | Acceptance rate | Notes |
+| Engine | Quant | Drafter | tg128 | Speedup | Acceptance rate | Notes |
 |---|---|---|---|---|---|---|
 | _pending_ | | | | | | |
+
+### Preliminary — not part of the matrix
+
+One-prompt load check, **not** `llama-bench`, **not** comparable to the rows
+above or to Phase 1. Recorded because it is the first evidence DFlash2 runs here.
+
+| Engine | Quant | Drafter | Split | Decode | Acceptance | Notes |
+|---|---|---|---|---|---|---|
+| mainline | UD-Q6_K_M | DFlash2-Q4_K_M | layer | 16.10 t/s | 239/419 = 57.0% | `-c 4096`, 300 tok, temp 0, one prompt. Load 4m40s, 13.8/15.0 GiB, 49°C |
 
 ---
 
@@ -100,5 +109,5 @@ Hand-scored after each run. A model can be fast and still fail here.
 | H4 (TurboQuant KV penalty) | _pending_ | |
 | H5 (NCCL harmful) | `phase0-ik-graph-q6k` | **Partly confirmed** — fails outright, not merely slower. See HYPOTHESES.md |
 | H7 (dispatch bug) | _pending_ | |
-| H8 (DFlash2 usable) | `mainline` (PR #27342) built for sm_60; drafters verified v2 | **Unblocked, untested.** Forks have v1 only. See HYPOTHESES.md |
+| H8 (DFlash2 usable) | `h8-loadcheck-df2q4` — runs on both GPUs, 57.0% acceptance, clean output | **Works.** Speedup not yet quantified — needs mainline's own no-drafter control |
 | H9 (Q8 vs Q4 drafter) | _pending_ | No longer gated |
