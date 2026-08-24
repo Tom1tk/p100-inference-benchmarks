@@ -25,3 +25,9 @@ h11-df2q8-cuda0,draft-dflash,Qwen3.8-27B-DFlash2-Q8_0.gguf,CUDA0,0,,,,,,,,,,40,F
 h11-df2q8-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q8_0.gguf,CUDA1,1,14.47,35.69,400,513,228,44.4,8647,12233,57,10,ok
 h11-df2q8-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q8_0.gguf,CUDA1,2,14.47,43.32,400,513,228,44.4,8647,12233,59,10,ok
 h11-df2q8-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q8_0.gguf,CUDA1,3,14.45,43.24,400,513,228,44.4,8647,12233,60,10,ok
+h11-depth16k-df2q4-default,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,default,1,17.14,159.40,400,406,263,64.8,10201,11087,59,10,ok
+h11-depth16k-df2q4-default,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,default,2,17.07,160.28,400,406,263,64.8,10201,11087,61,10,ok
+h11-depth16k-df2q4-default,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,default,3,17.08,160.19,400,406,263,64.8,10201,11087,63,10,ok
+h11-depth16k-df2q4-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,CUDA1,1,17.09,159.59,400,406,263,64.8,9079,11887,61,10,ok
+h11-depth16k-df2q4-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,CUDA1,2,17.06,160.50,400,406,263,64.8,9079,11887,63,10,ok
+h11-depth16k-df2q4-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,CUDA1,3,17.04,160.33,400,406,263,64.8,9079,11887,63,10,ok

@@ -531,3 +531,56 @@ drafter currently has no measured advantage to justify its footprint.
   figure is the rep 2-3 mean. First load took 182s at ~112 MB/s disk-bound;
   subsequent loads of the same target hit page cache and took 10-35s.
 - Peak temp across all 10 arms was 60°C, 23°C under the 83°C limit.
+
+---
+
+## 2026-08-24 — H11 depth check, and H11 closed
+
+`-c 4096` with a ~50-token prompt only ever decodes at ~450 tokens of real
+depth — `-c` sizes the KV allocation, not the occupancy. Since placement is a
+locality claim and inter-GPU traffic scales with depth, the 4096 null was not
+sufficient on its own. Re-ran `default` vs `-devd CUDA1` (DFlash2-Q4) at
+`-c 16384` behind a 14.5k-token prompt built from the repo's own docs — real,
+varied, deterministic text rather than repeated filler.
+
+| Placement | Decode | Prefill | Acceptance | VRAM 0/1 | GPU1 free |
+|---|---|---|---|---|---|
+| `default` | 17.10 t/s | 160.0 t/s | 263/406 = 64.8% | 10201/11087 | 5182 MiB |
+| `-devd CUDA1` | 17.06 t/s | 160.1 t/s | 263/406 = 64.8% | 9079/11887 | 4382 MiB |
+
+0.2% apart, `default` fractionally ahead, acceptance identical to the token.
+**H11 is refuted at both depths and is now closed.**
+
+Settled the standing recommendation: **do not pass `-devd`.** `CUDA1` was
+tempting because it is the one pin DFlash2 tolerates, but `default` tolerates it
+too — only `CUDA0` aborts — so there is no compatibility argument, and pinning
+costs 800 MiB of headroom on the already-fuller card at 16k, growing with
+context.
+
+Also retired the load-time argument for pinning. The apparent "CUDA1 loads
+faster" pattern (10s vs 21s/35s) was page-cache first-touch ordered by run
+sequence: every `default` arm happened to be the first read of its drafter file,
+every `CUDA1` arm ran third in its group. The controlled pair is
+`h11-mtp-cuda0` and `h11-mtp-cuda1` — same drafter, same cache state — at 10s
+and 10s. Run 2 also loads *no* drafter in 20s, slower than run 4 loads one in
+10s. Failed arms' 20s/40s are abort-plus-backtrace, not load.
+
+### Incidental: decode is faster at depth, not slower
+
+17.10 t/s at 14.5k vs 14.46 t/s at 450. Acceptance rose 45.8% -> 64.8%:
+summarising a supplied document is much more predictable than free-form
+generation, and that outweighed the deeper-KV cost. A caution against reading
+any single-prompt acceptance number as a property of the drafter — it is a
+property of drafter *and* task.
+
+### Harness bugs found and fixed
+
+- **First attempt at this run failed all six requests and recorded no reason.**
+  `curl -sf` hides the response body, so the harness logged three
+  `FAILED(request)` rows per arm with nothing to diagnose. The server had said
+  `request (18313 tokens) exceeds the available context size (16384 tokens)` —
+  my chars-per-token estimate was 4.0 when the real ratio is 3.18. Switched to
+  `curl -s` plus an explicit `"timings"` check that prints the server's error
+  into the log. The bogus rows were removed from the CSV; they were a harness
+  defect, not a measurement.
+- `scripts/run-spec-placement.sh` gained `CTX` and `PROMPT_FILE` env overrides.
