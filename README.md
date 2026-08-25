@@ -1,6 +1,6 @@
 # Dual Tesla P100 — Qwen3.8-27B Inference Engine Benchmarks
 
-Benchmarking three llama.cpp-family inference engines on a dual Tesla P100
+Benchmarking four llama.cpp-family inference engines on a dual Tesla P100
 (sm_60) rig to find the fastest stable configuration for serving Qwen3.8-27B.
 
 **If you are an agent picking this work up: read [RUNBOOK.md](RUNBOOK.md) first.**
@@ -13,26 +13,53 @@ and the mandatory commit/push protocol. Everything else is reference.
 
 | | |
 |---|---|
-| Phase 0 — smoke tests | **Done** (cooling validated, one engine blocked) |
-| Phase 1 — engine baseline | **In progress** (pflash/layer done) |
-| Phase 2 — drafters on/off | Not started |
-| Phase 3 — quant sweep | Not started |
-| Phase 4 — hypothesis tests | Not started |
+| Phase 0 — smoke tests | **Done** |
+| Phase 1 — engine baseline | **Done** except the single-GPU (`none`) leg, deferred |
+| Phase 2 — drafters on/off | **Done** |
+| Phase 3 — quant sweep | Not started (a partial KV-quant sweep was run — see RESULTS) |
+| Phase 4 — hypothesis tests | **9 of 12 settled** — see below |
 | Phase 5 — agentic web build | Not started (tooling ready) |
-| Phase 6 — dual-GPU transport (H10–H12) | Not started |
+| Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
 
-**Resolved (2026-08-24):** DFlash2 now runs. The three forks all have DFlash
-**v1**; upstream `ggml-org/llama.cpp` **PR #27342** has v2, and it builds for
-`sm_60`. Added as a fourth engine, `mainline`. Both drafters are on disk and
-metadata-verified as genuine v2. See H8.
+### Best measured configuration
 
-**Blocker 1:** `ik_llama` `-sm graph` aborts with `ncclAllReduce failed with
-status 1`. Fix is known and untried — rebuild with `-DGGML_NCCL=OFF`. See
-[RUNLOG.md](RUNLOG.md) and H5 in [HYPOTHESES.md](HYPOTHESES.md).
+```
+mainline-rebased (57affa09)  ·  -sm tensor  ·  GGML_CUDA_ALLREDUCE=none
+Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
+-ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16
+```
 
-**Validated:** cooling is adequate — a full prefill sweep peaked at 63°C
-against an 83°C throttle. Power cap (175W/card) and persistence mode are
-confirmed applied.
+**29.26 t/s decode · 198.4 t/s prefill at 16k context**, 73.3% draft acceptance.
+For comparison, the best layer-split configuration reaches 19.05 t/s and the
+Phase 1 drafter-free best was 22.05.
+
+⚠️ `GGML_CUDA_P2P=1` measured +2.9% decode *on its own*, drafter-free. The
+combination with MTP was never measured — **do not quote ~30 t/s.**
+
+### What is settled
+
+| | |
+|---|---|
+| Split mode | `-sm tensor` wins, and it matters more than the drafter (+55–60% either way) |
+| Drafter | MTP. Its speedup is depth-dependent: 1.05× at 4k, 1.48× at 16k |
+| Engine | `mainline-rebased`. `buun` trails 12–14% on prefill; `ik` has no tensor split |
+| KV cache | `f16`. TurboQuant costs 14.3% of decode to save 788 MiB |
+| DFlash2 | Layer-split-only, so it cannot be used. See H8 |
+| AllReduce | `none`. `internal` needs Volta and silently falls back on Pascal |
+
+**Two measurement rules**, both learned by getting them wrong: never size a
+speculative-decoding run at 64 tokens (it overstated a speedup by 13x), and
+never compare acceptance rates across engines without pinning `n_max`/`p_min`.
+
+**Resolved (2026-08-24):** DFlash2 runs — upstream PR #27342 has v2 and builds
+for `sm_60`. It is nonetheless unusable in the winning configuration (H8).
+
+**Resolved (2026-08-24):** the `ik_llama` `-sm graph` NCCL abort. NCCL is broken
+rig-wide, not just on `ik`; on mainline it is switchable at runtime. See H5.
+
+**Validated:** cooling is adequate — the hottest cell of the whole project
+peaked at 70°C against an 83°C throttle. Power cap (175W/card) and persistence
+mode are confirmed applied.
 
 ---
 
