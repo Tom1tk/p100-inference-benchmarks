@@ -29,7 +29,7 @@ are prior knowledge to verify, not baselines to assume.
 | Arch | GP100, compute capability 6.0 (sm_60) |
 | Bandwidth | 732.2 GB/s HBM2 per card (the widely-quoted 549 GB/s figure is the 12GB variant) |
 | Interconnect | PCIe 3.0, **no NVLink** — this is why NCCL AllReduce loses to direct P2P here |
-| Power | 175W/card cap, confirmed applied. Persistence mode enabled. Neither survives a host reboot |
+| Power | 175W/card cap, confirmed applied. **Approved ceiling 220W** (H15, gated on a manual PSU check). Persistence mode enabled. Neither survives a host reboot |
 | Cooling | Passive cards, custom 3D-printed shroud + Arduino Nano PWM controller |
 | Thermal limits | Idle ≤45°C · load 70–80°C · throttle 83°C · hard shutdown 87°C |
 
@@ -470,9 +470,20 @@ flag tuning is bounded by the gap between 30% and ~55% of peak — worth roughly
 ```
 
 This is a prefill-specific tax: prefill is clock-bound, decode is
-bandwidth-bound. Raising it is deferred by standing instruction and collides
-with the 83 °C rule (H15). **Never change the cap silently — record it as a
-column.**
+bandwidth-bound.
+
+**The ceiling is 220 W per card, approved 2026-08-25 — not 250 W.** The 175 W
+setting was chosen as a conservative default, not derived from a measurement. All
+runs to date were taken at 175 W and that stays the baseline; 220 W is the top of
+the range H15 is allowed to explore, and 250 W stays out of bounds.
+
+**One gate before any run above 175 W:** the wall draw of the PSU has never been
+measured. The user checks it with a plug-socket power meter, in person — it is not
+readable from this host — and until that check is reported, the cap stays at
+175 W. When cleared, step 175 → 200 → 220, one step per run.
+
+**Never change the cap silently — record it as a column**, and re-apply it after
+any host reboot, which reverts both cards to the 250 W default.
 
 ### MTP measurement (Phase 2)
 

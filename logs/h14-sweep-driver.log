@@ -1,0 +1,7 @@
+=== preflight ===
+hottest card: 49C
+0, 175.00 W
+1, 175.00 W
+=== running: h14-ubatch-sweep-q4km ===
+ub=128,256,512,1024,2048  p=2048,4096  r=2  -sm tensor  ALLREDUCE=none
+NOTE: model load takes 4-8 min with no output. This is not a hang.

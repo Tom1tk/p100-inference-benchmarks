@@ -350,8 +350,8 @@ phase is aimed at the right target.
 | 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
 | 6 | 9B single-GPU vs 27B, NIAH 8k→100k | H20 | Harness and fixtures already exist |
 | 7 | TurboPrefill build, 4 cells at 64k | H16 | Build cost; forces `-sm layer`, so report TTFT *and* decode |
-| 8 | Power cap 175→200 W | H15 | **Ask first** — deferred by standing instruction, and thermally the riskiest |
-| 9 | PFlash-style selection spike | H21 | Largest upside, largest cost. Gate on NIAH before quoting throughput |
+| 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
+| ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
 
 **Thermal note, and it is new.** A 100k prefill is 8–16 minutes of *sustained*
 compute — several times longer than any run this repo has done, and prefill loads
@@ -360,14 +360,17 @@ profile. Monitor cell 1 actively; do not background it and walk away.
 
 **Reuse what exists.** `/root/niah_test/` has a working harness, generated
 fixtures at 8k/32k/64k/100k (single and multi-needle) and a July baseline for
-Qwen3.5-9B. `pflash-llama.cpp` ships a built `llama-niah` with fixtures to 128k.
-H20 and H21 are mostly re-runs, not new harness work.
+Qwen3.5-9B. `pflash-llama.cpp` ships a built `llama-niah` with fixtures to 128k —
+that binary and its fixtures are the only reason the fork is still on disk. H20 is
+mostly a re-run, not new harness work.
 
 ### Deferred
 ~~Context depths beyond 16k~~ — **now Phase 7 cell 1, the top priority**.
-Power-limit experiment (175W vs 200W+ — log as a separate row, don't silently
-change the cap mid-matrix) is **H15, and still needs explicit approval**; fine-grained
-row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
+~~Power-limit experiment~~ — **approved 2026-08-25 to a 220 W ceiling** (not 250 W),
+now Phase 7 cell 8. Still blocked on one thing: the user must measure PSU wall draw
+with a plug-socket meter in person before the first run above 175 W. Log the cap as
+a separate column; don't change it silently mid-matrix. Remaining deferred:
+fine-grained row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
 
 ### Closed — do not spend runs here
 
@@ -379,7 +382,7 @@ row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
 | `GGML_CUDA_ALLREDUCE` tuning | Only butterfly runs on Pascal; `internal` and `none` are the same path. Use `none`. H10 |
 | Drafter placement (`-devd`) | Moves VRAM, not throughput. H11 |
 | `ik` `-sm graph` knobs (H12) | Low value now — `-sm tensor` beats graph on prefill at every depth and is within 8% on decode, and `ik` has no path to tensor split |
-| **PFlash** (as shipped) | Requires **sm_80+** — the `mean_K → score → select → sparse_fwd` kernels plus BSA target Ampere. No v2 exists. Architecturally unavailable regardless of the earlier quality verdict. The *technique* is reopened as H21 |
+| **PFlash — product, fork and technique** | Requires **sm_80+** — the `mean_K → score → select → sparse_fwd` kernels plus BSA target Ampere, and no v2 exists, so it is architecturally unavailable. H21 briefly reopened the *technique* as a hand-port; **withdrawn 2026-08-25** — not worth the build cost with no upstream to track. Note also that the earlier "too lossy" quality verdict was formed on a **7900 XTX, not on these P100s**, so the sm_60 arithmetic bug (H17) never confounded it. `pflash-llama.cpp` stays on disk only for its built `llama-niah` binary and fixtures |
 | **vLLM / vllm-pascal / pascal-pkgs-ci** | vLLM needs cc ≥ 7.0; `vllm-pascal` is discontinued, its successor tops out at vLLM **0.10.0** and is "soft-broken due to PyTorch". 0.10 long predates `qwen35` hybrid-SSM support |
 | **SGLang, TensorRT-LLM, ExLlamaV3, ktransformers** | sm_75 / sm_80+ minimum |
 | **MLC-LLM / TVM** | No `qwen35` hybrid support; we would be writing GDN kernels in TVM with worse tooling, and MLC prefill trails llama.cpp where measured |
