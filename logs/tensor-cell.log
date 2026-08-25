@@ -1,0 +1,17 @@
+=== preflight ===
+GPUs: 2 | hottest card: 49C
+0, 175.00 W, Enabled
+1, 175.00 W, Enabled
+=== running: phase1-mainline-tensor-q4km ===
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -p 0\,2048\,4096\,8192\,16384 -n 128 -r 3 -o csv 
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+./scripts/run-bench.sh: line 98: 58671 Aborted                 CUDA_VISIBLE_DEVICES=0,1 "${CMD[@]}" > "$CSV" 2> "$LOG"
+=== finished in 5s | exit 134 | peak 50C ===
+--- run failed, last 20 log lines ---
+ggml_cuda_init: found 2 CUDA devices (Total VRAM: 32538 MiB):
+  Device 0: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+  Device 1: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+/root/dflash2-llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:106: CUDA error
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+warning: 360	../csu/libc-start.c: No such file or directory
