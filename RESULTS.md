@@ -47,6 +47,9 @@ The apples-to-apples comparison. All cells on **`Qwen3.8-27B-UD-Q4_K_M`**.
 | buun | `39d97a876` | layer | 178.47 | 194.31 | 200.73 | 198.67 | 13.10 | 659s, peak 68C |
 | mainline (pr-27342) | `64f765f5` | layer | 180.38 | 190.96 | 192.14 | 188.69 | 12.88 | 684s, peak 65C |
 | ik (NCCL on) | `8337e4c` | graph | — | — | — | — | — | **exit 134 after 9s** — `ncclAllReduce failed with status 1`. See H5 |
+| mainline (pr-27342) | `64f765f5` | **tensor**, `ALLREDUCE=internal` | **214.83** | **219.13** | **212.70** | **206.32** | 20.34 | 608s, peak 67C |
+| mainline (pr-27342) | `64f765f5` | **tensor**, `ALLREDUCE=none` | 214.68 | 219.12 | 212.71 | 206.40 | 20.38 | 608s, peak 69C |
+| mainline (pr-27342) | `64f765f5` | tensor, `ALLREDUCE=nccl` (Linux default) | — | — | — | — | — | **exit 134 after 5s** — `ggml_backend_cuda_comm_allreduce_nccl`. See H5/H10 |
 
 Earlier Q6_K_M reference cell, kept for continuity (different quant — not
 comparable to the rows above):
@@ -57,16 +60,24 @@ comparable to the rows above):
 
 ### What Phase 1 established
 
-**1. `-sm graph` is the only path to fast decode, by a wide margin.**
-22.05 t/s against 12.53–13.54 for *every* layer implementation in *every*
-engine. Three independent forks land in a 1.0 t/s band; graph is 63–76% above
-all of them. Nothing else in the matrix moves decode at all.
+**1. Splitting the *computation* is what buys decode — not which fork does it.**
+Both compute-splitting modes break out of the layer-split band: `ik`'s graph at
+22.05 and mainline's tensor at 20.34, against 12.53–13.54 for *every* layer
+implementation in *every* engine. Layer split is the thing that's slow; the
+engine is incidental.
 
-**2. `-sm graph` is the only path that decays with depth on prefill.**
-Graph runs 199 → 198 → 180 → 153 from pp2048 to pp16384 (−23%). pflash,
-buun and mainline are flat or *rising* over the same range (buun: 178 → 199).
-Crossover is around 6k: graph wins short prefill, loses deep prefill.
-This matters because agentic transcripts live past the crossover.
+**2. `-sm tensor` on mainline is the best cell in the matrix.**
+Fastest prefill at *every* depth (214.83 / 219.13 / 212.70 / 206.32), and it
+holds shape: −6% from its 4k peak out to 16k. It beats `ik` graph by **+35% at
+pp16384** and gives up only **7.8%** of graph's decode. Both cards run at
+97–99% utilisation simultaneously, 170–180W each — genuine parallel work,
+where layer split leaves one card idle while the other runs its half.
+
+**2b. `-sm graph` is the mode that decays with depth.**
+Graph runs 199 → 198 → 180 → 153 from pp2048 to pp16384 (−23%), while every
+layer implementation is flat or *rising* (buun: 178 → 199) and tensor is nearly
+flat. This is the cost of `ik`, and it lands hardest exactly where agentic
+transcripts live.
 
 **3. `ik`'s own `-sm layer` is broken, and it poisoned the first read.**
 80.08 at pp16384 versus 187.87–198.67 for the other three engines on the
@@ -82,9 +93,19 @@ pflash / buun / mainline sit within 5% of each other at every depth
 performance decision — so it can be made on features (DFlash2, arch support)
 instead.
 
+**5. The AllReduce backend is a correctness switch, not a performance one.**
+`internal` and `none` are indistinguishable — every cell within 0.2%, most
+within 0.05%, against stddevs of 0.02–0.16, and both runs took exactly 608s.
+No fallback warning was logged, so `internal` really did initialise; AllReduce
+volume simply isn't a bottleneck here. What matters is avoiding `nccl`, which
+aborts.
+
+**Operational consequence:** `-sm tensor` on mainline **requires**
+`GGML_CUDA_ALLREDUCE=internal` (or `none`) on this rig. NCCL is the Linux
+default and it aborts in 5s. Bake this into every mainline invocation.
+
 **Still missing from this phase:** the single-GPU (`none`) leg, which needs
-`UD-IQ3_S` to fit in 16 GB. `-sm tensor` on mainline is not in this table but
-is now known to be available (see H6).
+`UD-IQ3_S` to fit in 16 GB.
 
 ---
 

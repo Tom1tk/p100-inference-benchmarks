@@ -170,7 +170,8 @@ Do not just retry. Failures are results.
 |---|---|---|
 | `ncclAllReduce failed with status 1`, abort at `reduce.cu:169` | `ik_llama` built with NCCL (`GGML_NCCL` defaults **ON**); no NVLink on this rig | Rebuild ik_llama with `-DGGML_NCCL=OFF` |
 | `error: invalid parameter for argument: -sm` | Split mode not supported by that engine | Check the per-engine matrix in METHODOLOGY.md |
-| `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'` | `-sm tensor` is arch-gated and `qwen35` isn't on the list — in any engine | Not a bug and not fixable here. Usable split modes for this model are `none`/`layer`/`row`, plus `graph` on `ik` |
+| `ggml-cuda.cu:106: CUDA error` on mainline `-sm tensor` | NCCL AllReduce, the Linux default, is broken on this rig — same root cause as the `ik` row above. The line number is the generic abort dispatcher; get the real cause from the backtrace frame `ggml_backend_cuda_comm_allreduce_nccl` | Set `GGML_CUDA_ALLREDUCE=internal` (or `none`). No rebuild needed |
+| `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture '<arch>'` | `-sm tensor` is arch-gated — but the gate is a **denylist** (`default: return true`), so most archs including `qwen35` are permitted. Earlier guidance here claimed the reverse and was wrong | If you see this for `qwen35`, something else changed — check `llm_arch_supports_sm_tensor()` in `src/llama-arch.cpp` |
 | Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
 | No `pp0` row in output | `-p 0` is a no-op prefill and is silently omitted | Expected, not a bug |
 | Load appears hung, GPUs idle | Normal model load, or disk contention | See §2 timing table |
@@ -288,13 +289,17 @@ Phases 1–3. Full knob list in METHODOLOGY §3.
 
 Highest value first:
 
-1. `GGML_CUDA_P2P=1` vs unset on the current working `-sm layer` config. Peer
-   access is **off by default** in mainline and these cards can peer.
-2. `GGML_CUDA_ALLREDUCE` three-way (`nccl` default / `internal` / `none`) on
-   `-sm row`, which is the mode that actually exercises AllReduce.
-3. Drafter placement: default vs `-devd CUDA0` vs `-devd CUDA1`.
-4. `ik` graph knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) — **after** the
-   `-DGGML_NCCL=OFF` rebuild unblocks `-sm graph`.
+1. `GGML_CUDA_P2P=1` vs unset on **`-sm tensor`**. Peer access is **off by
+   default** in mainline and these cards peer in both directions. Test it on
+   tensor split, not layer — tensor moves far more cross-GPU data. This is the
+   best remaining cheap test in the project.
+2. ~~`GGML_CUDA_ALLREDUCE` three-way~~ — **done**. `nccl` aborts; `internal`
+   and `none` are identical to within 0.2%. Correctness switch, not a
+   performance one. See H10.
+3. ~~Drafter placement~~ — **done**, refuted at 4k and 16k. See H11.
+4. `ik` graph knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) — unblocked by the
+   `build-nonccl` rebuild, but lower priority now that `-sm tensor` beats
+   `-sm graph` on prefill at every depth.
 
 Record per-GPU utilization from the temps log alongside throughput. These
 hypotheses are about transfer stalls, so utilization is the evidence.

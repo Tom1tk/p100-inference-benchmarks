@@ -668,3 +668,74 @@ invalidate the comparability of the `mainline` row above.
 and `DictReader` access return the wrong column silently — it read `ik`'s
 decode as 0.02 t/s instead of 22.05. Parse `results/raw/<label>.csv` instead;
 each carries its own correct header. Documented in RUNBOOK.md §4.
+
+## 2026-08-25 — `-sm tensor` on mainline, and the DFlash2 rebase
+
+Two items closed. The single-GPU (`none`/IQ3_S) leg stays deferred.
+
+### `-sm tensor` wins, and `ik` lock-in was never real
+
+Three cells: mainline `-sm tensor` under each AllReduce backend.
+
+The NCCL leg aborted in 5s. The harness log truncated the message to
+`ggml-cuda.cu:106: CUDA error`, which is just the generic abort dispatcher, so
+I reproduced it by hand to get the backtrace — worth doing rather than guessing:
+
+```
+#3 ggml_cuda_error(...)
+#4 ggml_backend_cuda_comm_allreduce_nccl(...)
+#5 ggml_backend_meta_graph_compute(...)
+```
+
+That is H5 again, in a second engine. NCCL AllReduce is broken rig-wide, not in
+`ik` specifically — I had recorded the opposite in H5 and have corrected it.
+Layer split was never affected because it performs no AllReduce, which is why
+every `-sm layer` cell ran fine on NCCL-linked builds.
+
+Mainline exposes a runtime escape (`GGML_CUDA_ALLREDUCE`) where `ik` needs a
+rebuild. With `internal`:
+
+| test | mainline tensor | ik graph | mainline layer |
+|---|---|---|---|
+| pp2048 | **214.83** | 199.14 | 180.38 |
+| pp4096 | **219.13** | 198.45 | 190.96 |
+| pp8192 | **212.70** | 179.56 | 192.14 |
+| pp16384 | **206.32** | 153.04 | 188.69 |
+| tg128 | 20.34 | **22.05** | 12.88 |
+
+Fastest prefill in the entire matrix at every depth, +35% over graph at 16k,
+holding shape (−6% from its 4k peak vs graph's −23%), for 7.8% of graph's
+decode. Both cards at 97–99% utilisation and 170–180W throughout — real
+parallel work, unlike layer split where one card idles.
+
+`internal` vs `none` came out identical: every cell within 0.2%, most within
+0.05%, stddevs 0.02–0.16, both runs 608s to the second. No
+`internal AllReduce init failed` warning, so the dedicated two-device pipeline
+did initialise and still changed nothing. AllReduce is a correctness switch on
+this rig, not a performance one. That is half of H10 answered; `GGML_CUDA_P2P`
+is the remaining half and is now the best cheap test available, since tensor
+split moves far more cross-GPU data than the `-sm layer` config H10 originally
+proposed testing on.
+
+**Third correction to the `-sm tensor` story.** I had it wrong twice: first that
+the arch gate blocked `qwen35` (it is a denylist — absence means permitted),
+then, when it did fail, the cause was NCCL rather than the gate. The gate was
+never involved.
+
+### Rebase
+
+`pr-27342-rebased` at `/root/dflash2-rebased` (separate worktree, so the
+original branch and its binary stay intact and the Phase 1 rows stay
+reproducible). All 12 commits replayed onto `75844307` with zero conflicts, as
+the `merge-tree` dry-run predicted. Verified `84979813`, `d9b6be07`, `2c6b141e`
+and `f466cfa3` are all ancestors and DFlash2 content survived.
+
+The rebase also absorbed two upstream edits to `dflash.cpp` itself: the
+`ggml_rope_set_offset` refactor replacing a manual view/rope/concat, and
+`output` tensor creation moved ahead of the dsv4 early-return, with a new
+comment stating that a draft shipping its own embeddings and head "can run on
+devices the target does not use (e.g. `-devd` with a tensor-split target)".
+That is the exact failure diagnosed in H11. Our DFlash2 GGUF ships neither
+tensor, so it should still borrow via `ctx_other` and still fail on
+`-devd CUDA0` — but this is now worth re-testing rather than assuming, and it
+matters more than before, since tensor split is the new default target config.
