@@ -1,1 +1,15 @@
 ########## p2-layer-none-16k
+=== p2-layer-none-16k === (idle 60C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm layer -c 16384 
+loaded in 10s | VRAM 8125/9201 MiB
+  rep1: decode 12.35 t/s | prefill 183.88 t/s | accept 0/0 = n/a% | peak 65C
+  rep2: decode 12.35 t/s | prefill 183.88 t/s | accept 0/0 = n/a% | peak 66C
+  rep3: decode 12.35 t/s | prefill 183.89 t/s | accept 0/0 = n/a% | peak 66C
+########## p2-layer-mtp-16k
+=== p2-layer-mtp-16k === (idle 63C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm layer -c 16384 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 10s | VRAM 9079/11525 MiB
+  rep1: decode 19.15 t/s | prefill 162.81 t/s | accept 279/357 = 78.2% | peak 65C
+  rep2: decode 19.00 t/s | prefill 162.89 t/s | accept 278/360 = 77.2% | peak 65C
+  rep3: decode 19.00 t/s | prefill 162.97 t/s | accept 278/360 = 77.2% | peak 65C
+=== layer 16k pair complete ===
