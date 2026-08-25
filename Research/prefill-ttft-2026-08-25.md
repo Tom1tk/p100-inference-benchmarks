@@ -271,10 +271,12 @@ Three consequences for us:
    `buun` and `rebased` have not been running the same arithmetic. Any cross-engine
    *quality* comparison in this repo is confounded; throughput comparisons are fine, since
    the fix is throughput-neutral on prefill.
-3. It bears directly on **"PFlash was too lossy"**. That verdict was formed on P100 with
-   this bug live. It does not overturn the verdict — 1-in-20 token flips is not the same
-   failure mode as mangled tool calls — but it means the baseline those judgements were
-   made against was itself degraded. Worth knowing before re-testing anything on quality.
+3. ~~It bears directly on "PFlash was too lossy".~~ **Corrected 2026-08-25 — this point
+   was wrong and is withdrawn.** The PFlash quality work was done on a **7900 XTX**, not
+   on these P100s, so an sm_60 CUDA bug could not have touched it. The verdict stands
+   unconfounded. The point survives only in its narrow form: cross-engine *quality*
+   comparisons **made in this repo, on these cards** are confounded (item 2), and those
+   are the only ones this bug reaches.
 
 That the fix leaves prefill throughput *identical* while halving the GEMM compute rate is
 also the strongest external corroboration of the §3 thesis.
@@ -319,6 +321,22 @@ sparse_fwd`) plus BSA explicitly target Ampere. **P100 cannot run it.** This clo
 "is there a newer PFlash worth trying" question: there is no v2, and the shipped v1 is
 architecturally out of reach regardless of the earlier quality verdict.
 
+**And the technique is closed too, as of 2026-08-25.** This section originally proposed
+hand-porting the selection stage as H21, on the reasoning that the sm_80 dependency sits
+in `sparse_fwd` (which only accelerates the drafter) while selection is ordinary SIMT
+arithmetic. That hypothesis has been **withdrawn by user instruction**: with no upstream
+that compiles for sm_60, it is a from-scratch build project with no one to track, and the
+upside does not justify it. **Two corrections go with the withdrawal** — the earlier
+quality verdict was formed on a 7900 XTX, not on these cards (so §5.1's confounding
+argument, which was the main reason to re-test, does not apply); and `pflash-llama.cpp`
+remains on disk **only** as the source of the built `llama-niah` binary and its
+8k–128k fixtures, which stay useful for H13 and H20.
+
+The idea is not disproven, just unreachable: prefilling only the important spans is still
+the only surveyed technique that changes the *token count* rather than the *rate*, and so
+the only one with a path under the §2 floor. If selection-style prefill ever lands in a
+llama.cpp-family engine that builds for sm_60, reopen it then — don't hand-port it.
+
 Reported quality, for the record: NIAH single-needle passes at 32k/64k/128k at
 `keep_ratio=0.05`, though third-party testing found 0.05 unreliable in practice and
 [considers 0.10 the realistic floor at 128k](https://note.com/zephel01/n/n1cc5c4a9daeb?hl=en).
@@ -353,10 +371,10 @@ and the most work. See H21, and note it is gated on NIAH, which we already have.
 |---|---|---|
 | **Prompt / prefix cache reuse** | **Yes — free** | `-cram/--cache-ram` (default only 8192 MiB), `--cache-idle-slots`, `-ctxcp`, `-cms`. Eliminates prefill entirely on a stable prefix. Bounded by 28 GB host RAM. **Highest practical value for the agentic loop.** See H19. |
 | **ubatch/batch tuning** | **Yes — free, untested** | Never swept. See H14. |
-| **Power limit 175→250 W** | Yes, gated | Prefill is clock-bound. See H15. |
+| **Power limit 175→220 W** | **Yes — approved to 220 W** | Prefill is clock-bound. Ceiling is 220 W, not 250 W; gated on an in-person PSU plug-meter check. See H15. |
 | **Pipelined multi-GPU prefill** | Yes | TurboPrefill, §5.2. |
 | **Chunked GDN kernel** | Yes, but it's a build | §3. Largest lever we control. |
-| **Speculative prefill** | Partially | §5.3 / H21. |
+| ~~**Speculative prefill**~~ | **No — closed** | §5.3. sm_80-only, no v2; H21's hand-port withdrawn 2026-08-25. |
 | **Sparse attention (MInference, XAttention, FlexPrefill)** | Marginal | All target the quadratic term, which here is ~16 of 65 layers. All ship sm_80+ kernels. Low ceiling, high cost. |
 | **Smaller model** | **Yes** | User explicitly opened this. See H20. |
 | **KV quantisation** | Doesn't help prefill | Already refuted for decode (H4). Not needed for 100k memory either (§2). |
@@ -378,7 +396,8 @@ and the most work. See H21, and note it is gated on NIAH, which we already have.
    possibly the power cap. None have been tried.
 5. **We are running numerically degraded** relative to buun, for free, and it confounds
    every quality comparison we have made.
-6. **PFlash is closed as a product** and **open as a technique**.
+6. **PFlash is closed completely** — product, fork and technique (§5.3). Its "too lossy"
+   verdict was reached on a 7900 XTX and has no bearing on this rig either way.
 
 ---
 
@@ -393,10 +412,10 @@ Full text in `HYPOTHESES.md`. Ordered by (value ÷ cost).
 | H17 | The sm_60 FP16 fast-path fix is free (prefill flat, decode +1.4%) and changes output | 3-line patch + rebuild |
 | H18 | GDN layers, not GEMMs, dominate prefill (>50% of a 16k prefill) | instrumentation |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | 1 server config |
-| H15 | 175→250 W lifts prefill ≥15%, decode <3% | gated on approval |
+| H15 | 175→220 W lifts prefill ≥15%, decode <3% | approved; gated on a manual PSU check |
 | H16 | TurboPrefill nets a TTFT win at 64k despite forcing `-sm layer` | build + matrix |
 | H20 | A 9B on one P100 beats the 27B's TTFT by ≥2× at 64k at acceptable NIAH quality | 1 run, data partly exists |
-| H21 | PFlash-style token selection is portable to sm_60 without the BSA kernels | spike — largest upside, largest risk |
+| ~~H21~~ | ~~PFlash-style token selection is portable to sm_60~~ | **Withdrawn 2026-08-25** |
 
 ---
 
@@ -404,7 +423,7 @@ Full text in `HYPOTHESES.md`. Ordered by (value ÷ cost).
 
 | Line | Why |
 |---|---|
-| PFlash as shipped | sm_80+ kernels; no v2 exists |
+| PFlash — product, fork **and technique** | sm_80+ kernels; no v2 exists; the hand-port (H21) was withdrawn 2026-08-25 as not worth the build cost |
 | vLLM / vllm-pascal / pascal-pkgs-ci | vLLM 0.10 ceiling, soft-broken, no `qwen35` |
 | SGLang, TensorRT-LLM, ExLlamaV3, ktransformers | sm_75/sm_80+ minimum |
 | MLC-LLM / TVM | no hybrid-SSM support; slower than llama.cpp where measured |

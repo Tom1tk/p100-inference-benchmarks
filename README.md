@@ -77,9 +77,15 @@ Three facts that bound every proposed fix:
   faster pre-fill`. H18 tests this and decides the rest of the phase.
 
 Also newly known and not yet acted on: **the cards are power-capped at 175 W of a
-250 W default** (H15, needs approval), and **our builds carry a live sm_60
+250 W default** — raising it is now **approved to a 220 W ceiling** (H15), blocked
+only on an in-person PSU plug-meter check — and **our builds carry a live sm_60
 arithmetic bug** that flips ~1 in 20 greedy tokens, which `buun` has already
-fixed — so cross-engine *quality* comparisons in this repo are confounded (H17).
+fixed, so cross-engine *quality* comparisons made in this repo are confounded (H17).
+
+**PFlash is closed outright (2026-08-25)** — product, fork and technique. It needs
+sm_80, there is no v2, and hand-porting the selection stage (H21) is not worth the
+build cost. Its earlier "too lossy" verdict was reached on a **7900 XTX**, not on
+these cards, so it neither confounds nor is confounded by anything here.
 
 **Two measurement rules**, both learned by getting them wrong: never size a
 speculative-decoding run at 64 tokens (it overstated a speedup by 13x), and

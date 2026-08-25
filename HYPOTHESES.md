@@ -23,13 +23,13 @@ run label so the evidence is traceable.
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 | H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
 | H14 | `-ub` 512→1024/2048 improves prefill ≥10% | Untested |
-| H15 | Lifting the 175 W cap to 250 W improves prefill ≥15% and decode <3% | Untested — needs approval |
+| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
 | H16 | TurboPrefill nets a TTFT win at 64k despite forcing `-sm layer` | Untested |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **decides the plan** |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
 | H20 | A 9B on one P100 beats the 27B's TTFT by ≥2× at 64k at acceptable NIAH quality | Untested |
-| H21 | PFlash-style token selection ports to sm_60 without the BSA kernels | Untested — spike |
+| H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 
 ---
 
@@ -789,8 +789,8 @@ are listed in RUNBOOK's closed table rather than here.
 prefill cannot go below **144 s** however good the kernels get, and 45–55% of
 peak — a good outcome — is **260–320 s**. We measure 11.2 TFLOP/s today, 30% of
 peak. So H14–H16 are worth at most a ~1.5–2× improvement between them, and only
-H19, H20 and H21 can produce a step change, because only those three reduce the
-amount of work done.
+H19 and H20 can produce a step change, because only those two reduce the amount
+of work done. (H21 was a third such lever; it was withdrawn on 2026-08-25.)
 
 ---
 
@@ -839,7 +839,7 @@ they are grouped. **A null result here is positive evidence for H18.**
 
 ## H15 — the 175 W power cap is throttling prefill
 
-**Claim:** raising the limit from 175 W to 250 W improves prefill by ≥15% while
+**Claim:** raising the limit from 175 W to 220 W improves prefill by ≥15% while
 moving decode by <3%.
 
 **Reasoning:** both cards run at `175.00 W` against a `250.00 W` default — a 30%
@@ -848,12 +848,25 @@ bandwidth-bound and HBM2 clocks are not power-gated the same way. The asymmetric
 prediction is what makes this a real hypothesis rather than a knob-turn: if
 decode moves as much as prefill, the model of what is limiting us is wrong.
 
-**Status: needs an explicit decision.** Power-limit work above 175 W is deferred
-by standing instruction, and this collides with the 83 °C rule — the cards
-already reach 70 °C at 175 W on a 684 s run. **Do not raise the cap without
-asking.** If approved: raise to 200 W first, not 250 W, and treat the temperature
-log as the primary output. Record the cap as a column, never change it silently
-mid-matrix.
+**Status: approved to 220 W (2026-08-25).** The 175 W setting was conservative,
+not a measured limit. The ceiling is now **220 W per card — not 250 W**, and that
+number is a hard cap on this hypothesis, not a starting point to negotiate up
+from.
+
+**One human gate remains before the first run at >175 W.** Two cards at 220 W is
++90 W over the current draw, and nobody has measured what the PSU is actually
+pulling at the wall. The user will check this with a plug-socket power meter,
+**manually and in person** — it cannot be read from this host. Do not raise the
+cap until that check has been reported back.
+
+**How to run it once cleared:** step **175 → 200 → 220**, one step per run, never
+jumping straight to 220. Treat the temperature log as the primary output, not the
+throughput — this collides directly with the 83 °C rule, and the cards already
+reach 70 °C at 175 W on a 684 s run, which leaves 13 °C of headroom to spend.
+Abort the step and stay at the previous cap if any card crosses 80 °C. Record the
+cap as a CSV column and restore 175 W afterwards; the setting does not survive a
+host reboot, so a reboot silently reverts to 250 W — re-apply the cap on every
+boot.
 
 ---
 
@@ -981,33 +994,27 @@ scenario if this looks promising.
 
 ---
 
-## H21 — speculative prefill without the sm_80 kernels
+## H21 — speculative prefill without the sm_80 kernels — **WITHDRAWN**
 
-**Claim:** PFlash's token-selection stage is portable to sm_60, and delivers most
-of the speedup, even though its block-sparse-attention kernels are not.
+**Withdrawn 2026-08-25, one day after it was opened, by user instruction.**
+PFlash requires sm_80 and there is no v2; porting the selection stage by hand is
+a build project with no upstream to track. It is not worth thinking about further.
 
-**Reasoning:** PFlash reports **10.4× TTFT at 128k** by scoring token importance
-with a 0.6B drafter and prefilling only the surviving spans. **It requires sm_80+**
-— the four kernels (`mean_K → score → select → sparse_fwd`) plus BSA target
-Ampere — so we cannot run it, and there is no v2. But the sm_80 dependency is
-concentrated in `sparse_fwd`, which accelerates the *drafter's own* forward pass.
-The selection stage is ordinary SIMT arithmetic. A 0.6B drafter running a dense
-forward over 100k tokens is cheap in absolute terms; we would forgo the drafter
-speedup and keep the target speedup, which is where nearly all the win is.
+**A correction this repo needs to carry.** When H21 was written it argued that the
+earlier "PFlash is too lossy" verdict deserved re-testing because it had been
+formed on this rig while the sm_60 arithmetic bug (H17) was live. **That is
+wrong.** The PFlash quality work was done on a 7900 XTX, not on these P100s, so
+the sm_60 bug never touched it and cannot have confounded it. The argument for
+reopening the technique rested entirely on that mistake, and falls with it.
 
-**Why it is nonetheless top of the upside list:** at `keep_ratio = 0.10` the
-target prefills 10k instead of 100k tokens. This is the only technique surveyed
-with a plausible path to a **sub-2-minute 100k TTFT** on this hardware — §2's
-floor of 144 s applies to prefilling *all* 100k tokens, and this changes the
-input to that calculation rather than the rate.
+**What survives.** Nothing about the *technique* is disproven — prefilling only
+the important spans is still the only surveyed idea with a path below the 144 s
+floor, because it is the only one that changes the token count rather than the
+rate. It is simply not reachable from any codebase we can build. If a
+selection-style prefill ever lands in a llama.cpp-family engine that compiles for
+sm_60, reopen it then. Do not hand-port it.
 
-**Caveats, stated plainly:** this is lossy by construction, and PFlash's own
-`keep_ratio = 0.05` default was found unreliable in third-party testing, with 0.10
-the realistic floor at 128k. It is also a build project, not a config test — by
-far the largest engineering cost in this list.
-
-**Gate:** do not evaluate this on throughput first. Run the NIAH harness at
-`keep_ratio` ∈ {0.05, 0.10, 0.20} across 32k/64k/100k, single **and multi**-needle,
-before quoting a single TTFT number. The earlier "PFlash is too lossy" verdict
-stands for PFlash-the-product; this is a test of the technique, and it was formed
-while the sm_60 arithmetic bug (H17) was live.
+PFlash is now closed in every sense: **the product** (sm_80-only, §8 of the
+research doc), **the fork** (`pflash-llama.cpp` stays only as the source of the
+built `llama-niah` binary and its fixtures, which remain useful for H13 and H20),
+and **the technique** (this hypothesis).
