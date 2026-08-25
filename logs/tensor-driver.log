@@ -1,0 +1,18 @@
+=== cooling before internal ===
+hottest card: 50C
+=== running: tensor/internal ===
+=== preflight ===
+GPUs: 2 | hottest card: 50C
+0, 175.00 W, Enabled
+1, 175.00 W, Enabled
+=== running: phase1-mainline-tensor-internal-q4km ===
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -p 0\,2048\,4096\,8192\,16384 -n 128 -r 3 -o csv 
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 608s | exit 0 | peak 67C ===
+--- results ---
+build_commit,build_number,cpu_info,gpu_info,backends,model_filename,model_type,model_size,model_n_params,n_batch,n_ubatch,n_threads,cpu_mask,cpu_strict,poll,type_k,type_v,n_gpu_layers,n_cpu_moe,split_mode,main_gpu,no_kv_offload,flash_attn,devices,tensor_split,tensor_buft_overrides,load_mode,embeddings,no_op_offload,no_host,fit_target,fit_min_ctx,n_prompt,n_gen,n_depth,test_time,avg_ns,stddev_ns,avg_ts,stddev_ts
+"64f765f5","1068","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","2048","0","0","2026-08-25T10:32:13Z","9533148995","3451713","214.829348","0.077795"
+"64f765f5","1068","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","4096","0","0","2026-08-25T10:32:52Z","18692112394","10757557","219.129910","0.126084"
+"64f765f5","1068","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","8192","0","0","2026-08-25T10:34:07Z","38513836759","3764216","212.702778","0.020732"
+"64f765f5","1068","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","16384","0","0","2026-08-25T10:36:41Z","79410235825","8204409","206.321011","0.021305"
+"64f765f5","1068","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","0","128","0","2026-08-25T10:41:59Z","6293531368","16442115","20.338435","0.053068"
