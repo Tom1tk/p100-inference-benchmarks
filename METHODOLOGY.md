@@ -76,27 +76,60 @@ table was wrong about `ik`.
 
 | Engine | `none` | `layer` | `row` | `tensor` | `graph` |
 |---|---|---|---|---|---|
-| `pflash` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| `buun` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| `pflash` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `buun` | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `ik` | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `mainline` | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| `mainline` / `mainline-rebased` | ✅ | ✅ | ✅ | ✅ | ❌ |
 
 `-sm graph` exists **only** in `ik_llama`. Passing a value the binary doesn't
 know gives `error: invalid parameter for argument: -sm`.
 
-⚠️ **`-sm tensor` is accepted by the parser but unusable for our model.** It is
-gated per-architecture, and `qwen35` is not on the list in any of the three
-engines that offer the flag — verified by reading
-`llm_arch_supports_sm_tensor()` in each tree (30 architectures in mainline:
-Grok, MPT, Deepseek2/32/4, Mamba/Mamba2, Jamba, Nemotron-H, MiniMax, LFM2…;
-the only Qwen entry is `QWEN3TTS`, a different arch). It fails at load with:
+**Correction (2026-08-24): `-sm tensor` works, and it won Phase 1.** This
+section previously said it was arch-gated off for `qwen35` and advised "don't
+spend a run on `-sm tensor`". That was wrong. `llm_arch_supports_sm_tensor()`
+is a **denylist**, not an allowlist:
 
-```
-LLAMA_SPLIT_MODE_TENSOR not implemented for architecture 'qwen35'
+```cpp
+switch (arch) {
+    case LLM_ARCH_GROK: ... case LLM_ARCH_QWEN3TTS:
+        return false;
+    default:
+        return true;      // qwen35 lands here
+}
 ```
 
-So the real split-mode matrix for **this model** is `none` / `layer` / `row`,
-plus `graph` on `ik` only. Don't spend a run on `-sm tensor`.
+Verified identical in both `mainline` (`src/llama-arch.cpp`) and `buun`
+(`src/llama-arch.cpp:1023`). `qwen35` is absent from the list, so it is
+**permitted**. `-sm tensor` is now the selected split mode — see Phase 1.
+
+**`-sm tensor` requires `GGML_CUDA_ALLREDUCE=none` on this rig.** The NCCL
+default aborts (H5, rig-wide); `internal` silently falls back to the same
+butterfly path `none` uses, because it needs sm70+ (H10 Finding 3). Use `none`.
+
+### Engine capability matrix — what can be combined (2026-08-25)
+
+The three features worth combining do not all live in the same tree:
+
+| Engine | `-sm tensor` | MTP | DFlash2 | TurboQuant KV |
+|---|---|---|---|---|
+| `mainline-rebased` | ✅ | ✅ | ✅ (layer only) | ❌ |
+| `ik` | ❌ | ✅ (`--spec-type mtp`) | ❌ | ❌ |
+| `buun` | ✅ | ✅ | ❌ | ✅ |
+| `pflash` | ✅ | — | — | ✅ (excluded from testing) |
+
+**`buun` is the only tree with tensor + MTP + TurboQuant together.**
+`mainline-rebased` is the only tree with DFlash2 — and DFlash2 is layer-only
+anyway (H8), so it can never be combined with tensor split regardless of engine.
+
+TurboQuant KV types live in `buun` and `pflash` only: `turbo2`, `turbo3`,
+`turbo4`, `turbo8`, `turbo3_tcq`, `turbo2_tcq`, `turbo1_tcq`, `vbr`. Neither
+`ik` nor `mainline` has them, so H4 and H7 can only be tested on `buun`.
+
+⚠️ **`buun`'s default KV type is `vbr` (implicit t4 floor), not `f16`.** Any
+`buun` run that does not pin `-ctk`/`-ctv` is not measuring what a `mainline`
+run with the same flags measures. `scripts/run-bench.sh` pins both to `f16`,
+so existing rows are comparable — but hand-run `llama-server` invocations are
+not, unless pinned.
 
 ### Dual-GPU tuning knobs — surveyed 2026-08-24
 
