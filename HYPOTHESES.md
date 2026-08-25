@@ -9,7 +9,7 @@ run label so the evidence is traceable.
 
 | ID | Claim | Status |
 |---|---|---|
-| H1 | MTP wins bigger on P100 than on a 3090 | Untested |
+| H1 | MTP wins bigger on P100 than on a 3090 | **REFUTED as stated — and speedup is depth-dependent, not a constant: 1.05× @4k, 1.48× @16k** |
 | H2 | XL quants stall one GPU on the split | Untested |
 | H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
 | H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
@@ -37,8 +37,38 @@ the batched verification path exercises well.
 rate alongside throughput — a speedup without a plausible acceptance rate is a
 measurement error, not a win.
 
-**Status:** Untested. Requires Phase 2. MTP draft head is on disk and verified
-(`nextn_predict_layers = 1`).
+**Status: REFUTED at the claimed size — and the claim was missing a variable.**
+
+Phase 2, `-sm tensor`, `UD-Q4_K_M`, `REPS=3`, 400 tokens:
+
+| Depth | Control | + MTP | Speedup | Acceptance |
+|---|---|---|---|---|
+| 4k | 20.30 | 21.27 | **1.05×** | 40.1% |
+| 16k | 19.75 | 29.26 | **1.48×** | 73.3% |
+
+Neither figure reaches the ~1.7× reported on a 3090, so the hypothesis as
+written is refuted. But the more useful finding is that **"the" speedup does not
+exist as a single number — it is a function of context depth**, and the claim
+never specified one. The bandwidth-bound reasoning above is not wrong, it is
+just not the binding constraint: what moves the speedup is *acceptance*, which
+nearly doubles between 4k and 16k on an identical drafter and budget.
+
+That points at a mechanism the original claim didn't consider: a long prompt
+constrains the plausible continuation, so a small draft head guesses right far
+more often. The same pattern appeared for DFlash2 in the H11 depth check
+(45.8% → 64.8%). A 3090 comparison would have to fix depth to mean anything, and
+the published 3090 number almost certainly came from a shallow-context run — in
+which case the honest comparison at 4k is 1.05× vs 1.7×, and P100 does *worse*
+relatively, not better.
+
+Two secondary results recorded here because they bear on how this gets measured:
+
+- **A 64-token generation overstated the speedup by 13x** (claimed +61.9% at
+  90.0% acceptance; the truth at 400 tokens was +4.8% at 40.1%). Acceptance
+  measured over a short generation is not a usable number.
+- **Acceptance shifts with split mode.** Same drafter, prompt, and budget at 4k:
+  44.4% on layer, 40.1% on tensor. Tensor split changes matmul reduction order,
+  so logits differ slightly and drafts diverge.
 
 ---
 
