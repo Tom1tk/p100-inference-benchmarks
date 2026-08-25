@@ -1,0 +1,35 @@
+build_commit,build_number,cpu_info,gpu_info,backends,model_filename,model_type,model_size,model_n_params,n_batch,n_ubatch,n_threads,cpu_mask,cpu_strict,poll,type_k,type_v,n_gpu_layers,n_cpu_moe,split_mode,main_gpu,no_kv_offload,flash_attn,devices,tensor_split,tensor_buft_overrides,load_mode,embeddings,no_op_offload,no_host,fit_target,fit_min_ctx,n_prompt,n_gen,n_depth,test_time,avg_ns,stddev_ns,avg_ts,stddev_ts
+[New LWP 58756]
+[New LWP 58755]
+[New LWP 58754]
+[New LWP 58753]
+[New LWP 58714]
+[New LWP 58713]
+[New LWP 58678]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x000070dcfd910813 in __GI___wait4 (pid=58757, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+#0  0x000070dcfd910813 in __GI___wait4 (pid=58757, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x000070dcfdb416c3 in ggml_print_backtrace () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#2  0x000070dcfdb4186b in ggml_abort () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#3  0x000070dcf5e3c7d7 in ggml_cuda_error(char const*, char const*, char const*, int, char const*) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-cuda.so.0
+#4  0x000070dcf5e44d21 in ggml_backend_cuda_comm_allreduce_nccl(ggml_backend_cuda_comm_context*, ggml_tensor**) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-cuda.so.0
+#5  0x000070dcfdb7034e in ggml_backend_meta_graph_compute(ggml_backend*, ggml_cgraph*) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#6  0x000070dcfdb601af in ggml_backend_sched_graph_compute_async () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libggml-base.so.0
+#7  0x000070dcfcefa611 in llama_context::graph_compute(ggml_cgraph*, bool) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#8  0x000070dcfcefe77a in llama_context::process_ubatch(llama_ubatch const&, llm_graph_type, llama_memory_context_i*, ggml_status&) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#9  0x000070dcfcf0590d in llama_context::decode(llama_batch const&) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#10 0x000070dcfcf06e3f in llama_decode () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama.so.0
+#11 0x000070dcfdee4d31 in test_prompt(llama_context*, int, int, int) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-bench-impl.so
+#12 0x000070dcfdef3cbe in llama_bench(int, char**) () from /root/dflash2-llama.cpp/build-cuda-p100/bin/libllama-bench-impl.so
+#13 0x000070dcfd82a1ca in __libc_start_call_main (main=main@entry=0x58cf02feb270 <main>, argc=argc@entry=23, argv=argv@entry=0x7fff6c4961f8) at ../sysdeps/nptl/libc_start_call_main.h:58
+#14 0x000070dcfd82a28b in __libc_start_main_impl (main=0x58cf02feb270 <main>, argc=23, argv=0x7fff6c4961f8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7fff6c4961e8) at ../csu/libc-start.c:360
+#15 0x000058cf02feb2a5 in _start ()
+[Inferior 1 (process 58671) detached]
