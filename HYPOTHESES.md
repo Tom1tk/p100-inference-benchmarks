@@ -21,6 +21,15 @@ run label so the evidence is traceable.
 | H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **CLOSED — AllReduce: no lever (only butterfly runs on Pascal). P2P: real but small, +2.9% decode / −0.3% prefill** |
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
+| H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
+| H14 | `-ub` 512→1024/2048 improves prefill ≥10% | Untested |
+| H15 | Lifting the 175 W cap to 250 W improves prefill ≥15% and decode <3% | Untested — needs approval |
+| H16 | TurboPrefill nets a TTFT win at 64k despite forcing `-sm layer` | Untested |
+| H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
+| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **decides the plan** |
+| H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
+| H20 | A 9B on one P100 beats the 27B's TTFT by ≥2× at 64k at acceptable NIAH quality | Untested |
+| H21 | PFlash-style token selection ports to sm_60 without the BSA kernels | Untested — spike |
 
 ---
 
@@ -765,3 +774,240 @@ Phase 1 also gave them a specific target: graph's prefill decays with depth
 stays flat. That decay is the thing to attack — `-sas` (async compute-graph
 evaluation, overlapping PCIe transfer with compute) is the most plausible lever
 if the decay is transfer-bound.
+
+---
+
+# Prefill / TTFT hypotheses (H13–H21)
+
+Added 2026-08-25 from `Research/prefill-ttft-2026-08-25.md`, which carries the
+reasoning, the source citations and the arithmetic behind these. Read it first —
+several obvious-looking prefill knobs are already closed at the source level and
+are listed in RUNBOOK's closed table rather than here.
+
+**Framing that applies to all nine.** Prefill is compute-bound at roughly
+`2 × 27e9 = 54 GFLOP/token`. Two P100s peak at 37.4 TFLOPS FP16, so a 100k
+prefill cannot go below **144 s** however good the kernels get, and 45–55% of
+peak — a good outcome — is **260–320 s**. We measure 11.2 TFLOP/s today, 30% of
+peak. So H14–H16 are worth at most a ~1.5–2× improvement between them, and only
+H19, H20 and H21 can produce a step change, because only those three reduce the
+amount of work done.
+
+---
+
+## H13 — the prefill decay curve to 100k
+
+**Claim:** 27B prefill holds ≥150 t/s at 100k, decaying less steeply than the
+Qwen3.5-9B did in the July NIAH runs, because `full_attention_interval = 4`
+means only ~16 of 65 layers carry a quadratic term.
+
+**Why it comes first:** we have never prefilled this model past 16,384 tokens.
+Every 64k/100k figure in circulation is an extrapolation, and the honest bracket
+is wide enough to change the plan: **7.8 min (linear) to 15.9 min (9B decay
+shape)** for 100k. Which end we are on decides whether the target is "shave 30%"
+or "restructure the work".
+
+**Test:** `llama-bench -p 16384,32768,65536,100000 -n 0` on `mainline-rebased`,
+`-sm tensor`, `UD-Q4_K_M`, f16 KV, `GGML_CUDA_ALLREDUCE=none`. Single rep is
+fine at the long tiers; they are slow and the variance on prefill has been <1%.
+VRAM at 100k is ~22.8 GB of 31.8 GB, so it fits (§2 of the research doc).
+
+**Watch:** the 83 °C limit. A 100k prefill is ~8–16 minutes of sustained
+compute, far longer than any run this repo has done. Do not leave it unmonitored.
+
+---
+
+## H14 — ubatch is mis-tuned for prefill
+
+**Claim:** raising `-ub` from 512 to 1024 or 2048 improves prefill by ≥10%.
+
+**Reasoning:** every prefill number in this repo was taken at the default
+`-ub 512` / `-b 2048`; it has never been swept. Larger ubatches give cuBLAS
+taller GEMMs, and on a card with no tensor cores, GEMM efficiency is strongly
+shape-dependent. Two ceilings to respect: `ssm-scan.cu` defines
+`SSM_SSD_MAX_TOKENS = 8192`, above which the SSD path falls back to the slow
+scan; and activation memory grows with ubatch, which competes with a 6.25 GiB
+KV cache at 100k.
+
+**Counter-argument, and why the test is still cheap:** if H18 is right and
+prefill is bound by the sequential GDN kernel rather than by GEMMs, ubatch will
+move almost nothing — the GDN kernel's cost is linear in tokens regardless of how
+they are grouped. **A null result here is positive evidence for H18.**
+
+**Test:** `-ub 512 / 1024 / 2048` × `-b 2048 / 4096`, at 16k, `-sm tensor`.
+
+---
+
+## H15 — the 175 W power cap is throttling prefill
+
+**Claim:** raising the limit from 175 W to 250 W improves prefill by ≥15% while
+moving decode by <3%.
+
+**Reasoning:** both cards run at `175.00 W` against a `250.00 W` default — a 30%
+power cut. Prefill is compute-bound and therefore clock-bound; decode is
+bandwidth-bound and HBM2 clocks are not power-gated the same way. The asymmetric
+prediction is what makes this a real hypothesis rather than a knob-turn: if
+decode moves as much as prefill, the model of what is limiting us is wrong.
+
+**Status: needs an explicit decision.** Power-limit work above 175 W is deferred
+by standing instruction, and this collides with the 83 °C rule — the cards
+already reach 70 °C at 175 W on a 684 s run. **Do not raise the cap without
+asking.** If approved: raise to 200 W first, not 250 W, and treat the temperature
+log as the primary output. Record the cap as a column, never change it silently
+mid-matrix.
+
+---
+
+## H16 — TurboPrefill on two GPUs
+
+**Claim:** TurboPrefill's pipelined ubatch scheduling produces a net TTFT win at
+64k even though it forces `-sm layer`.
+
+**Reasoning and the tradeoff:** it keeps several ubatches in flight at different
+pipeline stages, and reports **5.3× on 12× P104-100** (Pascal). But speedup
+scales with pipeline depth and we have two cards, so expect **1.3–1.6×**. It
+requires `-sm layer`, and Phase 2 measured layer+MTP at 19.05 t/s against
+tensor+MTP at 29.26 — **layer costs 35% of decode.** So this is a tradeoff to
+quantify, not a win to collect: worth it only if TTFT dominates the session.
+
+**Test:** build `turboprefill-rfc-poc` (llama.cpp b10335) for sm_60. Compare four
+cells at 64k: {layer, layer+TURBOPREFILL=1} × {no drafter, MTP}. Follow their
+sizing guidance, `-b 4096 -ub 128`. Report **both** TTFT and decode — a prefill
+number alone cannot settle this.
+
+**Note:** b10335 predates our `57affa09`, so it will not carry the DFlash2 rebase
+or PR #26177. This is a prefill probe, not a candidate daily driver.
+
+---
+
+## H17 — the sm_60 FP16 fast-path fix
+
+**Claim:** patching sm_60 out of the FP16 fast path leaves prefill unchanged,
+gains ~1.4% decode, and measurably changes model output.
+
+**Reasoning:** [issue #25593](https://github.com/ggml-org/llama.cpp/issues/25593)
+— sm_61 has a carve-out from the fast path, sm_60 does not, so FP32 math is
+silently truncated. Measured upstream: median KL divergence **0.004962 → 0.000001**,
+same-top-token rate **95.00% → 99.89%**. Roughly **1 in 20 greedy tokens flips.**
+Fix is three lines adding `cc != 600` beside the existing `!= 610` checks.
+
+**Two reasons this matters beyond quality.** First, **`buun` already carries the
+fix** (its PR #80) and our `mainline-rebased` does not — so every *quality*
+comparison between them in this repo is confounded, though throughput comparisons
+survive, the fix being throughput-neutral. Second, the upstream report that
+prefill throughput is *identical* with FP32 compute is strong external evidence
+for H18: halving the GEMM rate should be visible if prefill were GEMM-bound.
+
+**Test:** patch, rebuild, re-run one Phase 2 cell for throughput, then a NIAH
+tier for quality. Free by hypothesis, so if throughput holds, adopt it.
+
+---
+
+## H18 — GDN layers dominate prefill
+
+**Claim:** in a 16k prefill, more than half of GPU time is spent in
+`GATED_DELTA_NET`, not in `MUL_MAT`.
+
+**Reasoning:** `full_attention_interval = 4` puts ~49 of 65 layers in the
+gated-delta-net path, and that kernel walks tokens one at a time —
+`gated_delta_net.cu:63` is `for (int t = 0; t < n_tokens; t++)` with warp
+reductions per step and no GEMMs, so it never touches the P100's 2:1 FP16 rate.
+Line 180 carries the author's own `//TODO: Add chunked kernel for even faster
+pre-fill`; [PR #19504](https://github.com/ggml-org/llama.cpp/pull/19504) shipped
+the op as a vector implementation with chunking left as future work. The Mamba-2
+path in the same tree *did* get its chunked kernel (`SSM_SSD_CHUNK_SIZE 256`).
+
+Three observations fit: prefill is flat 2k→16k (−6.4%), we sit at 30% of FP16
+peak, and upstream reports FP32 compute costs no prefill throughput.
+
+**Why it decides the plan:** if true, H14 and the whole family of quant/GEMM
+knobs are dead ends, and the largest lever we control is writing a chunked GDN
+kernel — plausibly **1.5–2.5× on those layers, ~1.3–1.7× end-to-end** (the
+published 2–3× figures rely on Hopper TMA and warp specialisation we cannot use;
+the chunked *algorithm* itself is architecture-neutral).
+
+**Test, cheapest first:**
+1. `GGML_CUDA_CUBLAS_COMPUTE_TYPE=f32` vs `f16` on a 16k prefill. Halves the GEMM
+   rate. If prefill barely moves, prefill is not GEMM-bound. **One run, decisive.**
+2. `test-backend-ops perf` filtered to `GATED_DELTA_NET` — **not currently built**;
+   needs a rebuild with tests enabled.
+3. `nsys`/`ncu` on a single 16k prefill for a per-kernel breakdown.
+
+---
+
+## H19 — prompt-cache reuse for the agentic loop
+
+**Claim:** with the prompt cache sized for the workload, turn-2-onward TTFT in an
+agentic session drops by more than 90%.
+
+**Reasoning:** an agentic loop re-sends a nearly identical prefix every turn.
+llama-server can keep slot KV in host RAM and restore it — `-cram/--cache-ram`,
+`--cache-idle-slots`, `-ctxcp/--ctx-checkpoints`, `-cms/--checkpoint-min-step`.
+**The default `--cache-ram` is only 8192 MiB**, and this model's KV is 64 KiB per
+token (16 attention layers × 4 KV heads × 256 × 2 × 2 B), so 8 GiB holds roughly
+*one* 100k context. We have never tuned this.
+
+**Hard bound:** host RAM is **28 GB total, ~27 GB available** — perhaps three 100k
+f16 contexts, fewer with the model's host-side allocations. This is the one place
+where KV quantisation might still earn its 14.3% decode cost (H4), by tripling
+how many contexts fit in host RAM. Worth a follow-up cell if the bound binds.
+
+**Test:** `--cache-ram 20000 --cache-idle-slots` on the WEB_BENCH agentic
+scenario, measuring per-turn TTFT across a multi-turn session against the same
+session with `--cache-ram 0`. This is the **highest-value practical change in the
+list** for the stated use case, and it costs nothing but a flag.
+
+---
+
+## H20 — a smaller model on a single P100
+
+**Claim:** Qwen3.5-9B on one P100 delivers ≥2× the 27B's prefill at 64k with NIAH
+quality acceptable for the target workload.
+
+**Reasoning:** prefill FLOPs scale with parameter count, so a 9B should prefill
+~3× faster than a 27B at equal efficiency; a single card halves that, leaving
+~1.5×, plus whatever is recovered by removing all cross-GPU traffic. **We already
+hold half the data:** the July NIAH runs measured the 9B on two cards at 234.7 t/s
+at 64k and 187.9 t/s at 100k, scoring 12/12 needle hits at every tier and depth.
+
+**Test:** re-run the existing NIAH harness (`/root/niah_test/run_engine.py`,
+fixtures already generated) with `CUDA_VISIBLE_DEVICES=0`, and add a 27B leg for
+the comparison the July runs lack. The harness and fixtures exist; this is
+mostly a re-run.
+
+**Watch:** 9B Q4_K_XL is ~5.5 GB, plus 100k KV — comfortable in 16 GB. Quality is
+the real question, and NIAH single-needle is a weak proxy for agentic tool use.
+Use the multi-needle fixtures (`niah_*_multi.jsonl`) too, and the WEB_BENCH
+scenario if this looks promising.
+
+---
+
+## H21 — speculative prefill without the sm_80 kernels
+
+**Claim:** PFlash's token-selection stage is portable to sm_60, and delivers most
+of the speedup, even though its block-sparse-attention kernels are not.
+
+**Reasoning:** PFlash reports **10.4× TTFT at 128k** by scoring token importance
+with a 0.6B drafter and prefilling only the surviving spans. **It requires sm_80+**
+— the four kernels (`mean_K → score → select → sparse_fwd`) plus BSA target
+Ampere — so we cannot run it, and there is no v2. But the sm_80 dependency is
+concentrated in `sparse_fwd`, which accelerates the *drafter's own* forward pass.
+The selection stage is ordinary SIMT arithmetic. A 0.6B drafter running a dense
+forward over 100k tokens is cheap in absolute terms; we would forgo the drafter
+speedup and keep the target speedup, which is where nearly all the win is.
+
+**Why it is nonetheless top of the upside list:** at `keep_ratio = 0.10` the
+target prefills 10k instead of 100k tokens. This is the only technique surveyed
+with a plausible path to a **sub-2-minute 100k TTFT** on this hardware — §2's
+floor of 144 s applies to prefilling *all* 100k tokens, and this changes the
+input to that calculation rather than the rate.
+
+**Caveats, stated plainly:** this is lossy by construction, and PFlash's own
+`keep_ratio = 0.05` default was found unreliable in third-party testing, with 0.10
+the realistic floor at 128k. It is also a build project, not a config test — by
+far the largest engineering cost in this list.
+
+**Gate:** do not evaluate this on throughput first. Run the NIAH harness at
+`keep_ratio` ∈ {0.05, 0.10, 0.20} across 32k/64k/100k, single **and multi**-needle,
+before quoting a single TTFT number. The earlier "PFlash is too lossy" verdict
+stands for PFlash-the-product; this is a test of the technique, and it was formed
+while the sm_60 arithmetic bug (H17) was live.

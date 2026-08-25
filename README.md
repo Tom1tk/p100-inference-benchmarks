@@ -17,9 +17,10 @@ and the mandatory commit/push protocol. Everything else is reference.
 | Phase 1 — engine baseline | **Done** except the single-GPU (`none`) leg, deferred |
 | Phase 2 — drafters on/off | **Done** |
 | Phase 3 — quant sweep | Not started (a partial KV-quant sweep was run — see RESULTS) |
-| Phase 4 — hypothesis tests | **9 of 12 settled** — see below |
+| Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
+| **Phase 7 — prefill & TTFT (H13–H21)** | **Open — the current priority.** See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) |
 
 ### Best measured configuration
 
@@ -46,6 +47,39 @@ combination with MTP was never measured — **do not quote ~30 t/s.**
 | KV cache | `f16`. TurboQuant costs 14.3% of decode to save 788 MiB |
 | DFlash2 | Layer-split-only, so it cannot be used. See H8 |
 | AllReduce | `none`. `internal` needs Volta and silently falls back on Pascal |
+
+### The open problem: TTFT at 64k–100k
+
+Everything above optimises **decode at 4k–16k**. The workload target is 100k, and
+at that depth the binding constraint is prefill, which we have never measured
+past 16,384 tokens.
+
+| | 16k | 64k | 100k |
+|---|---|---|---|
+| prefill t/s | **208 (measured)** | 128–208 (est.) | 102–208 (est.) |
+| TTFT | 79 s | **5.0–8.1 min** | **7.8–15.9 min** |
+
+The bracket is that wide because the 27B has never been run past 16k; the low end
+applies the decay curve measured on this rig for a 9B in July. **Closing that
+bracket is Phase 7 cell 1.**
+
+Three facts that bound every proposed fix:
+
+- **Hardware floor.** 54 GFLOP/token × 100k ÷ 37.4 TFLOPS = **144 s minimum**, at
+  100% of FP16 peak. A realistic 45–55% is 260–320 s. Tuning is worth ~1.5–2×,
+  not 10× — a step change requires prefilling *fewer tokens*, a *smaller model*,
+  or *cache reuse*.
+- **The model is a hybrid.** `full_attention_interval = 4` — only ~16 of 65 layers
+  are attention. Prefill is near-linear (−6.4% from 2k to 16k), KV is only
+  64 KiB/token, and sparse-attention techniques have a low ceiling here.
+- **The suspect is the gated-delta-net kernel**, not the GEMMs. It walks tokens
+  one at a time and carries its author's `//TODO: Add chunked kernel for even
+  faster pre-fill`. H18 tests this and decides the rest of the phase.
+
+Also newly known and not yet acted on: **the cards are power-capped at 175 W of a
+250 W default** (H15, needs approval), and **our builds carry a live sm_60
+arithmetic bug** that flips ~1 in 20 greedy tokens, which `buun` has already
+fixed — so cross-engine *quality* comparisons in this repo are confounded (H17).
 
 **Two measurement rules**, both learned by getting them wrong: never size a
 speculative-decoding run at 64 tokens (it overstated a speedup by 13x), and
