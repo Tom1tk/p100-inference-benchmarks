@@ -584,3 +584,87 @@ property of drafter *and* task.
   into the log. The bogus rows were removed from the CSV; they were a harness
   defect, not a measurement.
 - `scripts/run-spec-placement.sh` gained `CTX` and `PROMPT_FILE` env overrides.
+
+---
+
+## 2026-08-25 — Phase 1 engine baseline on `UD-Q4_K_M`
+
+Six cells, `scripts/run-phase1.sh`, run detached. Five completed, one aborted
+by design (`ik` with NCCL — that abort *is* the H5 result). Chose `UD-Q4_K_M`
+over Q6 for speed; the whole phase took ~64 min of GPU time and never exceeded
+68°C.
+
+Deliberately **not** run: `ik` with NCCL on `layer`. We only want `ik` for
+`-sm graph`, so the NCCL question only needs answering on the mode we'd
+actually use.
+
+### Two conclusions were overturned mid-phase
+
+Worth recording, because in both cases the first result was the misleading one.
+
+**1. "graph beats layer by +91%" — measured against a broken baseline.**
+The first two cells were ik graph vs ik layer, and graph won both axes.
+I flagged the suspicious part at the time: the odd number wasn't graph's 153
+at pp16384, it was *layer's 80*. Three subsequent engines put layer at
+187.87 / 198.67 / 188.69 on identical work. `ik`'s layer implementation is the
+outlier, 2.3× off the field, and comparing graph to it inflated graph's case.
+Against a competent layer implementation graph is a **trade**: +76% decode,
+−23% deep prefill, crossover near 6k.
+
+This also retires an earlier speculation of mine *and* its retraction. I first
+guessed graph trades prefill for decode; then withdrew that when the
+same-binary comparison showed graph winning both. The original guess was right
+at the cross-engine level and wrong within `ik` — the within-engine comparison
+simply had a defective control.
+
+**2. `-sm tensor` is not arch-blocked for `qwen35`. I had the gate backwards.**
+Recorded previously as unusable because `qwen35` is absent from
+`llm_arch_supports_sm_tensor()`. It is a **denylist**:
+
+```cpp
+case LLM_ARCH_QWEN3TTS:
+    return false;
+default:
+    return true;      // qwen35 lands here
+```
+
+Absence means *permitted*. True on our built branch too, not just upstream
+tip — `build-cuda-p100/bin/llama-bench` advertises `<none|layer|row|tensor>`.
+The decisive cell for the whole ik-lock-in question needs no rebuild and has
+not been run.
+
+### Upstream drift check
+
+`origin/master` (`75844307`, Aug 24) is **115 commits** ahead of our PR
+branch's base. Reviewed all of them for relevance to this rig:
+
+- **Worth having:** `84979813` (backend split scheduler race — splits without
+  input running concurrently while reusing another split's memory; we run two
+  GPUs on every cell), `d9b6be07` (cuBLAS static workspace, 4 MiB/stream —
+  cuBLAS FP16 GEMM is our entire prefill path), `2c6b141e` + `f466cfa3`
+  (speculative/MTP fixes, bear on Phase 2).
+- **Inert for us:** `2b562109` "CUDA: switch points per HW and quant type to
+  tune the mvq->MMQ decode crossover" sounds targeted but its tables cover only
+  Ada/Blackwell/DGX Spark/CDNA, and MMQ is unreachable on our build anyway —
+  `ggml_cuda_should_use_mmq` returns false when
+  `highest_compiled_arch(cc) < GGML_CUDA_CC_DP4A` (610) and we compile for 60.
+  The new `GGML_CUDA_MMVQ_MAX` env knob is therefore a no-op here; don't chase
+  it. `d59d455f` (tensor-split meta backend fixes) was reverted by `f20395da`.
+  Zero Pascal/sm_60-specific changes in the entire `ggml-cuda` diff.
+- The "large release" itself is `bb4caa75`, a version bump to 0.2.0 plus
+  release tooling — process, not code.
+
+The DFlash2 PR merges onto current master **conflict-free**
+(`git merge-tree --write-tree origin/master pr-27342` → exit 0, tree OID only,
+no conflict paths). So rebasing costs nothing but a rebuild; the PR branch does
+not have to be given up to pick up the fixes above. Not done yet — it would
+invalidate the comparability of the `mainline` row above.
+
+### Harness/data bug found
+
+`results/all-results.csv` concatenates three different llama-bench schemas
+(pflash 43 columns, buun 46, `ik` 56) under whichever header was written first.
+`avg_ts` therefore sits at a different index per engine, and both positional
+and `DictReader` access return the wrong column silently — it read `ik`'s
+decode as 0.02 t/s instead of 22.05. Parse `results/raw/<label>.csv` instead;
+each carries its own correct header. Documented in RUNBOOK.md §4.
