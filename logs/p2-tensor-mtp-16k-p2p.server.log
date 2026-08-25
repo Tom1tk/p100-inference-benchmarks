@@ -1,0 +1,20 @@
+0.00.314.267 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.315.183 W srv  llama_server: -----------------
+0.00.315.186 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.315.187 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.315.187 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.315.187 W srv  llama_server: -----------------
+0.00.316.565 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+0.00.316.721 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.04.091.287 I cmn          init: llama threadpool init, n_threads = 8
+0.04.286.267 I common_speculative_init_result: loading draft model '/root/mtp-Qwen3.8-27B-Q4_0.gguf'
+0.05.253.729 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 16384, kv_unified = 'true'
+0.05.253.913 W set_sampler: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU
+0.05.253.917 W spec common_specu: backend offload failed for seq_id=0; using CPU sampler
+0.05.253.920 W spec common_specu: backend offload failed for seq_id=1; using CPU sampler
+0.05.253.921 W spec common_specu: backend offload failed for seq_id=2; using CPU sampler
+0.05.253.922 W spec common_specu: backend offload failed for seq_id=3; using CPU sampler
+0.05.273.384 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.05.273.428 I srv  llama_server: model loaded
+0.05.273.433 I srv  llama_server: listening on http://127.0.0.1:8300
+0.09.975.154 I srv    operator(): operator(): cleaning up before exit...
