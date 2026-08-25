@@ -1,1 +1,13 @@
 ########## p3-buun-mtp-16k-f16 (ctk=f16 ctv=f16)
+=== p3-buun-mtp-16k-f16 === (idle 57C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/buun-llama-cpp/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 20s | VRAM 10031/11521 MiB
+  rep1: decode 27.94 t/s | prefill 178.31 t/s | accept 255/319 = 79.9% | peak 69C
+  rep2: decode 28.22 t/s | prefill 178.21 t/s | accept 248/301 = 82.4% | peak 70C
+  rep3: decode 28.20 t/s | prefill 178.15 t/s | accept 248/301 = 82.4% | peak 70C
+########## p3-buun-mtp-16k-h7 (ctk=turbo3 ctv=f16)
+=== p3-buun-mtp-16k-h7 === (idle 66C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/buun-llama-cpp/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk turbo3 -ctv f16 -sm tensor -c 16384 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 20s | VRAM 9835/11325 MiB
+  rep1: decode 24.76 t/s | prefill 177.68 t/s | accept 247/333 = 74.2% | peak 70C
+########## p3-buun-mtp-16k-t3t3 (ctk=turbo3 ctv=turbo3)

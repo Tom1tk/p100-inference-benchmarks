@@ -1,0 +1,53 @@
+0.00.034.758 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.337.578 W srv  llama_server: -----------------
+0.00.337.582 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.337.582 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.337.583 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.337.583 W srv  llama_server: -----------------
+0.00.339.045 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+VMEAN tap: no live V layers — add disabled
+VMEAN tap: no live V layers — add disabled
+0.05.312.163 I srv    load_model: [spec] estimated memory usage of draft model is 31384.43 MiB
+0.06.907.126 W common_fit_params: failed to fit params to free device memory: model does not fit at the minimum context size and layer redistribution is not available under SPLIT_MODE_TENSOR, abort
+0.06.907.139 E cmn  common_init_: fit could not prove a viable placement; restoring the pre-fit parameters
+TCQ1 decode: K/V codebooks (K=baked-in V=baked-in) hotswap=0
+TCQ decode: context-adaptive V alpha enabled
+TCQ1 decode: K/V codebooks (K=baked-in V=baked-in) hotswap=0
+0.10.954.011 I srv    load_model: tensor-split target: draft model falls back to layer split (use --spec-draft-device to pin it to one GPU)
+0.11.874.656 I srv    load_model: computation-frontier ratchet: legacy reads authoritative, flip after 1024 qualifying agreements
+0.11.874.661 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 16384, kv_unified = 'true'
+0.11.875.464 I slot   load_model: id  0 | task -1 | speculative decoding context initialized
+0.11.875.472 I slot   load_model: id  1 | task -1 | speculative decoding context initialized
+0.11.875.473 I slot   load_model: id  2 | task -1 | speculative decoding context initialized
+0.11.875.474 I slot   load_model: id  3 | task -1 | speculative decoding context initialized
+0.11.885.213 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.11.885.270 I srv  llama_server: model loaded
+0.11.885.277 I srv  llama_server: listening on http://127.0.0.1:8300
+0.20.142.507 I slot cache_plan_s: id  0 | task -1 | selected slot by LRU, t_last = -1 (best rejected sim = 0.000)
+0.20.142.639 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.20.142.660 I slot   operator(): id  0 | task 0 | edit/divergence sample (cached/incoming/lcp/reusable/rewind/append/cache_prompt) = (0/14187/0/0/0/14187/0)
+0.21.099.690 W slot   operator(): id  0 | task 0 | created context checkpoint 1 of 32 (pos_min = 41, pos_max = 41, n_tokens = 42, size = 149.626 MiB)
+0.31.713.894 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   2090, progress = 0.15, t =  11.57 s / 180.62 tokens per second
+0.42.672.008 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   4138, progress = 0.29, t =  22.53 s / 183.67 tokens per second
+0.53.786.407 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   6186, progress = 0.44, t =  33.64 s / 183.87 tokens per second
+1.05.207.185 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   8234, progress = 0.58, t =  45.06 s / 182.72 tokens per second
+1.16.724.291 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  10282, progress = 0.72, t =  56.58 s / 181.72 tokens per second
+1.28.465.437 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  12330, progress = 0.87, t =  68.32 s / 180.47 tokens per second
+1.36.570.391 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  13671, progress = 0.96, t =  76.43 s / 178.87 tokens per second
+1.36.701.191 W slot   operator(): id  0 | task 0 | created context checkpoint 2 of 32 (pos_min = 13670, pos_max = 13670, n_tokens = 13671, size = 149.626 MiB)
+1.39.718.857 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  14183, progress = 1.00, t =  79.58 s / 178.23 tokens per second
+1.39.849.437 W slot   operator(): id  0 | task 0 | created context checkpoint 3 of 32 (pos_min = 14182, pos_max = 14182, n_tokens = 14183, size = 149.626 MiB)
+1.43.721.811 I slot print_timing: id  0 | task 0 | n_decoded =    100, tg =  26.80 t/s, tg_3s =  26.80 t/s
+1.46.774.180 I slot print_timing: id  0 | task 0 | n_decoded =    180, tg =  26.53 t/s, tg_3s =  26.21 t/s
+1.49.784.082 I slot print_timing: id  0 | task 0 | n_decoded =    252, tg =  25.73 t/s, tg_3s =  23.92 t/s
+1.52.792.486 I slot print_timing: id  0 | task 0 | n_decoded =    321, tg =  25.07 t/s, tg_3s =  22.94 t/s
+1.55.805.815 I slot print_timing: id  0 | task 0 | n_decoded =    396, tg =  25.04 t/s, tg_3s =  24.89 t/s
+1.55.921.561 W slot   operator(): id  0 | task 0 | draft size 2 exceeds max 1, truncating
+1.56.142.533 I slot print_timing: id  0 | task 0 | prompt eval time =   79847.20 ms / 14187 tokens (    5.63 ms per token,   177.68 tokens per second)
+1.56.142.540 I slot print_timing: id  0 | task 0 |        eval time =   16152.66 ms /   400 tokens (   40.38 ms per token,    24.76 tokens per second)
+1.56.142.542 I slot print_timing: id  0 | task 0 |       total time =   95999.86 ms / 14587 tokens
+1.56.142.547 I slot print_timing: id  0 | task 0 |    graphs reused =        147
+1.56.142.553 I slot print_timing: id  0 | task 0 | draft acceptance = 0.74174 (  247 accepted /   333 generated), mean len =  2.64
+1.56.142.559 I slot print_timing: id  0 | task 0 | verify/rollback histogram (draft/rejected:cycles) = (1/1:1, 2/0:74, 2/1:26, 2/2:18, 3/0:19, 3/1:7, 3/2:2, 3/3:4)
+1.56.143.449 I slot      release: id  0 | task 0 | stop processing: n_tokens = 14586, truncated = 0
+1.56.180.051 I srv    operator(): operator(): cleaning up before exit...

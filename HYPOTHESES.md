@@ -15,7 +15,7 @@ run label so the evidence is traceable.
 | H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
 | H5 | NCCL is harmful for split inference | **CONFIRMED and rig-wide — an abort, in both `ik` and mainline** |
 | H6 | `-sm graph` is the best split mode | **REFUTED — mainline `-sm tensor` wins: fastest prefill at every depth, decode within 8%** |
-| H7 | `(turbo*, F16)` KV combo aborts | Untested |
+| H7 | `(turbo*, F16)` KV combo aborts | **REFUTED — `turbo3/f16` runs clean on `buun`. Turbo KV is legal and ~12% slower than f16** |
 | H8 | DFlash2 is worth using on this rig | **Constrained — aborts under `-sm tensor` (borrowed axis-0-split `output.weight`); layer-split-only, so it must beat MTP-on-tensor from a 37% hole** |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
 | H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **CLOSED — AllReduce: no lever (only butterfly runs on Pascal). P2P: real but small, +2.9% decode / −0.3% prefill** |
@@ -257,8 +257,28 @@ reverse `(turbo*, F16)`. So asymmetric KV types abort:
 relying on any asymmetric turbo KV configuration. This is a cheap check — the
 abort happens early, so it doesn't need a full benchmark run.
 
-**Status:** Untested on current builds. The claim was made against a different
-fork and may not apply to all three.
+**Status: REFUTED on `buun` — the only tree it could be tested on.**
+
+Turbo KV types exist only in `buun` and `pflash` (`pflash` is excluded from
+testing). Neither `ik` nor `mainline` has them, so `buun` is the whole
+population here.
+
+`buun` · `-sm tensor` · `UD-Q4_K_M` · MTP-Q4_0 · 16k depth · 1 rep:
+
+```
+-ctk turbo3 -ctv f16   ->  runs clean, 24.76 t/s, 177.68 pp, 74.2% acceptance
+```
+
+No abort, no `fattn.cu:348`. The claim was inherited from a different fork and
+the caveat recorded against it ("may not apply to all three") was correct.
+
+**The useful finding is not the refutation — it is that turbo KV is slower.**
+Against `f16/f16` on the same engine and depth (28.12 t/s), `turbo3/f16` costs
+**12% of decode**. That is the opposite of what H4 hoped for, and it is measured
+on the asymmetric combination this hypothesis said was impossible.
+
+Caveat: the H7 cell ran 1 rep, because it was built as an abort check rather
+than a measurement. The sign is unambiguous, the magnitude is provisional.
 
 
 ---
