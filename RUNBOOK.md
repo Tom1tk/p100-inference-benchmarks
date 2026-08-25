@@ -124,7 +124,16 @@ normal and is worth investigating.
 After each run:
 
 1. **`results/all-results.csv`** — appended automatically by the script. This
-   is the machine-readable source of truth. Don't hand-edit it.
+   is the machine-readable aggregate. Don't hand-edit it.
+
+   > **Do not parse this file by column position or by `csv.DictReader`.**
+   > Different engines emit different llama-bench schemas — pflash 43 columns,
+   > buun 46, ik 56 — and they are all appended under the single header written
+   > by whichever engine ran first. `avg_ts` therefore sits at a different index
+   > per engine, and a positional or header-keyed read silently returns the
+   > wrong column (observed: ik decode read as 0.02 t/s instead of 22.05).
+   > **Parse `results/raw/<label>.csv` instead** — each carries its own correct
+   > header. Use `all-results.csv` only for grepping which labels exist.
 2. **[RESULTS.md](RESULTS.md)** — add a curated row to the relevant phase
    table. Include split mode, peak temp, and anything anomalous.
 3. **[RUNLOG.md](RUNLOG.md)** — add an entry only if something notable
