@@ -1,0 +1,15 @@
+=== running: phase1-buun-tensor-q4km ===
+CUDA_VISIBLE_DEVICES=0\,1 /root/buun-llama-cpp/build-cuda-p100/bin/llama-bench -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -p 0\,2048\,4096\,8192\,16384 -n 128 -r 3 -o csv 
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 684s | exit 0 | peak 70C ===
+--- results ---
+build_commit,build_number,cpu_info,gpu_info,backends,model_filename,model_type,model_size,model_n_params,n_batch,n_ubatch,n_threads,cpu_mask,cpu_strict,poll,type_k,type_v,n_gpu_layers,n_cpu_moe,moe_cache,moe_cache_fit,repack,split_mode,main_gpu,no_kv_offload,flash_attn,devices,tensor_split,tensor_buft_overrides,load_mode,embeddings,no_op_offload,no_host,fit_target,fit_min_ctx,n_prompt,n_gen,n_gen_warmup,n_depth,test_time,avg_ns,stddev_ns,avg_ts,stddev_ts
+"39d97a876","11260","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","auto","0","1","tensor","0","0","1","auto","0.00","none","mmap","0","0","0","0","0","2048","0","0","0","2026-08-25T12:13:55Z","10583933520","5557722","193.500873","0.101602"
+"39d97a876","11260","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","auto","0","1","tensor","0","0","1","auto","0.00","none","mmap","0","0","0","0","0","4096","0","0","0","2026-08-25T12:14:38Z","21349015303","12001656","191.859006","0.107859"
+"39d97a876","11260","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","auto","0","1","tensor","0","0","1","auto","0.00","none","mmap","0","0","0","0","0","8192","0","0","0","2026-08-25T12:16:04Z","43441783524","13125686","188.574221","0.056966"
+"39d97a876","11260","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","auto","0","1","tensor","0","0","1","auto","0.00","none","mmap","0","0","0","0","0","16384","0","0","0","2026-08-25T12:18:58Z","89653608351","2965397","182.747804","0.006045"
+"39d97a876","11260","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","auto","0","1","tensor","0","0","1","auto","0.00","none","mmap","0","0","0","0","0","0","128","1","0","2026-08-25T12:24:56Z","6193325447","28991005","20.667713","0.097003"
+pushed
+
+Next: update RESULTS.md, and HYPOTHESES.md if this bears on H1-H7 (see RUNBOOK.md section 4).
+=== buun tensor complete ===

@@ -170,9 +170,9 @@ Do not just retry. Failures are results.
 |---|---|---|
 | `ncclAllReduce failed with status 1`, abort at `reduce.cu:169` | `ik_llama` built with NCCL (`GGML_NCCL` defaults **ON**); no NVLink on this rig | Rebuild ik_llama with `-DGGML_NCCL=OFF` |
 | `error: invalid parameter for argument: -sm` | Split mode not supported by that engine | Check the per-engine matrix in METHODOLOGY.md |
-| `ggml-cuda.cu:106: CUDA error` on mainline `-sm tensor` | NCCL AllReduce, the Linux default, is broken on this rig — same root cause as the `ik` row above. The line number is the generic abort dispatcher; get the real cause from the backtrace frame `ggml_backend_cuda_comm_allreduce_nccl` | Set `GGML_CUDA_ALLREDUCE=internal` (or `none`). No rebuild needed |
+| `ggml-cuda.cu:106: CUDA error` on mainline `-sm tensor` | NCCL AllReduce, the Linux default, is broken on this rig — same root cause as the `ik` row above. The line number is the generic abort dispatcher; get the real cause from the backtrace frame `ggml_backend_cuda_comm_allreduce_nccl` | Set `GGML_CUDA_ALLREDUCE=none`. (`internal` also works but only because it falls back to the same path — see below.) No rebuild needed |
 | `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture '<arch>'` | `-sm tensor` is arch-gated — but the gate is a **denylist** (`default: return true`), so most archs including `qwen35` are permitted. Earlier guidance here claimed the reverse and was wrong | If you see this for `qwen35`, something else changed — check `llm_arch_supports_sm_tensor()` in `src/llama-arch.cpp` |
-| Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
+| Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse. Turbo KV types exist only in `buun` and `pflash` | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
 | No `pp0` row in output | `-p 0` is a no-op prefill and is silently omitted | Expected, not a bug |
 | Load appears hung, GPUs idle | Normal model load, or disk contention | See §2 timing table |
 | `pi` hangs at startup, no request reaches the server | `pi` blocks on startup network operations in this environment | `PI_OFFLINE=1` — `run-web-bench.sh` sets it. Verified, not guesswork |
@@ -182,6 +182,9 @@ Do not just retry. Failures are results.
 | Tool calls malformed / ignored in Phase 5 | `--jinja` missing, or a genuinely bad drafter | The script passes `--jinja`. If it's there, this is a **result** — see H8 |
 | DFlash2 run shows poor acceptance instead of an error | A **v1** engine (`buun`/`ik`) silently ran the v1 path — same `draft-dflash` flag, no selector | Use `mainline`. Confirm the selector loaded in `logs/<label>.server.log` before recording. See H8 |
 | `failed to load model` on `-sm none` | Target too big for one 16 GiB card | Only `UD-IQ3_S` (~11 GiB) fits a single P100 with usable KV |
+| Running script dies with a syntax error partway through (`break: only meaningful in a loop`, `<message>: command not found`) | **A script was edited while a background job was executing it.** Bash reads a script incrementally, so an edit shifts the byte offsets under the running shell and it resumes mid-token. The file is fine afterwards — `bash -n` passes — which makes this look like a phantom | Never edit `scripts/*.sh` while `pgrep -f llama-server\|llama-bench` shows work in flight. Re-run the affected cell; discard nothing else |
+| `ggml-backend-meta.cpp:543: GGML_ASSERT(src_ss[0].axis != GGML_BACKEND_SPLIT_AXIS_0)` on DFlash2 | DFlash2 borrows the target's `output.weight` via `ctx_other`; `-sm tensor` shards it on axis 0 and the split planner can't handle a per-row op over it | Not fixable by configuration. DFlash2 is layer-split-only. See H8 |
+| `internal AllReduce init failed (n_devices != 2?)` | Misleading message — the real gate is compute capability. The internal pipeline needs `__nanosleep` (sm70+); P100 is sm_60 | Expected on this rig, harmless. Use `GGML_CUDA_ALLREDUCE=none`; `internal` reaches the same butterfly path. See H10 |
 
 ---
 

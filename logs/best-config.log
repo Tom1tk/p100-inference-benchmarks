@@ -1,0 +1,7 @@
+=== p2-tensor-mtp-16k-p2p === (idle 60C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+./scripts/run-spec-placement.sh: line 127: ERROR: not healthy after 900s: command not found
+./scripts/run-spec-placement.sh: line 128: break: only meaningful in a `for', `while', or `until' loop
+./scripts/run-spec-placement.sh: line 129: syntax error near unexpected token `fi'
+./scripts/run-spec-placement.sh: line 129: `    fi'
+=== best-config check complete ===

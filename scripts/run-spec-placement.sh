@@ -29,6 +29,9 @@ THREADS=8
 FA=1
 CTX="${CTX:-4096}"
 N_PREDICT="${N_PREDICT:-400}"
+# buun defaults KV to vbr, not f16 -- always pin these. See METHODOLOGY.
+CTK="${CTK:-f16}"
+CTV="${CTV:-f16}"
 REPS="${REPS:-3}"
 PORT=8300
 LOAD_TIMEOUT=900
@@ -97,7 +100,7 @@ SERVER_CMD=(
     "$BIN" -m "$MODEL"
     --host 127.0.0.1 --port "$PORT"
     -ngl "$NGL" -fa "$FA" -t "$THREADS"
-    -ctk f16 -ctv f16
+    -ctk "$CTK" -ctv "$CTV"
     -sm "$SPLIT" -c "$CTX"
 )
 if [[ "$DRAFTER" != none ]]; then
