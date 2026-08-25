@@ -55,3 +55,23 @@ ggml_cuda_init: found 2 CUDA devices:
 ggml_cuda_op_reduce: ncclAllReduce failed with status 1
 /root/ik_llama.cpp/ggml/src/ggml-cuda/reduce.cu:169: Fatal error
 warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+pushed
+
+Next: update RESULTS.md, and HYPOTHESES.md if this bears on H1-H7 (see RUNBOOK.md section 4).
+############ phase1-ik-graph-q4km exit=134 ############
+############ phase1-pflash-layer-q4km ############
+=== preflight ===
+GPUs: 2 | hottest card: 50C
+0, 175.00 W, Enabled
+1, 175.00 W, Enabled
+=== running: phase1-pflash-layer-q4km ===
+CUDA_VISIBLE_DEVICES=0\,1 /root/pflash-llama.cpp/build-cuda-p100/bin/llama-bench -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm layer -p 0\,2048\,4096\,8192\,16384 -n 128 -r 3 -o csv 
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 685s | exit 0 | peak 65C ===
+--- results ---
+build_commit,build_number,cpu_info,gpu_info,backends,model_filename,model_type,model_size,model_n_params,n_batch,n_ubatch,n_threads,cpu_mask,cpu_strict,poll,type_k,type_v,n_gpu_layers,n_cpu_moe,split_mode,main_gpu,no_kv_offload,flash_attn,devices,tensor_split,tensor_buft_overrides,use_mmap,use_direct_io,embeddings,no_op_offload,no_host,fit_target,fit_min_ctx,n_prompt,n_gen,n_depth,test_time,avg_ns,stddev_ns,avg_ts,stddev_ts
+"e05ff58b7","9110","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","layer","0","0","1","auto","0.00","none","1","0","0","0","0","0","0","2048","0","0","2026-08-25T09:06:52Z","11111460505","3494270","184.314216","0.057928"
+"e05ff58b7","9110","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","layer","0","0","1","auto","0.00","none","1","0","0","0","0","0","0","4096","0","0","2026-08-25T09:07:37Z","21373697806","25514293","191.637588","0.228865"
+"e05ff58b7","9110","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","layer","0","0","1","auto","0.00","none","1","0","0","0","0","0","0","8192","0","0","2026-08-25T09:09:03Z","42592838833","18165522","192.332824","0.082005"
+"e05ff58b7","9110","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","layer","0","0","1","auto","0.00","none","1","0","0","0","0","0","0","16384","0","0","2026-08-25T09:11:53Z","87207368229","55194577","187.874083","0.118883"
+"e05ff58b7","9110","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","layer","0","0","1","auto","0.00","none","1","0","0","0","0","0","0","0","128","0","2026-08-25T09:17:42Z","10212239113","6901708","12.533984","0.008472"
