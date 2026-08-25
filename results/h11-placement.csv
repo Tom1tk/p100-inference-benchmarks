@@ -31,3 +31,12 @@ h11-depth16k-df2q4-default,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,default,
 h11-depth16k-df2q4-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,CUDA1,1,17.09,159.59,400,406,263,64.8,9079,11887,61,10,ok
 h11-depth16k-df2q4-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,CUDA1,2,17.06,160.50,400,406,263,64.8,9079,11887,63,10,ok
 h11-depth16k-df2q4-cuda1,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,CUDA1,3,17.04,160.33,400,406,263,64.8,9079,11887,63,10,ok
+smoke-tensor-none,none,none,default,1,20.13,66.47,64,0,0,,8183,8183,50,10,ok
+smoke-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,32.60,55.47,64,50,45,90.0,9827,9827,53,20,ok
+smoke-tensor-df2q4,draft-dflash,Qwen3.8-27B-DFlash2-Q4_K_M.gguf,default,0,,,,,,,,,,21,FAILED(load)
+p2-tensor-none,none,none,default,1,20.31,66.73,400,0,0,,8183,8183,60,10,ok
+p2-tensor-none,none,none,default,2,20.30,68.08,400,0,0,,8183,8183,63,10,ok
+p2-tensor-none,none,none,default,3,20.29,68.01,400,0,0,,8183,8183,65,10,ok
+p2-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,21.24,57.03,400,543,218,40.1,9827,9827,65,10,ok
+p2-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,21.30,59.04,400,543,218,40.1,9827,9827,65,10,ok
+p2-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,21.28,59.14,400,543,218,40.1,9827,9827,66,10,ok

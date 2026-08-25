@@ -19,13 +19,17 @@ cd "$REPO"
 
 # --- Fixed parameters -------------------------------------------------------
 MODEL=/root/Qwen3.8-27B-UD-Q4_K_M.gguf
-SPLIT=layer
+# Phase 1 selected -sm tensor, so SPLIT is now an env knob rather than a
+# constant. Tensor split needs GGML_CUDA_ALLREDUCE=internal (or none) -- the
+# NCCL default aborts. See H5/H10.
+SPLIT="${SPLIT:-layer}"
+BIN="${BIN:-/root/dflash2-rebased/build-cuda-p100/bin/llama-server}"
 NGL=99
 THREADS=8
 FA=1
 CTX="${CTX:-4096}"
-N_PREDICT=400
-REPS=3
+N_PREDICT="${N_PREDICT:-400}"
+REPS="${REPS:-3}"
 PORT=8300
 LOAD_TIMEOUT=900
 ABORT_TEMP=83
@@ -45,7 +49,6 @@ fi
 [[ $# -eq 4 ]] || { sed -n '2,14p' "$0" >&2; exit 2; }
 LABEL="$1"; SPEC_TYPE="$2"; DRAFTER="$3"; PLACEMENT="$4"
 
-BIN=/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-server
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }
 [[ -f "$MODEL" ]] || { echo "ERROR: model not found: $MODEL" >&2; exit 2; }
 [[ "$DRAFTER" == none || -f "$DRAFTER" ]] || { echo "ERROR: drafter not found: $DRAFTER" >&2; exit 2; }

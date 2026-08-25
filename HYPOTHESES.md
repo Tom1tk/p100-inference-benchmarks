@@ -16,9 +16,9 @@ run label so the evidence is traceable.
 | H5 | NCCL is harmful for split inference | **CONFIRMED and rig-wide — an abort, in both `ik` and mainline** |
 | H6 | `-sm graph` is the best split mode | **REFUTED — mainline `-sm tensor` wins: fastest prefill at every depth, decode within 8%** |
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
-| H8 | DFlash2 is worth using on this rig | **Runs on both GPUs, 57% acceptance** — speedup unquantified |
+| H8 | DFlash2 is worth using on this rig | **Constrained — aborts under `-sm tensor` (borrowed axis-0-split `output.weight`); layer-split-only, so it must beat MTP-on-tensor from a 37% hole** |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
-| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **Half settled — AllReduce backend is correctness-only (`internal`==`none`, NCCL aborts).** P2P untested |
+| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **AllReduce half CLOSED — only butterfly works on Pascal (`internal` needs sm70+ `__nanosleep`); NCCL aborts.** P2P untested |
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 
@@ -341,6 +341,35 @@ MTP-on-buun would confound drafter with engine.
 
 ---
 
+### DFlash2 is incompatible with `-sm tensor` (2026-08-25)
+
+Phase 1 selected `-sm tensor` as the best split mode, which makes this a hard
+constraint on H8 rather than a footnote: **DFlash2 cannot run in the split mode
+we want to use.** It aborts during load:
+
+```
+ggml-backend-meta.cpp:543: GGML_ASSERT(src_ss[0].axis != GGML_BACKEND_SPLIT_AXIS_0) failed
+```
+
+That assert is in `handle_per_row`, the meta-backend's split planner: a per-row
+op was handed a source split along axis 0 — the row axis — which it cannot plan
+for. The source in question is the target's `output.weight`, which DFlash2
+*borrows* via `cparams.ctx_other` rather than shipping its own. Under `-sm
+tensor` that borrowed tensor is sharded across both cards on axis 0, so the
+drafter's graph inherits a split it was never designed to see.
+
+This is structural, not a knob. It also explains cleanly why MTP survives the
+same test: MTP ships its own `output.weight` and `token_embd.weight`, so its
+graph consumes unsplit tensors.
+
+**Consequence: DFlash2 is layer-split-only on this rig.** Since layer split
+costs ~37% of decode throughput before any drafter is involved (12.79 vs 20.30
+t/s control), DFlash2 now has to beat MTP-on-tensor from a hole that deep. The
+H8 comparison is therefore no longer drafter-vs-drafter; it is
+`tensor + MTP` vs `layer + DFlash2` as whole configurations.
+
+---
+
 ## H9 — Drafter quantisation: Q8 vs Q4
 
 **Claim:** the Q8_0 DFlash2 drafter accepts enough more tokens than the Q4_K_M
@@ -438,15 +467,51 @@ by env var, `ik` needs `-DGGML_NCCL=OFF` at build time.
 | tg128 | 20.34 ±0.05 | 20.38 ±0.03 | +0.2% |
 
 Identical to within 0.2%, most cells within 0.05%, against stddevs of
-0.02–0.16. Both cells took exactly 608s. No `internal AllReduce init failed`
-warning was logged, so the dedicated two-device pipeline really did initialise
-and still made no difference — AllReduce volume is simply not a bottleneck for
-this model in this mode.
+0.02–0.16. Both cells took exactly 608s.
 
-**So the H10 claim is half wrong as stated:** the AllReduce backend is *not*
-leaving performance on the table. It is a correctness switch. Pick `internal`
-(it initialises cleanly and is purpose-built for a 2-device rig); `none` is an
-equally valid fallback. Only `nccl` is wrong.
+**Finding 3 — and the reason they are identical: `internal` never runs on this
+rig.** The two cells above measured the *same code path* twice. Every
+tensor-split run on P100 falls back to the meta-backend butterfly, logging:
+
+```
+internal AllReduce init failed (n_devices != 2?); falling back to meta-backend butterfly
+```
+
+The warning's guess is wrong — we do have exactly 2 devices. The real gate is in
+`ggml/src/ggml-cuda/allreduce.cu:405`:
+
+```cpp
+// The chunked kernel uses __nanosleep, which is sm70+ (Volta+).
+for (size_t i = 0; i < n_devices; ++i) {
+    const int cc = ggml_cuda_info().devices[devices[i]].cc;
+    if (cc < GGML_CUDA_CC_VOLTA) { ... return nullptr; }
+}
+```
+
+`GGML_CUDA_CC_VOLTA` is 700 (`common.cuh:52`); P100 is `sm_60`, cc 600. The
+internal AllReduce depends on `__nanosleep`, a Volta+ instruction, so it is
+**architecturally unavailable on Pascal** — not a tunable, not a config
+accident, and no `GGML_CUDA_P2P` setting can unlock it.
+
+I previously recorded that "no `internal AllReduce init failed` warning was
+logged, so the dedicated two-device pipeline really did initialise." That was
+wrong: those were `llama-bench` runs, and `llama-bench` does not surface backend
+warnings. `llama-server` logs it on every start. The source gate is decisive
+either way.
+
+**So the H10 claim is wrong as stated on the AllReduce half:** the backend is
+not leaving performance on the table, because on this hardware there is only one
+backend that works. The full P100 picture:
+
+| `GGML_CUDA_ALLREDUCE` | what actually happens on P100 |
+|---|---|
+| `nccl` (Linux default) | **aborts** — `ggml_backend_cuda_comm_allreduce_nccl` |
+| `internal` | cc gate fails → falls back to butterfly |
+| `none` | butterfly |
+
+`internal` and `none` are the same thing here. Prefer `none`: it is honest about
+what runs and skips a failed init. Every tensor-split number in this project was
+measured on the butterfly path.
 
 **Remaining test — the one that could still pay off:**
 
