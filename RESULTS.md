@@ -36,14 +36,55 @@ Notes:
 
 ## Phase 1 — engine baseline
 
-`-r 3`, no MTP, no TurboQuant. The apples-to-apples comparison.
+`-r 3`, no MTP, no TurboQuant, `-ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16`.
+The apples-to-apples comparison. All cells on **`Qwen3.8-27B-UD-Q4_K_M`**.
 
-| Engine | Quant | Split | pp2048 | pp4096 | pp8192 | pp16384 | tg128 | VRAM (GPU0/GPU1) | Peak temp | Notes |
-|---|---|---|---|---|---|---|---|---|---|---|
-| pflash | UD-Q6_K_M | layer | 188.46 | 197.11 | 198.21 | 193.38 | 9.45 | — | 65°C | `-r 3`. `none` (single-GPU reference) blocked — 21.5GB model doesn't fit one 16GB card, `failed to load model`. Superseded: use `UD-IQ3_S` for the single-GPU leg |
+| Engine | Commit | Split | pp2048 | pp4096 | pp8192 | pp16384 | tg128 | Run |
+|---|---|---|---|---|---|---|---|---|
+| ik (no NCCL) | `8337e4c` | graph | 199.14 | 198.45 | 179.56 | 153.04 | 22.05 | 676s, peak 68C |
+| ik (no NCCL) | `8337e4c` | layer | 116.49 | 109.50 | 96.99 | 80.08 | 13.54 | 1065s, peak 62C |
+| pflash | `e05ff58b7` | layer | 184.31 | 191.64 | 192.33 | 187.87 | 12.53 | 685s, peak 65C |
+| buun | `39d97a876` | layer | 178.47 | 194.31 | 200.73 | 198.67 | 13.10 | 659s, peak 68C |
+| mainline (pr-27342) | `64f765f5` | layer | 180.38 | 190.96 | 192.14 | 188.69 | 12.88 | 684s, peak 65C |
+| ik (NCCL on) | `8337e4c` | graph | — | — | — | — | — | **exit 134 after 9s** — `ncclAllReduce failed with status 1`. See H5 |
 
-Cells needed: {pflash, buun, ik} × {none, layer}, plus ik × graph once
-unblocked.
+Earlier Q6_K_M reference cell, kept for continuity (different quant — not
+comparable to the rows above):
+
+| Engine | Quant | Split | pp2048 | pp4096 | pp8192 | pp16384 | tg128 | Peak temp | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| pflash | UD-Q6_K_M | layer | 188.46 | 197.11 | 198.21 | 193.38 | 9.45 | 65°C | `none` (single-GPU reference) blocked — 21.5GB model doesn't fit one 16GB card, `failed to load model`. Superseded: use `UD-IQ3_S` for the single-GPU leg |
+
+### What Phase 1 established
+
+**1. `-sm graph` is the only path to fast decode, by a wide margin.**
+22.05 t/s against 12.53–13.54 for *every* layer implementation in *every*
+engine. Three independent forks land in a 1.0 t/s band; graph is 63–76% above
+all of them. Nothing else in the matrix moves decode at all.
+
+**2. `-sm graph` is the only path that decays with depth on prefill.**
+Graph runs 199 → 198 → 180 → 153 from pp2048 to pp16384 (−23%). pflash,
+buun and mainline are flat or *rising* over the same range (buun: 178 → 199).
+Crossover is around 6k: graph wins short prefill, loses deep prefill.
+This matters because agentic transcripts live past the crossover.
+
+**3. `ik`'s own `-sm layer` is broken, and it poisoned the first read.**
+80.08 at pp16384 versus 187.87–198.67 for the other three engines on the
+identical model and flags — a 2.3× deficit that no other engine shows. The
+initial "graph is +91% over layer" figure was measured against this defect,
+not against a competent baseline. Against a good layer implementation the
+result is a **trade**, not a win. Corrected here deliberately: the within-ik
+comparison is the misleading one, and it was the first one run.
+
+**4. The three non-ik engines are interchangeable on layer split.**
+pflash / buun / mainline sit within 5% of each other at every depth
+(pp16384: 187.87 / 198.67 / 188.69). Engine choice on layer split is not a
+performance decision — so it can be made on features (DFlash2, arch support)
+instead.
+
+**Still missing from this phase:** the single-GPU (`none`) leg, which needs
+`UD-IQ3_S` to fit in 16 GB. `-sm tensor` on mainline is not in this table but
+is now known to be available (see H6).
 
 ---
 

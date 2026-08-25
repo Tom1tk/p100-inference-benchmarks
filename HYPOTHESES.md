@@ -13,14 +13,14 @@ run label so the evidence is traceable.
 | H2 | XL quants stall one GPU on the split | Untested |
 | H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
 | H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
-| H5 | NCCL is harmful for split inference | **Partly confirmed — worse than claimed** |
-| H6 | `-sm graph` is the best split mode | Untested (`graph` blocked by H5; single-GPU leg unblocked by IQ3_S) |
+| H5 | NCCL is harmful for split inference | **CONFIRMED — not a slowdown, an abort** |
+| H6 | `-sm graph` is the best split mode | **Partly confirmed — a trade: +76% decode, -23% deep prefill.** `-sm tensor` cell still open |
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
 | H8 | DFlash2 is worth using on this rig | **Runs on both GPUs, 57% acceptance** — speedup unquantified |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
 | H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | Untested |
-| H11 | Drafter placement across the two cards matters | Untested |
-| H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (blocked by H5) |
+| H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
+| H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 
 ---
 
@@ -103,30 +103,44 @@ combinations.
 split path. No NVLink means direct CUDA peer-to-peer beats AllReduce over
 PCIe. Original guidance: "do not build with NCCL."
 
-**Status: partly confirmed, and the reality is worse than the claim.**
+**Status: CONFIRMED, and the reality is worse than the claim.** NCCL doesn't
+cost 14% — it makes `-sm graph` unusable.
 
-On the current build (`8337e4c`), NCCL doesn't merely cost performance — it
-**fails outright**:
+Proven with a matched pair in Phase 1: same tree, same commit (`8337e4c`),
+same model, same flags, **one CMake flag apart**.
+
+| Build | Result |
+|---|---|
+| `build/` (`GGML_NCCL=ON`, the CMake default) | **exit 134 after 9s** — aborts on the first prefill test |
+| `build-nonccl/` (`GGML_NCCL=OFF`) | exit 0, 676s, full result set, peak 68°C |
 
 ```
 ggml_cuda_op_reduce: ncclAllReduce failed with status 1
 /root/ik_llama.cpp/ggml/src/ggml-cuda/reduce.cu:169: Fatal error
 ```
 
-Aborts on the first prefill test, before producing any throughput number.
-`GGML_NCCL` defaults to **ON** in ik_llama's CMake, so this is the default
-build's behaviour on this rig.
+Verified the two builds actually differ as intended: `build/bin/llama-bench`
+links `libnccl.so.2` (via `libggml.so`); `build-nonccl/bin/llama-bench` links
+neither.
 
-Evidence: `logs/phase0-ik-graph-q6k.log` (run `phase0-ik-graph-q6k`).
+The upstream author agrees, in `ggml/src/ggml-cuda/reduce.cu:146`:
 
-**Remaining work:**
-1. Rebuild ik_llama with `-DGGML_NCCL=OFF` and confirm `-sm graph` runs.
-2. Quantify the performance claim properly — that needs a working NCCL build
-   to compare against, which may not be achievable if NCCL simply doesn't
-   function here. If so, record that the −14% figure is untestable on this rig
-   and the operative guidance is "NCCL is unusable," which is stronger.
-3. Check whether this affects `pflash`/`buun` at all — the original finding was
-   specific to `ik`'s graph mode, and those engines don't offer graph split.
+```cpp
+#ifdef GGML_USE_NCCL
+    // Somehow I'm not able to figure out how to use NCCL correctly.
+    // Hence, if enabled, we use NCCL only for the cases where it works and performs well.
+```
+
+**Operative guidance — stronger than the original claim:** the −14% figure is
+untestable on this rig, because NCCL never produces a number to compare. Build
+`ik_llama` with `-DGGML_NCCL=OFF`. `GGML_NCCL` defaults to **ON**, so the
+default build is the broken one.
+
+Evidence: `logs/phase1-driver.log` (`phase1-ik-graph-q4km` vs
+`phase1-iknonccl-graph-q4km`), `logs/phase0-ik-graph-q6k.log`.
+
+**Not applicable to other engines.** `pflash`/`buun`/`mainline` don't offer
+graph split and don't link NCCL; H5 is an `ik` finding only.
 
 ---
 
@@ -135,16 +149,48 @@ Evidence: `logs/phase0-ik-graph-q6k.log` (run `phase0-ik-graph-q6k`).
 **Claim:** `ik_llama`'s `-sm graph` was the prior known-good baseline for this
 rig (on the much older build `286ce324`).
 
-**Question:** does graph split still win on current builds once MTP is factored
-in? `pflash`/`buun` don't have graph split at all, so if MTP is the bigger
-lever, the engine choice may flip.
+**Status: partly confirmed — graph is a trade, not a win.** Phase 1 settled
+the no-MTP half on `UD-Q4_K_M`.
 
-**Test:** Phase 1 establishes the no-MTP baseline across engines and split
-modes; Phase 2 re-tests with MTP. The comparison that matters is the
-*combination*, not either axis alone.
+| | pp2048 | pp16384 | tg128 |
+|---|---|---|---|
+| ik `graph` | **199.14** | 153.04 | **22.05** |
+| ik `layer` | 116.49 | 80.08 | 13.54 |
+| pflash `layer` | 184.31 | 187.87 | 12.53 |
+| buun `layer` | 178.47 | **198.67** | 13.10 |
+| mainline `layer` | 180.38 | 188.69 | 12.88 |
 
-**Status:** Untested — `-sm graph` is blocked by H5. `none`/`layer` comparisons
-can proceed on all three engines meanwhile.
+**Graph owns decode.** 22.05 vs 12.53–13.54 — every layer implementation in
+every engine sits in a 1.0 t/s band, and graph is 63–76% clear of all of them.
+
+**Graph loses deep prefill.** It is the only mode that decays with depth
+(199 → 153, −23% out to 16k) while the others stay flat or rise. Crossover
+is near 6k.
+
+**Correction on the record:** the first reading of this ("graph +91% over
+layer") compared graph to *ik's own* layer, which Phase 1 shows is anomalously
+broken — 80.08 at pp16384 against 187.87–198.67 for three other engines on
+identical work. Comparing within one engine was the wrong control; the
+cross-engine comparison is the honest one, and it turns a blowout into a trade.
+
+**Consequence for engine choice:** pflash / buun / mainline are within 5% of
+each other at every depth, so layer-split engine choice is a *feature*
+decision, not a performance one. The only thing `ik` uniquely buys is decode
+throughput via graph — at the cost of deep prefill, an NCCL-disabled custom
+build (H5), and an older feature set.
+
+**Still open:**
+1. **`-sm tensor` on mainline** — the decisive cell. `-sm tensor` was
+   previously recorded here as unusable for `qwen35`; **that was wrong**.
+   `llm_arch_supports_sm_tensor()` is a *denylist* (`default: return true`)
+   and `qwen35` is not on it, on our built branch as well as upstream tip. The
+   binary at `/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench` already
+   advertises `<none|layer|row|tensor>`. No rebuild needed. If tensor reaches
+   graph's decode, the case for `ik` collapses.
+2. `ik`'s `-sm attn` (`LLAMA_SPLIT_MODE_ATTN = 2`) — reachable from
+   `llama-cli`/`llama-server` but not `llama-bench`. Untested.
+3. Phase 2 re-tests the combination with MTP, which is the comparison that
+   actually decides the rig's configuration.
 
 ---
 
@@ -425,6 +471,12 @@ ships tuning flags for it that have never been exercised:
 | `-smgs` | 0 | Force graph scheduling |
 | `-sas` | 0 | Async compute-graph evaluation — the most likely to matter for overlapping PCIe transfer with compute |
 
-**Status:** Untested and **blocked by H5** — `-sm graph` aborts on the current
-NCCL-linked `ik` build. Rebuild with `-DGGML_NCCL=OFF` first; these knobs are
-only reachable once graph split runs at all.
+**Status: unblocked, untested.** The `-DGGML_NCCL=OFF` rebuild exists at
+`/root/ik_llama.cpp/build-nonccl/` and Phase 1 confirmed `-sm graph` runs there
+(676s, exit 0). These knobs are now reachable.
+
+Phase 1 also gave them a specific target: graph's prefill decays with depth
+(199 -> 153 from pp2048 to pp16384, -23%) while every layer implementation
+stays flat. That decay is the thing to attack — `-sas` (async compute-graph
+evaluation, overlapping PCIe transfer with compute) is the most plausible lever
+if the decay is transfer-bound.
