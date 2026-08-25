@@ -439,13 +439,21 @@ tokens cost", which is the TTFT question, `-p` is the correct measurement — bu
 it means **we have no data at all past 16,384 tokens**, and nothing about the
 cost of extending an existing context.
 
-**2. `-ub 512`, always.** Every number was taken at the defaults `-ub 512` /
-`-b 2048`. The ubatch/batch sweep has never been run (H14). Do not describe any
-existing prefill figure as tuned.
+**2. `-ub 512`, always — and it turned out to be the worst setting in its
+neighbourhood.** Every number in Phases 1–6 was taken at the defaults `-ub 512` /
+`-b 2048`. H14 swept it on 2026-08-25 and found **`-ub 2048` is 63% faster**
+(357.5 vs 218.9 t/s at p=2048), with the curve non-monotonic — `-ub 256` also
+beats 512. `-ub 4096` adds only 1.3% for double the activation VRAM, and `-ub 8192`
+OOMs in the cuBLAS staging allocator.
 
-When quoting prefill, state the length and the ubatch. "208 t/s" alone is
-ambiguous and has already been extrapolated to 64k and 100k in conversation,
-where the honest bracket is 5.0–8.1 min and 7.8–15.9 min respectively.
+**Consequence for every prefill number in Phases 1–6: they are ~35% low.** They
+stay valid as *relative* comparisons — all engines were measured at the same
+setting, so the rankings hold — but none of them describes this rig's prefill
+capability, and none should be quoted as such. `-ub 2048` is the standard from
+Phase 7 onward. Its effect on **decode** and on MTP acceptance is untested.
+
+When quoting prefill, state the length **and the ubatch**. "208 t/s" alone is
+ambiguous: it is the `-ub 512` figure, and the tuned rig does ~347 t/s at 8k.
 
 ### Prefill has a hardware floor — check it before chasing a speedup
 

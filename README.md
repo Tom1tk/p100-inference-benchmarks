@@ -20,15 +20,19 @@ and the mandatory commit/push protocol. Everything else is reference.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H21)** | **Open — the current priority.** See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H21)** | **Open — the current priority.** H14 confirmed (+63% from `-ub`); H21 withdrawn. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) |
 
 ### Best measured configuration
 
 ```
 mainline-rebased (57affa09)  ·  -sm tensor  ·  GGML_CUDA_ALLREDUCE=none
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
--ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16
+-ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -b 2048 -ub 2048
 ```
+
+⚠️ **`-ub 2048` is new (2026-08-25, H14) and its effect on decode is untested.**
+It is worth **+63% on prefill**; the 29.26 t/s decode figure below was measured at
+the old `-ub 512`.
 
 **29.26 t/s decode · 198.4 t/s prefill at 16k context**, 73.3% draft acceptance.
 For comparison, the best layer-split configuration reaches 19.05 t/s and the
@@ -54,27 +58,38 @@ Everything above optimises **decode at 4k–16k**. The workload target is 100k, 
 at that depth the binding constraint is prefill, which we have never measured
 past 16,384 tokens.
 
+**Updated 2026-08-25 — H14 moved these numbers substantially.** Prefill had only
+ever been measured at `-ub 512`, which the sweep found to be a local *minimum*.
+At `-ub 2048` the same rig does **357.5 t/s at 2k and 347.5 t/s at 8k, +63%.**
+
 | | 16k | 64k | 100k |
 |---|---|---|---|
-| prefill t/s | **208 (measured)** | 128–208 (est.) | 102–208 (est.) |
-| TTFT | 79 s | **5.0–8.1 min** | **7.8–15.9 min** |
+| prefill t/s, old `-ub 512` | 208 (measured) | 128–208 (est.) | 102–208 (est.) |
+| TTFT, old `-ub 512` | 79 s | 5.0–8.1 min | 7.8–15.9 min |
+| **prefill t/s, `-ub 2048`** | **not yet measured** | — | — |
+| **TTFT if ~347 t/s holds** | **47 s** | **3.1 min** | **4.8 min** |
 
-The bracket is that wide because the 27B has never been run past 16k; the low end
-applies the decay curve measured on this rig for a 9B in July. **Closing that
-bracket is Phase 7 cell 1.**
+The last row is a projection from an 8k measurement, not data — it assumes the
+gain survives to depth, where activation memory competes with a 6.25 GiB KV cache.
+**Re-measuring the curve at `-ub 2048` is Phase 7 cell 1** and is now the single
+highest-value run in the project.
 
 Three facts that bound every proposed fix:
 
 - **Hardware floor.** 54 GFLOP/token × 100k ÷ 37.4 TFLOPS = **144 s minimum**, at
   100% of FP16 peak. A realistic 45–55% is 260–320 s. Tuning is worth ~1.5–2×,
   not 10× — a step change requires prefilling *fewer tokens*, a *smaller model*,
-  or *cache reuse*.
+  or *cache reuse*. **H14 has now spent most of that tuning budget:** 347 t/s is
+  18.8 TFLOP/s, **52% of peak**, up from 30%. Treat further rate tuning as
+  low-yield and prioritise the work-reducing levers.
 - **The model is a hybrid.** `full_attention_interval = 4` — only ~16 of 65 layers
   are attention. Prefill is near-linear (−6.4% from 2k to 16k), KV is only
   64 KiB/token, and sparse-attention techniques have a low ceiling here.
-- **The suspect is the gated-delta-net kernel**, not the GEMMs. It walks tokens
-  one at a time and carries its author's `//TODO: Add chunked kernel for even
-  faster pre-fill`. H18 tests this and decides the rest of the phase.
+- ~~**The suspect is the gated-delta-net kernel**, not the GEMMs.~~ **Weakened by
+  H14.** The GDN kernel still walks tokens one at a time and still carries its
+  author's `//TODO: Add chunked kernel for even faster pre-fill`, but a 63% swing
+  from ubatch alone is GEMM-shaped behaviour, so GDN is no longer the leading
+  explanation. H18 still decides the rest of the phase — re-run it at `-ub 2048`.
 
 Also newly known and not yet acted on: **the cards are power-capped at 175 W of a
 250 W default** — raising it is now **approved to a 220 W ceiling** (H15), blocked

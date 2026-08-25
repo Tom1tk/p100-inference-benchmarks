@@ -22,7 +22,7 @@ run label so the evidence is traceable.
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 | H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
-| H14 | `-ub` 512→1024/2048 improves prefill ≥10% | Untested |
+| H14 | `-ub` 512→1024/2048 improves prefill ≥10% | **CONFIRMED 2026-08-25 — +63%.** Use `-ub 2048` |
 | H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
 | H16 | TurboPrefill nets a TTFT win at 64k despite forcing `-sm layer` | Untested |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
@@ -834,6 +834,60 @@ move almost nothing — the GDN kernel's cost is linear in tokens regardless of 
 they are grouped. **A null result here is positive evidence for H18.**
 
 **Test:** `-ub 512 / 1024 / 2048` × `-b 2048 / 4096`, at 16k, `-sm tensor`.
+
+### Result — CONFIRMED, and by a much larger margin than claimed (2026-08-25)
+
+Two runs, `scripts/run-ubatch-sweep.sh`, `mainline-rebased 57affa09`, `-sm tensor`,
+`UD-Q4_K_M`, f16 KV, `ALLREDUCE=none`, prefill only, r=2. Raw:
+`results/raw/h14-ubatch-sweep-q4km.csv`, `results/raw/h14-ubatch-sweep-hi-q4km.csv`.
+
+Sweep 1 — `-b 2048`, so `-ub` is capped at 2048:
+
+| `-ub` | 128 | 256 | **512 (old default)** | 1024 | 2048 |
+|---|---|---|---|---|---|
+| p=2048 t/s | 197.0 | 249.7 | **218.9** | 278.8 | **357.5** |
+| p=4096 t/s | 194.8 | 241.7 | **221.8** | 276.5 | **351.1** |
+
+Sweep 2 — `-b 8192`, p=8192, to find the top of the curve:
+
+| `-ub` | 1024 | 2048 | 4096 | 8192 |
+|---|---|---|---|---|
+| t/s | 271.9 | 342.9 | **347.5** | **OOM** |
+
+**Verdict: +63% at 2–4k, +57% at 8k, from one flag.** The claim was ≥10%.
+
+**Where it tops out.** The curve plateaus at 2048–4096 (+1.3% for 2× the
+activation VRAM) and `-ub 8192` aborts in `ggml_cuda_pool_vmm::alloc` inside
+`ggml_cuda_mul_mat_cublas_impl` — VRAM exhaustion on the dequant→cuBLAS staging
+buffer, not the `SSM_SSD_MAX_TOKENS = 8192` fallback that was the predicted
+ceiling. **`-ub 2048` is the pick**: 4096's extra 1.3% is not worth doubling
+activation memory that has to coexist with a 6.25 GiB KV cache at 100k.
+
+**The curve is non-monotonic, and that is a real finding, not noise.** 256 (249.7)
+beats 512 (218.9) at both prompt lengths, with stddev under 0.15 t/s. A smooth
+"bigger GEMMs are better" story does not produce a dip at exactly the default. It
+points at a shape- or alignment-sensitive path — something in the tensor-split or
+GDN launch geometry that 512 lands badly on. Worth understanding before trusting
+any single ubatch as optimal at a depth we have not measured.
+
+**What this does to H18.** H14 was framed so a null result would be positive
+evidence that prefill is GDN-bound rather than GEMM-bound. We got the opposite of
+a null result, so that inference does not fire — a 63% swing from ubatch alone is
+GEMM-shaped behaviour. H18 is **not** settled by this (the GDN kernel is still
+sequential and still carries its author's TODO), but it is no longer the leading
+explanation for the 30%-of-peak figure, and it should be re-run at `-ub 2048`
+rather than at the old default.
+
+**What this does to the rest of the repo.** Every prefill number ever recorded
+here was taken at `-ub 512` — the one setting in the sweep that underperforms its
+neighbours in both directions. All of them are ~35% low. They remain valid as
+*relative* engine comparisons (all were taken at the same setting) but must not be
+quoted as this rig's prefill capability. Re-baseline before drawing TTFT
+conclusions.
+
+**Not tested:** the effect of `-ub 2048` on **decode** or on MTP acceptance, and
+whether +63% survives to 64k–100k, where activation memory competes with KV. Both
+belong to H13, which should now run at `-ub 2048`.
 
 ---
 
