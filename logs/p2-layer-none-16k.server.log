@@ -74,3 +74,24 @@
 3.49.452.052 I slot get_availabl: id  3 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.973
 3.49.452.144 I slot launch_slot_: id  3 | task 820 | processing task, is_child = 0
 4.00.536.638 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =   2090, progress = 0.15, t =  11.08 s / 188.55 tokens per second
+4.10.862.553 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =   4138, progress = 0.29, t =  21.41 s / 193.27 tokens per second
+4.21.340.915 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =   6186, progress = 0.44, t =  31.89 s / 193.99 tokens per second
+4.32.012.028 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =   8234, progress = 0.58, t =  42.56 s / 193.47 tokens per second
+4.42.910.880 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =  10282, progress = 0.72, t =  53.46 s / 192.34 tokens per second
+4.54.014.663 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =  12330, progress = 0.87, t =  64.56 s / 190.98 tokens per second
+5.01.391.669 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =  13671, progress = 0.96, t =  71.94 s / 190.04 tokens per second
+5.05.053.663 I slot print_timing: id  3 | task 820 | prompt processing, n_tokens =  14183, progress = 1.00, t =  75.60 s / 187.60 tokens per second
+5.14.617.234 I slot print_timing: id  3 | task 820 | n_gen =    100, tg =  12.35 t/s, tg_3s =  12.47 t/s
+5.17.694.045 I slot print_timing: id  3 | task 820 | n_gen =    138, tg =  12.35 t/s, tg_3s =  12.35 t/s
+5.20.694.451 I slot print_timing: id  3 | task 820 | n_gen =    175, tg =  12.35 t/s, tg_3s =  12.33 t/s
+5.23.775.172 I slot print_timing: id  3 | task 820 | n_gen =    213, tg =  12.34 t/s, tg_3s =  12.33 t/s
+5.26.853.862 I slot print_timing: id  3 | task 820 | n_gen =    251, tg =  12.34 t/s, tg_3s =  12.34 t/s
+5.29.934.826 I slot print_timing: id  3 | task 820 | n_gen =    289, tg =  12.34 t/s, tg_3s =  12.33 t/s
+5.33.011.810 I slot print_timing: id  3 | task 820 | n_gen =    327, tg =  12.34 t/s, tg_3s =  12.35 t/s
+5.36.087.808 I slot print_timing: id  3 | task 820 | n_gen =    365, tg =  12.34 t/s, tg_3s =  12.35 t/s
+5.38.919.560 I slot print_timing: id  3 | task 820 | prompt eval time =   77148.35 ms / 14187 tokens (    5.44 ms per token,   183.89 tokens per second)
+5.38.919.566 I slot print_timing: id  3 | task 820 |        eval time =   32318.91 ms /   400 tokens (   81.00 ms per token,    12.35 tokens per second)
+5.38.919.568 I slot print_timing: id  3 | task 820 |       total time =  109467.26 ms / 14587 tokens
+5.38.919.569 I slot print_timing: id  3 | task 820 |    graphs reused =       1192
+5.38.920.414 I slot      release: id  3 | task 820 | stop processing: n_tokens = 14586, truncated = 0
+5.38.957.370 I srv    operator(): operator(): cleaning up before exit...

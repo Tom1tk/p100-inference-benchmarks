@@ -158,6 +158,36 @@ does (compare the H11 rows: 8647 / 10997 and similar).
 **29.26 t/s at 16k is the best decode in the project**, against Phase 1's best of
 22.05 (`ik` `-sm graph`, no drafter, tg128) and layer + DFlash2 at 16k at 17.08.
 
+### The matched 2x2 at 16k — split mode vs drafter
+
+Same drafter, same prompt, same 400-token budget, `REPS=3`. This isolates the
+two effects against each other at the depth the agentic phase will run at.
+
+| Split | Control | + MTP | MTP gain | Prefill cost of MTP | Acceptance |
+|---|---|---|---|---|---|
+| layer | 12.35 (183.9 pp) | 19.05 (162.9 pp) | +54.3% | **−11.4%** | 77.5% |
+| **tensor** | 19.75 (199.0 pp) | **29.26 (198.4 pp)** | +48.2% | **−0.3%** | 73.3% |
+
+Four things fall out of this:
+
+1. **Split mode is the larger effect.** Tensor beats layer by +59.9% on the
+   drafter-free control, and by +53.6% with MTP on both sides. The drafter is
+   worth ~50% on top of whichever split you pick; the split is worth ~55–60%
+   regardless of drafter.
+2. **MTP pays slightly *less* on tensor** (+48.2% vs +54.3%), the same direction
+   as at 4k (+4.8% vs +10.3%) but a far smaller gap. Tensor split makes each
+   decode step cheaper, so there is less for speculation to reclaim.
+3. **The drafter is free on prefill under tensor and expensive under layer** —
+   −0.3% vs −11.4%. This is the clearest advantage tensor has beyond raw
+   throughput, and it is not something the decode numbers show.
+4. **Acceptance is consistently lower on tensor** (73.3% vs 77.5% here; 40.1% vs
+   44.4% at 4k). Reduction-order differences perturb the logits. Tensor wins
+   anyway, by enough that the acceptance penalty is irrelevant.
+
+**Best measured configuration: `-sm tensor` + MTP-Q4_0 at depth, 29.26 t/s.**
+Adding `GGML_CUDA_P2P=1` should put it near 30 (H10: +2.9% on decode), untested
+in combination.
+
 ### Why the smoke test was wrong by 13x
 
 The gating smoke run reported MTP at 32.60 t/s and **90.0%** acceptance — a
