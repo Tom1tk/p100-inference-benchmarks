@@ -16,11 +16,13 @@ cd "$REPO"
 
 BIN=/root/dflash2-rebased/build-cuda-p100/bin/llama-bench
 MODEL=/root/Qwen3.8-27B-UD-Q4_K_M.gguf
-LABEL=h14-ubatch-sweep-q4km
+LABEL=${LABEL:-h14-ubatch-sweep-q4km}
 
-UBATCHES=128,256,512,1024,2048
-PROMPTS=2048,4096
-REPS=2
+# -ub is capped by -b, so raising BATCH is required to explore ub > 2048.
+UBATCHES=${UBATCHES:-128,256,512,1024,2048}
+PROMPTS=${PROMPTS:-2048,4096}
+BATCH=${BATCH:-2048}
+REPS=${REPS:-2}
 
 ABORT_TEMP=83
 PREFLIGHT_TEMP=70
@@ -45,7 +47,7 @@ MONITOR_PID=$!
 trap "kill $MONITOR_PID 2>/dev/null" EXIT
 
 echo "=== running: $LABEL ==="
-echo "ub=${UBATCHES}  p=${PROMPTS}  r=${REPS}  -sm tensor  ALLREDUCE=none"
+echo "ub=${UBATCHES}  b=${BATCH}  p=${PROMPTS}  r=${REPS}  -sm tensor  ALLREDUCE=none"
 echo "NOTE: model load takes 4-8 min with no output. This is not a hang."
 
 START=$(date +%s)
@@ -54,7 +56,7 @@ CUDA_VISIBLE_DEVICES=0,1 GGML_CUDA_ALLREDUCE=none "$BIN" \
     -ngl 99 -fa 1 -t 8 \
     -ctk f16 -ctv f16 \
     -sm tensor \
-    -ub "$UBATCHES" \
+    -b "$BATCH" -ub "$UBATCHES" \
     -p "$PROMPTS" -n 0 -r "$REPS" \
     -o csv > "$CSV" 2> "$LOG"
 STATUS=$?

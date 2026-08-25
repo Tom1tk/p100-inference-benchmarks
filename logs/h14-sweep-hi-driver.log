@@ -1,0 +1,17 @@
+=== preflight ===
+hottest card: 55C
+0, 175.00 W
+1, 175.00 W
+=== running: h14-ubatch-sweep-hi-q4km ===
+ub=1024,2048,4096,8192  b=8192  p=8192  r=2  -sm tensor  ALLREDUCE=none
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+./scripts/run-ubatch-sweep.sh: line 61: 96392 Aborted                 CUDA_VISIBLE_DEVICES=0,1 GGML_CUDA_ALLREDUCE=none "$BIN" -m "$MODEL" -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -b "$BATCH" -ub "$UBATCHES" -p "$PROMPTS" -n 0 -r "$REPS" -o csv > "$CSV" 2> "$LOG"
+=== finished in 243s | exit 134 | peak 69C ===
+--- run failed, last 20 log lines ---
+ggml_cuda_init: found 2 CUDA devices (Total VRAM: 32538 MiB):
+  Device 0: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+  Device 1: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+/root/dflash2-rebased/ggml/src/ggml-cuda/ggml-cuda.cu:107: CUDA error
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+warning: 360	../csu/libc-start.c: No such file or directory
