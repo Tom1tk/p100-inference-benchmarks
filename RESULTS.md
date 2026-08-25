@@ -50,6 +50,8 @@ The apples-to-apples comparison. All cells on **`Qwen3.8-27B-UD-Q4_K_M`**.
 | mainline (pr-27342) | `64f765f5` | **tensor**, `ALLREDUCE=internal` | **214.83** | **219.13** | **212.70** | **206.32** | 20.34 | 608s, peak 67C |
 | mainline (pr-27342) | `64f765f5` | **tensor**, `ALLREDUCE=none` | 214.68 | 219.12 | 212.71 | 206.40 | 20.38 | 608s, peak 69C |
 | mainline (pr-27342) | `64f765f5` | tensor, `ALLREDUCE=nccl` (Linux default) | — | — | — | — | — | **exit 134 after 5s** — `ggml_backend_cuda_comm_allreduce_nccl`. See H5/H10 |
+| **mainline rebased** | `57affa09` | **tensor**, `ALLREDUCE=internal` | **222.62** | **223.59** | **214.98** | **208.38** | 20.34 | 601s, peak 69C. Best cell in the matrix |
+| mainline rebased | `57affa09` | layer | 180.85 | 190.80 | 192.09 | 187.15 | 12.89 | — |
 
 Earlier Q6_K_M reference cell, kept for continuity (different quant — not
 comparable to the rows above):
@@ -103,6 +105,25 @@ aborts.
 **Operational consequence:** `-sm tensor` on mainline **requires**
 `GGML_CUDA_ALLREDUCE=internal` (or `none`) on this rig. NCCL is the Linux
 default and it aborts in 5s. Bake this into every mainline invocation.
+
+**6. The rebase onto current master helps tensor split, and only tensor split.**
+`pr-27342` replayed onto `75844307` (115 upstream commits) and re-measured:
+
+| | pp2048 | pp4096 | pp8192 | pp16384 | tg128 |
+|---|---|---|---|---|---|
+| tensor | **+3.6%** | **+2.0%** | **+1.1%** | **+1.0%** | −0.0% |
+| layer | +0.3% | −0.1% | −0.0% | −0.8% | +0.1% |
+
+The tensor deltas are 10–100× their stddevs (±0.02–0.14), so they are real.
+Decode is untouched in both modes.
+
+Most likely `d9b6be07`, which moved cuBLAS handles from one-per-device to
+one-per-device-**per-stream** and dropped the explicit `cublasSetStream` calls.
+Per-stream handles can only pay where concurrent streams exist: tensor split
+runs both cards at 97–99% simultaneously, layer split serialises them. That
+also explains why "it's the cuBLAS prefill path" is *not* sufficient — layer
+prefill is cuBLAS GEMM too and gained nothing. Inference from the diff plus
+these two cells, not instrumented.
 
 **Still missing from this phase:** the single-GPU (`none`) leg, which needs
 `UD-IQ3_S` to fit in 16 GB.

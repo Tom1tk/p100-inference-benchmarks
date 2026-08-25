@@ -739,3 +739,21 @@ That is the exact failure diagnosed in H11. Our DFlash2 GGUF ships neither
 tensor, so it should still borrow via `ctx_other` and still fail on
 `-devd CUDA0` — but this is now worth re-testing rather than assuming, and it
 matters more than before, since tensor split is the new default target config.
+
+### Rebase validated — and the gain is narrower than I first said
+
+Re-ran both split modes on the rebased build. Tensor gained +1.0–3.6% prefill;
+layer gained nothing (−0.8% to +0.3%). Decode unmoved in both.
+
+I initially read the tensor gain as "the cuBLAS static workspace helping the
+prefill path". The layer cell refutes that as stated — layer prefill is cuBLAS
+GEMM too and did not move. The narrower explanation that fits both: `d9b6be07`
+moved cuBLAS handles from one-per-device to one-per-device-*per-stream* and
+dropped the explicit `cublasSetStream` calls, which can only pay where
+concurrent streams exist. Tensor split runs both cards at 97–99% at once; layer
+split serialises them. Inference from the diff plus these two cells — not
+instrumented, and worth revisiting if a later mode contradicts it.
+
+Adopting the rebase regardless: the gain lands on the config Phase 1 selected,
+and the multi-GPU scheduler race fix (`84979813`) and speculative fixes come
+free with it.
