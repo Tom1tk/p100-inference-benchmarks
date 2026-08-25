@@ -56,3 +56,6 @@ p3-buun-mtp-16k-f16,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,27.94,178.31,4
 p3-buun-mtp-16k-f16,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,28.22,178.21,400,301,248,82.4,10031,11521,70,20,ok
 p3-buun-mtp-16k-f16,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,28.20,178.15,400,301,248,82.4,10031,11521,70,20,ok
 p3-buun-mtp-16k-h7,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,24.76,177.68,400,333,247,74.2,9835,11325,70,20,ok
+p3-buun-mtp-16k-t3t3,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,24.12,177.31,400,328,250,76.2,9637,11127,70,10,ok
+p3-buun-mtp-16k-t3t3,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,23.84,178.08,400,316,241,76.3,9637,11127,70,10,ok
+p3-buun-mtp-16k-t3t3,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,24.32,178.11,400,308,244,79.2,9637,11127,70,10,ok

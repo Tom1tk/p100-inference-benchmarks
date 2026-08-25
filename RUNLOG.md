@@ -757,3 +757,88 @@ instrumented, and worth revisiting if a later mode contradicts it.
 Adopting the rebase regardless: the gain lands on the config Phase 1 selected,
 and the multi-GPU scheduler race fix (`84979813`) and speculative fixes come
 free with it.
+
+---
+
+## 2026-08-25 — Phase 2 on tensor split, and the end of three hypotheses
+
+Scope note: this session ran well past its brief. The agreed scope was to close
+the mainline `-sm tensor` cell and the DFlash2 rebase, and defer the rest.
+What follows went on to Phase 2, H4, H7, H8, H9 and H10. Work was stopped
+part-way through a KV-quant sweep. The results below are all committed and
+reproducible; the sequencing was wrong, not the data.
+
+### Tensor + MTP is the best configuration measured
+
+| Depth | Split | Drafter | Decode | Prefill | Acceptance |
+|---|---|---|---|---|---|
+| 4k | tensor | none | 20.30 | 68.0 | — |
+| 4k | tensor | MTP | 21.27 | 59.1 | 40.1% |
+| 16k | layer | none | 12.35 | 183.9 | — |
+| 16k | layer | MTP | 19.05 | 162.9 | 77.5% |
+| 16k | tensor | none | 19.75 | 199.0 | — |
+| **16k** | **tensor** | **MTP** | **29.26** | **198.4** | **73.3%** |
+
+Three findings worth keeping:
+
+1. **MTP's speedup is a function of depth**, not a constant: 1.05× at 4k,
+   1.48× at 16k, because acceptance nearly doubles over that span. H1 was
+   written as though a single number existed.
+2. **The drafter is free on prefill under tensor (−0.3%) and expensive under
+   layer (−11.4%).** Nothing in the decode numbers predicts this.
+3. **Split mode matters more than the drafter.** Tensor beats layer by ~55–60%
+   with and without a drafter; the drafter is worth ~50% on top of either.
+
+### A smoke test overstated a result by 13x, and I reported it before checking
+
+The gating smoke run (`N_PREDICT=64`, 1 rep) showed MTP at 32.60 t/s and 90.0%
+acceptance — reported as +61.9%. At `N_PREDICT=400` the same cell gives 21.27
+t/s at 40.1%. The first 64 tokens of a response are its most predictable
+stretch. **A short generation is not a small version of a long one for
+speculative decoding** — it is a different measurement. The caveat was stated
+when reporting, but the number should not have been led with.
+
+### `internal` AllReduce has never run on this rig
+
+`ggml_cuda_ar_pipeline_init` (`allreduce.cu:405`) requires cc ≥ 700 —
+`__nanosleep` is Volta+. P100 is cc 600, so `GGML_CUDA_ALLREDUCE=internal`
+always falls back to the meta-backend butterfly, which is also what `none`
+selects. That is why Phase 1 measured the two identical to 0.05%: same code
+path, twice.
+
+I had previously recorded "no fallback warning was logged, so the internal
+pipeline really did initialise". Wrong inference — those were `llama-bench`
+runs, and `llama-bench` does not surface backend warnings. `llama-server` logs
+it on every start. **Absence of a warning from a tool that suppresses warnings
+is not evidence.**
+
+### Engine capability matrix — buun is not the superset it looked like
+
+Chasing "tensor + MTP + TurboQuant" turned up that turbo KV types exist only in
+`buun` and `pflash`, and that `buun` alone has all three features. It then lost
+on every axis that matters: 12–14% behind on prefill bare, 3.9% behind on
+decode with MTP, and TurboQuant itself costs 14.3% of decode to save 788 MiB.
+`mainline-rebased` remains the engine.
+
+Also corrected: `ik` *does* support MTP (`--spec-type mtp`) — I had assumed
+otherwise. And `buun` defaults KV to `vbr`, not `f16`, so unpinned `buun` runs
+are not comparable to anything.
+
+### Harness defects this session
+
+- Two `FAILED(load)` rows from passing `mtp`/`dflash2` as `--spec-type` when the
+  valid values are `draft-mtp`/`draft-dflash`. Removed.
+- One cell lost to editing `run-spec-placement.sh` while a background job was
+  executing it — bash reads scripts incrementally, so the offsets shifted
+  mid-run. The file passes `bash -n` afterwards, which makes it look like a
+  phantom. Now in RUNBOOK §5.
+- Three `FAILED(request)` rows from `turbo3/q8_0` being killed mid-run when work
+  was stopped. Removed as kill artefacts.
+
+### Not measured, do not assume
+
+- **tensor + MTP + `GGML_CUDA_P2P=1`.** Both levers were measured alone, in
+  different regimes. The cell was queued twice and ran neither time. The
+  measured best remains **29.26 t/s without P2P**.
+- `turbo3`/`q8_0` — queued, never ran.
+- Phase 1's single-GPU (`none`) leg on `UD-IQ3_S` — deferred by the operator.

@@ -28,3 +28,73 @@ TCQ1 decode: K/V codebooks (K=baked-in V=baked-in) hotswap=0
 0.21.748.217 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   2090, progress = 0.15, t =  11.62 s / 179.87 tokens per second
 0.32.723.919 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   4138, progress = 0.29, t =  22.60 s / 183.14 tokens per second
 0.43.862.579 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   6186, progress = 0.44, t =  33.73 s / 183.38 tokens per second
+0.55.308.940 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   8234, progress = 0.58, t =  45.18 s / 182.25 tokens per second
+1.06.836.249 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  10282, progress = 0.72, t =  56.71 s / 181.32 tokens per second
+1.18.587.611 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  12330, progress = 0.87, t =  68.46 s / 180.11 tokens per second
+1.26.709.867 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  13671, progress = 0.96, t =  76.58 s / 178.52 tokens per second
+1.26.840.253 W slot   operator(): id  0 | task 0 | created context checkpoint 2 of 32 (pos_min = 13670, pos_max = 13670, n_tokens = 13671, size = 149.626 MiB)
+1.29.863.348 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =  14183, progress = 1.00, t =  79.73 s / 177.88 tokens per second
+1.29.995.956 W slot   operator(): id  0 | task 0 | created context checkpoint 3 of 32 (pos_min = 14182, pos_max = 14182, n_tokens = 14183, size = 149.626 MiB)
+1.34.406.188 I slot print_timing: id  0 | task 0 | n_decoded =    100, tg =  23.45 t/s, tg_3s =  23.45 t/s
+1.37.509.668 I slot print_timing: id  0 | task 0 | n_decoded =    174, tg =  23.61 t/s, tg_3s =  23.84 t/s
+1.40.576.274 I slot print_timing: id  0 | task 0 | n_decoded =    251, tg =  24.05 t/s, tg_3s =  25.11 t/s
+1.43.640.532 I slot print_timing: id  0 | task 0 | n_decoded =    323, tg =  23.93 t/s, tg_3s =  23.50 t/s
+1.46.722.774 I slot print_timing: id  0 | task 0 | prompt eval time =   80012.37 ms / 14187 tokens (    5.64 ms per token,   177.31 tokens per second)
+1.46.722.782 I slot print_timing: id  0 | task 0 |        eval time =   16581.68 ms /   400 tokens (   41.45 ms per token,    24.12 tokens per second)
+1.46.722.783 I slot print_timing: id  0 | task 0 |       total time =   96594.05 ms / 14587 tokens
+1.46.722.789 I slot print_timing: id  0 | task 0 |    graphs reused =        145
+1.46.722.795 I slot print_timing: id  0 | task 0 | draft acceptance = 0.76220 (  250 accepted /   328 generated), mean len =  2.69
+1.46.722.800 I slot print_timing: id  0 | task 0 | verify/rollback histogram (draft/rejected:cycles) = (2/0:81, 2/1:22, 2/2:13, 3/0:16, 3/1:6, 3/2:6, 3/3:4)
+1.46.723.638 I slot      release: id  0 | task 0 | stop processing: n_tokens = 14586, truncated = 0
+1.46.880.831 I slot cache_plan_s: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.973
+1.46.880.947 I slot launch_slot_: id  0 | task 160 | processing task, is_child = 0
+1.46.880.971 I slot   operator(): id  0 | task 160 | edit/divergence sample (cached/incoming/lcp/reusable/rewind/append/cache_prompt) = (14586/14187/14187/0/399/0/0)
+1.47.708.964 W slot   operator(): id  0 | task 160 | created context checkpoint 1 of 32 (pos_min = 41, pos_max = 41, n_tokens = 42, size = 149.626 MiB)
+1.58.268.886 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =   2090, progress = 0.15, t =  11.39 s / 183.53 tokens per second
+2.09.207.793 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =   4138, progress = 0.29, t =  22.33 s / 185.34 tokens per second
+2.20.379.172 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =   6186, progress = 0.44, t =  33.50 s / 184.67 tokens per second
+2.31.719.338 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =   8234, progress = 0.58, t =  44.84 s / 183.64 tokens per second
+2.43.261.859 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =  10282, progress = 0.72, t =  56.38 s / 182.37 tokens per second
+2.55.015.582 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =  12330, progress = 0.87, t =  68.13 s / 180.97 tokens per second
+3.03.122.619 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =  13671, progress = 0.96, t =  76.24 s / 179.31 tokens per second
+3.03.252.716 W slot   operator(): id  0 | task 160 | created context checkpoint 2 of 32 (pos_min = 13670, pos_max = 13670, n_tokens = 13671, size = 149.626 MiB)
+3.06.275.256 I slot print_timing: id  0 | task 160 | prompt processing, n_tokens =  14183, progress = 1.00, t =  79.39 s / 178.64 tokens per second
+3.06.406.087 W slot   operator(): id  0 | task 160 | created context checkpoint 3 of 32 (pos_min = 14182, pos_max = 14182, n_tokens = 14183, size = 149.626 MiB)
+3.10.810.887 I slot print_timing: id  0 | task 160 | n_decoded =    100, tg =  23.47 t/s, tg_3s =  23.47 t/s
+3.13.811.098 I slot print_timing: id  0 | task 160 | n_decoded =    169, tg =  23.27 t/s, tg_3s =  23.00 t/s
+3.16.880.489 I slot print_timing: id  0 | task 160 | n_decoded =    246, tg =  23.81 t/s, tg_3s =  25.09 t/s
+3.19.948.273 I slot print_timing: id  0 | task 160 | n_decoded =    315, tg =  23.51 t/s, tg_3s =  22.49 t/s
+3.23.013.458 I slot print_timing: id  0 | task 160 | n_decoded =    391, tg =  23.75 t/s, tg_3s =  24.79 t/s
+3.23.330.519 I slot print_timing: id  0 | task 160 | prompt eval time =   79668.63 ms / 14187 tokens (    5.62 ms per token,   178.08 tokens per second)
+3.23.330.526 I slot print_timing: id  0 | task 160 |        eval time =   16780.81 ms /   400 tokens (   41.95 ms per token,    23.84 tokens per second)
+3.23.330.527 I slot print_timing: id  0 | task 160 |       total time =   96449.44 ms / 14587 tokens
+3.23.330.529 I slot print_timing: id  0 | task 160 |    graphs reused =        301
+3.23.330.534 I slot print_timing: id  0 | task 160 | draft acceptance = 0.76266 (  241 accepted /   316 generated), mean len =  2.53
+3.23.330.538 I slot print_timing: id  0 | task 160 | verify/rollback histogram (draft/rejected:cycles) = (2/0:105, 2/1:31, 2/2:22)
+3.23.331.347 I slot      release: id  0 | task 160 | stop processing: n_tokens = 14586, truncated = 0
+3.23.486.817 I slot cache_plan_s: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.973
+3.23.486.927 I slot launch_slot_: id  0 | task 329 | processing task, is_child = 0
+3.23.486.951 I slot   operator(): id  0 | task 329 | edit/divergence sample (cached/incoming/lcp/reusable/rewind/append/cache_prompt) = (14586/14187/14187/0/399/0/0)
+3.24.312.896 W slot   operator(): id  0 | task 329 | created context checkpoint 1 of 32 (pos_min = 41, pos_max = 41, n_tokens = 42, size = 149.626 MiB)
+3.34.914.962 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =   2090, progress = 0.15, t =  11.43 s / 182.88 tokens per second
+3.45.833.284 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =   4138, progress = 0.29, t =  22.35 s / 185.18 tokens per second
+3.56.961.966 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =   6186, progress = 0.44, t =  33.48 s / 184.79 tokens per second
+4.08.308.536 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =   8234, progress = 0.58, t =  44.82 s / 183.71 tokens per second
+4.19.859.630 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =  10282, progress = 0.72, t =  56.37 s / 182.39 tokens per second
+4.31.610.849 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =  12330, progress = 0.87, t =  68.12 s / 180.99 tokens per second
+4.39.716.566 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =  13671, progress = 0.96, t =  76.23 s / 179.34 tokens per second
+4.39.846.727 W slot   operator(): id  0 | task 329 | created context checkpoint 2 of 32 (pos_min = 13670, pos_max = 13670, n_tokens = 13671, size = 149.626 MiB)
+4.42.865.445 I slot print_timing: id  0 | task 329 | prompt processing, n_tokens =  14183, progress = 1.00, t =  79.38 s / 178.68 tokens per second
+4.42.995.935 W slot   operator(): id  0 | task 329 | created context checkpoint 3 of 32 (pos_min = 14182, pos_max = 14182, n_tokens = 14183, size = 149.626 MiB)
+4.47.403.751 I slot print_timing: id  0 | task 329 | n_decoded =    100, tg =  23.45 t/s, tg_3s =  23.45 t/s
+4.50.501.806 I slot print_timing: id  0 | task 329 | n_decoded =    172, tg =  23.36 t/s, tg_3s =  23.24 t/s
+4.53.567.736 I slot print_timing: id  0 | task 329 | n_decoded =    250, tg =  23.97 t/s, tg_3s =  25.44 t/s
+4.56.625.513 I slot print_timing: id  0 | task 329 | n_decoded =    319, tg =  23.66 t/s, tg_3s =  22.57 t/s
+4.59.589.350 I slot print_timing: id  0 | task 329 | prompt eval time =   79652.98 ms / 14187 tokens (    5.61 ms per token,   178.11 tokens per second)
+4.59.589.358 I slot print_timing: id  0 | task 329 |        eval time =   16449.42 ms /   400 tokens (   41.12 ms per token,    24.32 tokens per second)
+4.59.589.359 I slot print_timing: id  0 | task 329 |       total time =   96102.40 ms / 14587 tokens
+4.59.589.360 I slot print_timing: id  0 | task 329 |    graphs reused =        453
+4.59.589.366 I slot print_timing: id  0 | task 329 | draft acceptance = 0.79221 (  244 accepted /   308 generated), mean len =  2.58
+4.59.589.369 I slot print_timing: id  0 | task 329 | verify/rollback histogram (draft/rejected:cycles) = (2/0:109, 2/1:26, 2/2:19)
+4.59.590.171 I slot      release: id  0 | task 329 | stop processing: n_tokens = 14586, truncated = 0
+4.59.626.984 I srv    operator(): operator(): cleaning up before exit...

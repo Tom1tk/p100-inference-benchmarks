@@ -11,3 +11,16 @@ CUDA_VISIBLE_DEVICES=0\,1 /root/buun-llama-cpp/build-cuda-p100/bin/llama-server 
 loaded in 20s | VRAM 9835/11325 MiB
   rep1: decode 24.76 t/s | prefill 177.68 t/s | accept 247/333 = 74.2% | peak 70C
 ########## p3-buun-mtp-16k-t3t3 (ctk=turbo3 ctv=turbo3)
+=== p3-buun-mtp-16k-t3t3 === (idle 66C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/buun-llama-cpp/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk turbo3 -ctv turbo3 -sm tensor -c 16384 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 10s | VRAM 9637/11127 MiB
+  rep1: decode 24.12 t/s | prefill 177.31 t/s | accept 250/328 = 76.2% | peak 70C
+  rep2: decode 23.84 t/s | prefill 178.08 t/s | accept 241/316 = 76.3% | peak 70C
+  rep3: decode 24.32 t/s | prefill 178.11 t/s | accept 244/308 = 79.2% | peak 70C
+########## p3-buun-mtp-16k-t3q8 (ctk=turbo3 ctv=q8_0)
+=== p3-buun-mtp-16k-t3q8 === (idle 66C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/buun-llama-cpp/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk turbo3 -ctv q8_0 -sm tensor -c 16384 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 10s | VRAM 9717/11207 MiB
+ERROR: request rep 1 failed (curl)
+ERROR: request rep 2 failed (curl)
+ERROR: request rep 3 failed (curl)
