@@ -15,3 +15,6 @@ ggml_cuda_init: found 2 CUDA devices (Total VRAM: 32538 MiB):
 warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
 warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
 warning: 360	../csu/libc-start.c: No such file or directory
+pushed
+
+Next: update RESULTS.md, and HYPOTHESES.md if this bears on H1-H7 (see RUNBOOK.md section 4).
