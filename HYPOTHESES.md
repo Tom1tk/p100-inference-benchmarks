@@ -24,12 +24,13 @@ run label so the evidence is traceable.
 | H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
 | H14 | `-ub` 512→1024/2048 improves prefill ≥10% | **CONFIRMED 2026-08-25 — +63%.** Use `-ub 2048` |
 | H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
-| H16 | TurboPrefill nets a TTFT win at 64k despite forcing `-sm layer` | Untested |
+| H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **decides the plan** |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
 | H20 | A 9B on one P100 beats the 27B's TTFT by ≥2× at 64k at acceptable NIAH quality | Untested |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
+| H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | Untested — **the last kernel-level lever** |
 
 ---
 
@@ -924,25 +925,20 @@ boot.
 
 ---
 
-## H16 — TurboPrefill on two GPUs
+## H16 — TurboPrefill on two GPUs — **WITHDRAWN**
 
-**Claim:** TurboPrefill's pipelined ubatch scheduling produces a net TTFT win at
-64k even though it forces `-sm layer`.
+**Withdrawn 2026-08-25 by user instruction: "TurboPrefill is a no-go."**
 
-**Reasoning and the tradeoff:** it keeps several ubatches in flight at different
-pipeline stages, and reports **5.3× on 12× P104-100** (Pascal). But speedup
-scales with pipeline depth and we have two cards, so expect **1.3–1.6×**. It
+The reasoning it was opened on still stands and is why it was never attractive:
+TurboPrefill reports 5.3× on 12× P104-100, but that speedup scales with pipeline
+depth and **we have two cards**, so the realistic expectation was 1.3–1.6×. It
 requires `-sm layer`, and Phase 2 measured layer+MTP at 19.05 t/s against
-tensor+MTP at 29.26 — **layer costs 35% of decode.** So this is a tradeoff to
-quantify, not a win to collect: worth it only if TTFT dominates the session.
+tensor+MTP at 29.26 — **it costs 35% of decode to buy prefill.** Against the
+project's stated goal of *both* high decode and high prefill at 100k, that is the
+wrong trade, and it would also mean running a b10335 build that predates our
+DFlash2 rebase and PR #26177.
 
-**Test:** build `turboprefill-rfc-poc` (llama.cpp b10335) for sm_60. Compare four
-cells at 64k: {layer, layer+TURBOPREFILL=1} × {no drafter, MTP}. Follow their
-sizing guidance, `-b 4096 -ub 128`. Report **both** TTFT and decode — a prefill
-number alone cannot settle this.
-
-**Note:** b10335 predates our `57affa09`, so it will not carry the DFlash2 rebase
-or PR #26177. This is a prefill probe, not a candidate daily driver.
+Do not reopen without a change to the decode requirement.
 
 ---
 
@@ -1072,3 +1068,73 @@ PFlash is now closed in every sense: **the product** (sm_80-only, §8 of the
 research doc), **the fork** (`pflash-llama.cpp` stays only as the source of the
 built `llama-niah` binary and its fixtures, which remain useful for H13 and H20),
 and **the technique** (this hypothesis).
+
+---
+
+## H22 — the chunked GDN graph path beats the fused sequential kernel
+
+**Claim:** forcing `cparams.fused_gdn_ch = false`, which routes GDN prefill
+through the existing `build_delta_net_chunking()` graph instead of the fused
+CUDA kernel, improves 8k prefill by ≥20% on sm_60.
+
+**Full analysis: `Research/chunked-gdn-2026-08-25.md`.** The short version, and
+the reason this is now cheap:
+
+**The chunked algorithm is already implemented** — not as a kernel, as a graph of
+generic ggml ops in `src/models/delta-net-base.cpp` (10 × `ggml_mul_mat`, plus
+`solve_tri`/`tri`/`cumsum`, chunk size `CS = 64`). It is the default on every
+backend that lacks the fused op, so it is well exercised for correctness. It is
+not selected here only because `fused_gdn_ch` defaults true and its probe asks
+merely *does the backend support the fused op* — which sm_60 does. **There is no
+CLI flag**; forcing it is a ~2-line patch, ideally behind an env var so one binary
+can A/B both paths.
+
+**Every op it needs runs on sm_60.** `ggml-cuda.cu:5307-5311` returns `true` for
+`CUMSUM`/`TRI`/`DIAG`/`SOLVE_TRI` with **no `cc` comparison**, and none of
+`solve_tri.cu`, `tri.cu`, `cumsum.cu` carries a `GGML_CUDA_CC_*` gate.
+`solve_tri.cu`'s fast path is `MAX_N_FAST 64`, exactly matching `CS = 64`.
+
+**Why the fused kernel is the suspect.** Its grid is `H × n_seqs × ceil(S_v/4)`
+and **contains no `n_tokens`** — 1536 blocks for our model whether the prefill is
+512 tokens or 100,000, with tokens as a sequential `for` loop inside each block.
+It is scalar FP32 with two serial warp reductions per token and **no GEMM and no
+FP16 at all**, so 49 of 65 layers use none of the 18.7 TFLOPS the floor argument
+is built on. The recurrence is only ~0.3% of prefill FLOPs, so any material time
+share means an efficiency two to three orders of magnitude below the GEMMs.
+
+**H14 raised this hypothesis's value.** The fused kernel is invariant to `-ub`
+(same tokens, same per-token cost), so H14's +63% came entirely from the GEMM
+side — which by Amdahl makes GDN a *larger* share of what remains. 20% of prefill
+at `-ub 512` becomes ~29% at `-ub 2048`; 35% becomes ~47%.
+
+**The strongest reason to think it fails.** The directly analogous Mamba-2 chunked
+path is gated `cc >= GGML_CUDA_CC_TURING` (`ssm-scan.cu:829`), introduced whole in
+PR #22675 with only the comment *"Requires NVIDIA Turing+ otherwise fallback to
+scan"* and **no stated reason**. If that gate encodes a *performance* finding —
+that without tensor cores the matmul form loses to the scalar scan — it predicts
+this hypothesis fails on Pascal. If it encodes an API constraint (that path stages
+`half` for cuBLAS; the GDN graph is FP32 throughout), it does not transfer. Nobody
+wrote it down, so this must be measured, not reasoned about.
+
+**Two costs charged against any win.** The unfused path materialises q and k at
+3× width, because `H_k = 16 ≠ H_v = 48` and `qwen35.cpp:441` inserts an explicit
+`ggml_repeat_4d` that the fused kernel avoids via its GQA fastmodulo. And ~50 ops
+per layer instead of 1 means more launches and more intermediates — though those
+scale with **ubatch, not context** (~25 MiB per `CS×CS×n_chunks×H_v` tensor at
+`-ub 2048`), so they do not grow toward 100k.
+
+**Test:** patch, rebuild for sm_60, then `llama-bench -p 2048,4096,8192 -n 0
+-ub 2048 -sm tensor`, fused vs chunked. **Check the load log for CPU-fallback
+warnings first** — issue #24712 is exactly the "assigned to CPU ... usually due to
+missing support" case, and a silent fallback would look like a refuted hypothesis
+rather than a misconfiguration. Decode should be untouched (`n_tokens == 1` takes
+the separate autoregressive path) but verify. Gate on one NIAH tier before quoting
+a throughput number — the two paths are different arithmetic.
+
+**Either result is worth having.** A win is a large free speedup. A loss explains
+the Turing+ gate and closes the last kernel-level lever, leaving only the power cap
+and the work-reducing levers.
+
+**Ordering:** run **H18 first** (`GGML_CUDA_CUBLAS_COMPUTE_TYPE`, at `-ub 2048`).
+H18 sizes the prize; H22 collects it. Running H22 blind risks spending a rebuild
+on a 5% slice.

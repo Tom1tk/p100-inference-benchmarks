@@ -944,3 +944,74 @@ argument for reopening the technique.
 measured. One human gate before any run above 175 W: PSU wall draw must be checked
 with a plug-socket meter in person, as it is not readable from this host. When
 cleared: step 175 → 200 → 220, one step per run, temperature log as primary output.
+
+### Later the same day — chunked GDN research, H16 withdrawn, objective recorded
+
+**Research only, no runs.** User: "TurboPrefill is a no-go", power cap is testable
+but needs careful manual involvement at every step, and "look further into Chunked
+GDN kernel". Full write-up in `Research/chunked-gdn-2026-08-25.md`.
+
+**The main finding reverses this morning's costing.** The previous research pass
+called a chunked GDN kernel "the largest lever we control" and priced it as a
+from-scratch CUDA build. It is not one. `build_delta_net_chunking()` in
+`src/models/delta-net-base.cpp` **already implements the chunkwise-parallel form**
+as a graph of generic ggml ops (10 × `ggml_mul_mat`, plus `solve_tri`/`tri`/
+`cumsum`, `CS = 64`), and `build_delta_net()` selects between it and the fused
+kernel on `cparams.fused_gdn_ch`. That flag defaults true and is auto-resolved by a
+probe that asks only whether the backend *supports* the fused op — which sm_60
+does, so we always get the sequential kernel. There is no CLI flag. Forcing the
+chunked path is a ~2-line patch. Opened as **H22**.
+
+**Every op the chunked graph needs runs on sm_60** — `ggml-cuda.cu:5307-5311`
+returns true for `CUMSUM`/`TRI`/`DIAG`/`SOLVE_TRI` with no `cc` comparison, and
+none of `solve_tri.cu`/`tri.cu`/`cumsum.cu` has a `GGML_CUDA_CC_*` gate.
+`solve_tri.cu`'s `MAX_N_FAST 64` matches `CS = 64` exactly.
+
+**Why the fused kernel is the suspect, stated properly this time.** Its grid is
+`H × n_seqs × ceil(S_v/4)` and contains **no `n_tokens`** — 1536 blocks for our
+model (`S_v=128`, `H_v=48` from `ssm.state_size` / `ssm.inner_size`) whether the
+prefill is 512 tokens or 100,000, with tokens as a sequential `for` loop inside
+each block, two serial warp reductions deep, in scalar FP32. **No GEMM, no FP16**,
+so 49 of 65 layers use none of the 18.7 TFLOPS the floor argument rests on. The
+recurrence is only ~0.3% of prefill FLOPs, so any material *time* share implies an
+efficiency two to three orders of magnitude below the GEMMs.
+
+**H14 raised H22's value rather than lowering it.** The fused kernel is invariant
+to `-ub`, so this morning's +63% came entirely from the GEMM side; Amdahl then makes
+GDN a larger share of what remains (20% → ~29%, or 35% → ~47%). Corrects this
+morning's note that H14 had weakened the GDN thesis — it weakened GDN as the
+explanation for the *old* 30%-of-peak figure, but strengthened it as a target now.
+
+**The best reason to expect failure**, recorded so it is not rediscovered: the
+analogous Mamba-2 chunked path is gated `cc >= GGML_CUDA_CC_TURING`
+(`ssm-scan.cu:829`), added whole in PR #22675 with only "Requires NVIDIA Turing+
+otherwise fallback to scan" and **no stated reason**. If that encodes a performance
+finding, it predicts H22 fails on Pascal. Two further costs: the unfused path
+materialises q/k at 3× width (`H_k=16 ≠ H_v=48`, `qwen35.cpp:441`), and ~50 ops per
+layer instead of 1 — though intermediates scale with ubatch, not context.
+
+**Upstream:** RFC #22967 asked for exactly this CUDA kernel and was **closed
+without landing**; PR #24561 is CDNA-only; PR #20377 (Vulkan) is open; FlashQLA is
+Hopper. Nobody is going to hand us a chunked CUDA GDN kernel.
+
+**H16 (TurboPrefill) withdrawn** by user instruction. Its own reasoning already
+made it unattractive: ~1.3–1.6× on two cards, bought by forcing `-sm layer`, which
+costs 35% of decode.
+
+**H15 (power cap) confirmed as a live lever** but requires the user's careful
+manual involvement at each step, on top of the PSU plug-meter gate already recorded.
+
+**The objective is now written down** in README ("The objective") and RUNBOOK, at
+the user's direction — it was implicit before. The deliverable is **a single server
+launch command**, not a benchmark table. Four targets simultaneously: 100k context,
+highest decode, highest prefill, and output quality indistinguishable from baseline.
+The quality target is the binding constraint and currently has the least data.
+Also recorded: intended deployment is a long-running autonomous harness
+(prime-agent, or anything with a `/goal` mode) so a large prefill amortises across
+a session — which is why H19 (prompt-cache reuse) is the highest-value practical item.
+
+**Deferred by user:** the full batch × context sweep, to be done another time. Today
+covered only 2k/4k/8k.
+
+**Paused here at user request.** Next action when work resumes: Phase 7 cell 1
+(H13, the 100k curve at `-ub 2048`), then cell 2 (H18) to size H22.

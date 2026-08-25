@@ -9,6 +9,46 @@ and the mandatory commit/push protocol. Everything else is reference.
 
 ---
 
+## The objective
+
+**Everything in this repo exists to produce one deliverable: a single server
+launch command (or a small set of them) for serving Qwen3.8-27B on this rig,
+primarily for coding work.** Not a table of benchmarks — a command line. Every
+hypothesis should be read as "does this change what goes in that command."
+
+Four targets, and all four must hold at once. That simultaneity is the whole
+difficulty; almost every lever trades one against another:
+
+| Target | Currently |
+|---|---|
+| **100k context** | Fits VRAM at f16 KV (6.25 GiB). Never run past 16k |
+| **Highest possible decode** | 29.26 t/s at 16k (`tensor` + MTP) |
+| **Highest possible prefill / TTFT** | 347 t/s at 8k after H14. Unmeasured at depth |
+| **Output quality indistinguishable from baseline** | Not yet measured against anything |
+
+The fourth is the constraint that makes the other three hard, and it is the one
+with the least data behind it today. It is why PFlash and DFlash v1 are excluded,
+why TurboQuant's 14.3% decode cost was judged not worth 788 MiB, and why any
+throughput win from a lossy technique has to clear a NIAH gate before it counts.
+
+**The levers, by category** — this is the search space the phases explore:
+
+| For | Options |
+|---|---|
+| **Context** | TurboQuant and other KV-cache quantisation; f16 baseline; cache reuse |
+| **Decode** | MTP, DFlash2, split mode, lower weight quantisation, P2P |
+| **Prefill / TTFT** | ubatch/batch (H14 ✓), chunked GDN (H22), power cap (H15), cache reuse (H19) |
+| **Quality** | Quantisation tiers and speculative-decoding settings, benchmarked against baseline |
+
+**Deployment mitigation, decided 2026-08-25.** Long TTFT at 100k is partly a
+*usage* problem, not only an engineering one. The intended real-world use is a
+long-running autonomous harness — prime-agent, or anything with a `/goal` mode —
+where a large prefill is amortised across a long session instead of being paid per
+turn. This is why H19 (prompt-cache reuse) is rated the highest-value practical
+item: it is the lever that matches how the rig will actually be used.
+
+---
+
 ## Current status
 
 | | |
@@ -20,7 +60,7 @@ and the mandatory commit/push protocol. Everything else is reference.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H21)** | **Open — the current priority.** H14 confirmed (+63% from `-ub`); H21 withdrawn. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H22)** | **Open — the current priority.** H14 confirmed (+63% from `-ub`); H16 and H21 withdrawn; H22 opened. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
 
 ### Best measured configuration
 
@@ -85,11 +125,15 @@ Three facts that bound every proposed fix:
 - **The model is a hybrid.** `full_attention_interval = 4` — only ~16 of 65 layers
   are attention. Prefill is near-linear (−6.4% from 2k to 16k), KV is only
   64 KiB/token, and sparse-attention techniques have a low ceiling here.
-- ~~**The suspect is the gated-delta-net kernel**, not the GEMMs.~~ **Weakened by
-  H14.** The GDN kernel still walks tokens one at a time and still carries its
-  author's `//TODO: Add chunked kernel for even faster pre-fill`, but a 63% swing
-  from ubatch alone is GEMM-shaped behaviour, so GDN is no longer the leading
-  explanation. H18 still decides the rest of the phase — re-run it at `-ub 2048`.
+- **The gated-delta-net kernel is still the kernel-level suspect, and the fix
+  already exists.** Its grid contains no `n_tokens` — 1536 blocks whether the
+  prefill is 512 tokens or 100,000, with tokens as a sequential loop inside, in
+  scalar FP32 with no GEMM and no FP16. H14 *raised* its importance rather than
+  lowering it: the kernel is invariant to `-ub`, so the +63% came from the GEMM
+  side, and Amdahl makes GDN a bigger share of what remains. **The chunked
+  algorithm is already implemented as a ggml graph and every op it needs runs on
+  sm_60** — it is a ~2-line patch, not a kernel project. H18 sizes the prize, H22
+  collects it. See [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md).
 
 Also newly known and not yet acted on: **the cards are power-capped at 175 W of a
 250 W default** — raising it is now **approved to a 220 W ceiling** (H15), blocked
@@ -124,7 +168,8 @@ mode are confirmed applied.
 |---|---|
 | [RUNBOOK.md](RUNBOOK.md) | **Start here.** How to run a benchmark, safety limits, failure handling, git protocol, phase completion criteria |
 | [METHODOLOGY.md](METHODOLOGY.md) | Hardware, engines, models, fixed parameters, and why each was chosen |
-| [HYPOTHESES.md](HYPOTHESES.md) | H1–H12 — the open questions each run is meant to answer, with current status |
+| [HYPOTHESES.md](HYPOTHESES.md) | H1–H22 — the open questions each run is meant to answer, with current status |
+| `Research/` | Deep-dive research documents, distilled into the hypotheses above |
 | [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 — the agentic web-build benchmark: port scheme, metrics, quality scoring |
 | [RESULTS.md](RESULTS.md) | Curated result tables, one section per phase |
 | [RUNLOG.md](RUNLOG.md) | Chronological log — what ran, what broke, what changed |
