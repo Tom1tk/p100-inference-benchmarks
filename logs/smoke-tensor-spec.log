@@ -1,0 +1,21 @@
+########## smoke-tensor-none
+=== smoke-tensor-none === (idle 49C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 4096 
+loaded in 10s | VRAM 8183/8183 MiB
+  rep1: decode 20.13 t/s | prefill 66.47 t/s | accept 0/0 = n/a% | peak 50C
+---- exit=0 ----
+########## smoke-tensor-mtp
+=== smoke-tensor-mtp === (idle 53C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 4096 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 20s | VRAM 9827/9827 MiB
+  rep1: decode 32.60 t/s | prefill 55.47 t/s | accept 45/50 = 90.0% | peak 53C
+---- exit=0 ----
+########## smoke-tensor-df2q4
+#15 0x0000732ae122a1ca in __libc_start_call_main (main=main@entry=0x5c66cd070270 <main>, argc=argc@entry=25, argv=argv@entry=0x7ffce127f548) at ../sysdeps/nptl/libc_start_call_main.h:58
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+#16 0x0000732ae122a28b in __libc_start_main_impl (main=0x5c66cd070270 <main>, argc=25, argv=0x7ffce127f548, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffce127f538) at ../csu/libc-start.c:360
+warning: 360	../csu/libc-start.c: No such file or directory
+#17 0x00005c66cd0702a5 in _start ()
+[Inferior 1 (process 74951) detached]
+---- exit=1 ----
+=== smoke complete ===

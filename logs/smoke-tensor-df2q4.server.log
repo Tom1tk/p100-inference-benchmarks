@@ -1,0 +1,81 @@
+0.00.035.157 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.036.076 W srv  llama_server: -----------------
+0.00.036.080 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.036.080 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.036.081 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.036.081 W srv  llama_server: -----------------
+0.00.037.424 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+0.00.037.610 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.023.081 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.023.101 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.023.132 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.01.023.146 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.01.023.160 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.01.023.205 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.01.023.222 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.023.236 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.023.252 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.01.023.266 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.023.283 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.01.023.298 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.01.023.316 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.023.334 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.023.371 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+0.03.972.392 W internal AllReduce init failed (n_devices != 2?); falling back to meta-backend butterfly
+0.04.037.946 I cmn          init: llama threadpool init, n_threads = 8
+0.04.228.329 I common_speculative_init_result: loading draft model '/root/Qwen3.8-27B-DFlash2-Q4_K_M.gguf'
+0.13.912.037 W internal AllReduce init failed (n_devices != 2?); falling back to meta-backend butterfly
+0.13.998.767 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 4096, kv_unified = 'true'
+0.13.998.820 I common_speculative_impl_draft_dflash: adding speculative implementation 'draft-dflash'
+0.13.998.822 I common_speculative_impl_draft_dflash: - n_max=3, n_min=0, p_min=0.00
+0.13.998.824 I common_speculative_impl_draft_dflash: - block_size=8, mask_token_id=248070, n_extract=5, sample_from_anchor=true
+/root/dflash2-rebased/ggml/src/ggml-backend-meta.cpp:543: GGML_ASSERT(src_ss[0].axis != GGML_BACKEND_SPLIT_AXIS_0) failed
+[New LWP 74980]
+[New LWP 74979]
+[New LWP 74978]
+[New LWP 74977]
+[New LWP 74976]
+[New LWP 74975]
+[New LWP 74974]
+[New LWP 74973]
+[New LWP 74972]
+[New LWP 74971]
+[New LWP 74970]
+[New LWP 74969]
+[New LWP 74968]
+[New LWP 74967]
+[New LWP 74966]
+[New LWP 74965]
+[New LWP 74964]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x0000732ae1310813 in __GI___wait4 (pid=75110, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+#0  0x0000732ae1310813 in __GI___wait4 (pid=75110, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x0000732ae207c703 in ggml_print_backtrace () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#2  0x0000732ae207c8ab in ggml_abort () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#3  0x0000732ae20a3604 in ggml_backend_meta_get_split_state(ggml_backend_meta_simple_tensor_container&, ggml_tensor const*, bool)::{lambda()#1}::operator()() const () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#4  0x0000732ae209ea22 in ggml_backend_meta_get_split_state(ggml_backend_meta_simple_tensor_container&, ggml_tensor const*, bool) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#5  0x0000732ae20a708c in ggml_backend_meta_buffer_init_tensor_impl(ggml_backend_meta_simple_tensor_container&, ggml_tensor*) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#6  0x0000732ae209360c in ggml_gallocr_alloc_graph () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#7  0x0000732ae2099f1f in ggml_backend_sched_alloc_graph () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#8  0x0000732ae0902f0d in llama_context::process_ubatch(llama_ubatch const&, llm_graph_type, llama_memory_context_i*, ggml_status&) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#9  0x0000732ae090a0cd in llama_context::decode(llama_batch const&) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#10 0x0000732ae090b5ff in llama_decode () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#11 0x0000732ae0defb89 in common_context_can_seq_rm(llama_context*) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama-common.so.0
+#12 0x0000732ae1b61f95 in server_context_impl::load_model(common_params&) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama-server-impl.so
+#13 0x0000732ae1ac3b47 in llama_server(common_params&, int, char**) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama-server-impl.so
+#14 0x0000732ae1ac5126 in llama_server(int, char**) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama-server-impl.so
+#15 0x0000732ae122a1ca in __libc_start_call_main (main=main@entry=0x5c66cd070270 <main>, argc=argc@entry=25, argv=argv@entry=0x7ffce127f548) at ../sysdeps/nptl/libc_start_call_main.h:58
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+#16 0x0000732ae122a28b in __libc_start_main_impl (main=0x5c66cd070270 <main>, argc=25, argv=0x7ffce127f548, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffce127f538) at ../csu/libc-start.c:360
+warning: 360	../csu/libc-start.c: No such file or directory
+#17 0x00005c66cd0702a5 in _start ()
+[Inferior 1 (process 74951) detached]
