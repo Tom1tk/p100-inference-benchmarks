@@ -41,7 +41,8 @@ case "$ENGINE" in
     ik)     BIN=/root/ik_llama.cpp/build/bin/llama-bench ;;
     ik-nonccl) BIN=/root/ik_llama.cpp/build-nonccl/bin/llama-bench ;;   # H5: same tree, -DGGML_NCCL=OFF
     mainline) BIN=/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench ;;
-    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|ik-nonccl|mainline)" >&2; exit 2 ;;
+    mainline-rebased) BIN=/root/dflash2-rebased/build-cuda-p100/bin/llama-bench ;;   # pr-27342 rebased onto 75844307
+    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|ik-nonccl|mainline|mainline-rebased)" >&2; exit 2 ;;
 esac
 
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }
