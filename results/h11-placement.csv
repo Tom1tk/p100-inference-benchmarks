@@ -40,3 +40,9 @@ p2-tensor-none,none,none,default,3,20.29,68.01,400,0,0,,8183,8183,65,10,ok
 p2-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,21.24,57.03,400,543,218,40.1,9827,9827,65,10,ok
 p2-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,21.30,59.04,400,543,218,40.1,9827,9827,65,10,ok
 p2-tensor-mtp,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,21.28,59.14,400,543,218,40.1,9827,9827,66,10,ok
+p2-tensor-none-16k,none,none,default,1,19.77,198.93,400,0,0,,8579,8579,67,10,ok
+p2-tensor-none-16k,none,none,default,2,19.74,199.04,400,0,0,,8579,8579,67,10,ok
+p2-tensor-none-16k,none,none,default,3,19.74,199.14,400,0,0,,8579,8579,68,10,ok
+p2-tensor-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,29.17,198.17,400,374,274,73.3,10235,10235,68,10,ok
+p2-tensor-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,29.30,198.41,400,374,274,73.3,10235,10235,69,10,ok
+p2-tensor-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,29.32,198.57,400,374,274,73.3,10235,10235,70,10,ok

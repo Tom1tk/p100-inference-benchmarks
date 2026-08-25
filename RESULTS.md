@@ -130,11 +130,59 @@ these two cells, not instrumented.
 
 ---
 
-## Phase 2 — drafters on/off
+## Phase 2 — drafters on `-sm tensor`
 
-| Engine | Quant | Drafter | tg128 | Speedup | Acceptance rate | Notes |
-|---|---|---|---|---|---|---|
-| _pending_ | | | | | | |
+`mainline-rebased` (`57affa09`, PR #27342 on `75844307`) · `UD-Q4_K_M` ·
+`llama-server` · `-ngl 99 -fa 1 -t 8` · `REPS=3` · `N_PREDICT=400` ·
+`GGML_CUDA_ALLREDUCE=internal`. Rows are means of 3 reps.
+
+| Depth | Drafter | Decode t/s | Prefill t/s | Acceptance | VRAM (0/1) |
+|---|---|---|---|---|---|
+| 4k | none | 20.30 | 68.0 | — | 8183 / 8183 |
+| 4k | MTP-Q4_0 | 21.27 | 59.1 | 40.1% | 9827 / 9827 |
+| 16k | none | 19.75 | 199.0 | — | 8579 / 8579 |
+| **16k** | **MTP-Q4_0** | **29.26** | **198.4** | **73.3%** | 10235 / 10235 |
+
+**MTP's speedup is a function of context depth: +4.8% at 4k, +48.2% at 16k.**
+Acceptance nearly doubles over the same span (40.1% → 73.3%) on an identical
+drafter and an identical 400-token budget. This is the same effect the H11 depth
+check found for DFlash2 (45.8% → 64.8%), but larger.
+
+**At depth the drafter is free on prefill** — 198.4 vs 199.0 t/s, inside noise.
+At 4k it costs 13% (68.0 → 59.1). The drafter's fixed per-request setup is
+invisible once a ~15k-token prompt amortises it.
+
+`-sm tensor` splits VRAM exactly evenly in every cell, which layer split never
+does (compare the H11 rows: 8647 / 10997 and similar).
+
+**29.26 t/s at 16k is the best decode in the project**, against Phase 1's best of
+22.05 (`ik` `-sm graph`, no drafter, tg128) and layer + DFlash2 at 16k at 17.08.
+
+### Why the smoke test was wrong by 13x
+
+The gating smoke run reported MTP at 32.60 t/s and **90.0%** acceptance — a
+claimed +61.9%. It used `N_PREDICT=64`. The first 64 tokens of a response are its
+most formulaic stretch, which is exactly what a small drafter predicts well; the
+same drafter on the same prompt run to 400 tokens accepts 40.1%. Short
+generations flatter drafters badly, and acceptance measured over one is not a
+usable number.
+
+### Acceptance is not a pure property of drafter and task
+
+Same drafter, same prompt, same token budget, 4k: layer split accepts 44.4%
+(`draft_n` 513), tensor split accepts 40.1% (`draft_n` 543). Tensor split changes
+matmul reduction order, so logits differ slightly and drafts diverge. The effect
+is small next to the depth effect, but it means split mode has to be held fixed
+when comparing acceptance rates.
+
+### DFlash2 is excluded from this matrix by necessity
+
+It aborts on load under `-sm tensor` in the meta-backend split planner
+(`ggml-backend-meta.cpp:543`, `handle_per_row` given an axis-0-split source).
+The source is the target's `output.weight`, which DFlash2 borrows via
+`cparams.ctx_other` instead of shipping; tensor split shards it on axis 0. MTP
+ships its own `output.weight` and `token_embd.weight`, so its graph never sees a
+split tensor. Structural — see H8. DFlash2 is layer-split-only on this rig.
 
 ### Preliminary — not part of the matrix
 
