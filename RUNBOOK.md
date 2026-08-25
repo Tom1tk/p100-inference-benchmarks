@@ -331,7 +331,13 @@ hypotheses are about transfer stalls, so utilization is the evidence.
 **Trap:** any `-ot` override silently disables pipeline parallelism. Compare
 `-ot` runs against a no-`-ot` control, never against the Phase 1 baseline.
 
-### Phase 7 — prefill and TTFT (H13–H21)
+### Phase 7 — prefill and TTFT (H13–H22)
+
+**Two levers remain after 2026-08-25**, once TurboPrefill (H16) and PFlash (H21)
+were withdrawn: the **power cap** (H15, cell 8 — requires the user's careful manual
+involvement at every step) and the **chunked GDN path** (H22, cell 7). Everything
+else in this phase is measurement, or a work-reducing lever rather than a way to
+make the existing kernels faster.
 
 **The current priority.** Opened 2026-08-25 from
 [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) —
@@ -349,9 +355,10 @@ phase is aimed at the right target.
 | 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
 | 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
 | 6 | 9B single-GPU vs 27B, NIAH 8k→100k | H20 | Harness and fixtures already exist |
-| 7 | TurboPrefill build, 4 cells at 64k | H16 | Build cost; forces `-sm layer`, so report TTFT *and* decode |
+| 7 | **Chunked GDN path** — patch `fused_gdn_ch=false` behind an env var, rebuild, A/B at `-ub 2048` | H22 | The last kernel-level lever. ~2-line patch, not a kernel project. **Run cell 2 first** — H18 sizes the prize. Check the load log for CPU-fallback warnings before trusting any number |
 | 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
 | ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
+| ~~—~~ | ~~TurboPrefill build~~ | ~~H16~~ | **Withdrawn 2026-08-25** — user call. Forces `-sm layer`, costing 35% of decode to buy prefill; wrong trade against the four simultaneous targets |
 
 **`-ub 2048` is now mandatory in every Phase 7 cell.** H14 found the old default
 `-ub 512` to be a local minimum of the throughput curve, worth 63% less than 2048.
@@ -405,3 +412,16 @@ fine-grained row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-I
 measured drafter-free on `llama-bench`; MTP (29.26 t/s) on `llama-server` at
 depth. The combined cell was queued twice and ran neither time. The defensible
 best-measured number is **29.26 t/s**, without P2P.
+
+---
+
+## What this project is for
+
+The deliverable is **a server launch command**, not a table. Read every phase as
+"does this change what goes in that command." Four targets must hold *at once* —
+100k context, highest decode, highest prefill, and output quality indistinguishable
+from baseline — and almost every lever trades one against another. The quality
+target is the binding constraint and has the least data behind it; a throughput win
+from a lossy technique does not count until it clears a NIAH gate.
+
+See [README.md](README.md#the-objective) for the full statement and the lever map.
