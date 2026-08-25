@@ -52,6 +52,9 @@ The apples-to-apples comparison. All cells on **`Qwen3.8-27B-UD-Q4_K_M`**.
 | mainline (pr-27342) | `64f765f5` | tensor, `ALLREDUCE=nccl` (Linux default) | — | — | — | — | — | **exit 134 after 5s** — `ggml_backend_cuda_comm_allreduce_nccl`. See H5/H10 |
 | **mainline rebased** | `57affa09` | **tensor**, `ALLREDUCE=internal` | **222.62** | **223.59** | **214.98** | **208.38** | 20.34 | 601s, peak 69C. Best cell in the matrix |
 | mainline rebased | `57affa09` | layer | 180.85 | 190.80 | 192.09 | 187.15 | 12.89 | — |
+| mainline rebased | `57affa09` | tensor, `ALLREDUCE=none`, **`P2P=1`** | 221.91 | 222.77 | 214.19 | 207.63 | **20.92** | Best decode. P2P costs ~0.3% pp, buys +2.9% tg. See H10 |
+| mainline rebased | `57affa09` | tensor, `ALLREDUCE=none`, P2P off | 222.75 | 223.43 | 214.88 | 208.25 | 20.34 | Reproduces the `internal` cell above to within 0.06% |
+| **buun** | `39d97a876` | **tensor**, `ALLREDUCE=none` | 193.50 | 191.86 | 188.57 | 182.75 | 20.67 | 684s, peak 70C. Tensor works on buun — but 12–14% behind rebased on prefill |
 
 Earlier Q6_K_M reference cell, kept for continuity (different quant — not
 comparable to the rows above):
@@ -227,12 +230,35 @@ above or to Phase 1. Recorded because it is the first evidence DFlash2 runs here
 
 ## Phase 3 — quant sweep
 
+**Not started.** The model-quant sweep below is still pending.
+
 | Engine | Split | Quant | pp16384 | tg128 | VRAM | Notes |
 |---|---|---|---|---|---|---|
 | _pending_ | | `IQ3_S` | | | | Run on both `layer` and `none` — the only single-GPU-capable target |
 | _pending_ | | `Q4_K_M` | | | | |
 | _pending_ | | `Q5_K_M` | | | | |
 | _pending_ | | `Q6_K_M` | | | | |
+
+### KV-cache quant sweep on `buun` — partial (2026-08-25)
+
+Ran ahead of Phase 3 to answer whether TurboQuant justifies switching engines.
+`buun` · `-sm tensor` · `UD-Q4_K_M` · MTP-Q4_0 · 16k depth · `ALLREDUCE=none`.
+
+| `-ctk`/`-ctv` | Decode t/s | Prefill t/s | Acceptance | VRAM (0+1) | Reps |
+|---|---|---|---|---|---|
+| `f16`/`f16` | **28.12** | 178.2 | 82.4% | 21552 MiB | 3 |
+| `turbo3`/`f16` | 24.76 | 177.7 | 74.2% | 21160 MiB | 1 |
+| `turbo3`/`turbo3` | 24.09 | 177.8 | ~77% | 20764 MiB | 3 |
+| `turbo3`/`q8_0` | — | — | — | — | **not run — stopped** |
+
+**TurboQuant is a loss on this rig: −14.3% decode for 788 MiB saved at 16k.**
+The 788 MiB is far less than an f16→3-bit KV conversion should yield at this
+depth, which suggests turbo is not applied to every layer's cache — unconfirmed,
+because `buun`'s server log emits no KV sizing lines. Answers H4 and H7.
+
+`turbo3/q8_0` was killed mid-run when work was stopped; its three
+`FAILED(request)` rows were removed from `results/h11-placement.csv` as kill
+artefacts rather than measurements.
 
 ---
 

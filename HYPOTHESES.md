@@ -12,12 +12,12 @@ run label so the evidence is traceable.
 | H1 | MTP wins bigger on P100 than on a 3090 | **REFUTED as stated — and speedup is depth-dependent, not a constant: 1.05× @4k, 1.48× @16k** |
 | H2 | XL quants stall one GPU on the split | Untested |
 | H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
-| H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
+| H4 | TurboQuant KV avoids the q4_0 KV penalty | **REFUTED — turbo3/turbo3 costs 14.3% of decode to save 788 MiB. `buun` has no remaining advantage** |
 | H5 | NCCL is harmful for split inference | **CONFIRMED and rig-wide — an abort, in both `ik` and mainline** |
-| H6 | `-sm graph` is the best split mode | **REFUTED — mainline `-sm tensor` wins: fastest prefill at every depth, decode within 8%** |
+| H6 | `-sm graph` is the best split mode | **REFUTED — `-sm tensor` on `mainline-rebased` wins. `buun`'s tensor is 12–14% slower on prefill** |
 | H7 | `(turbo*, F16)` KV combo aborts | **REFUTED — `turbo3/f16` runs clean on `buun`. Turbo KV is legal and ~12% slower than f16** |
-| H8 | DFlash2 is worth using on this rig | **Constrained — aborts under `-sm tensor` (borrowed axis-0-split `output.weight`); layer-split-only, so it must beat MTP-on-tensor from a 37% hole** |
-| H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
+| H8 | DFlash2 is worth using on this rig | **REFUTED as a configuration — layer-split-only, and `tensor + MTP` beats `layer + DFlash2` by +71% decode at 16k** |
+| H9 | Q8 drafter beats Q4 by more than it costs | **Provisionally REFUTED — matched DFlash2 pair is 0.1% apart on decode; Q8 costs 872 MiB and accepts less** |
 | H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **CLOSED — AllReduce: no lever (only butterfly runs on Pascal). P2P: real but small, +2.9% decode / −0.3% prefill** |
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
@@ -123,7 +123,36 @@ that penalty.
 `q8_0`, and the turbo types. Watch for the H7 dispatch bug when choosing
 combinations.
 
-**Status:** Untested.
+**Status: REFUTED.** TurboQuant does not avoid a KV penalty — it has one of its
+own, and a larger one than the question anticipated.
+
+`buun` (the only non-excluded tree with turbo types) · `-sm tensor` ·
+`UD-Q4_K_M` · MTP-Q4_0 · 16k depth:
+
+| `-ctk`/`-ctv` | Decode t/s | vs f16 | VRAM (0+1) | Reps |
+|---|---|---|---|---|
+| `f16`/`f16` | **28.12** | — | 21552 MiB | 3 |
+| `turbo3`/`f16` | 24.76 | −11.9% | 21160 MiB | 1 |
+| `turbo3`/`turbo3` | 24.09 | **−14.3%** | 20764 MiB | 3 |
+
+**−14.3% of decode to save 788 MiB at 16k context.** That is a bad trade at any
+depth this rig can reach, and it gets worse rather than better as context grows,
+because the throughput cost scales while the saving evidently does not.
+
+The 788 MiB is itself suspicious: an f16→3-bit KV conversion at 16k should free
+far more. The likely explanation is that turbo is not applied to every layer's
+cache, but `buun` emits no KV sizing lines in its server log, so this is
+unconfirmed. It does not change the verdict — the decode cost is measured
+directly and is what decides it.
+
+**Consequence: no reason to run `buun` over `mainline-rebased`.** TurboQuant was
+the only capability `buun` had that the rebased tree lacks (see METHODOLOGY's
+engine capability matrix), and it is not worth having. `buun` also trails on
+prefill by 12–14% and on decode by 3.9% with MTP attached.
+
+`turbo3`/`q8_0` was queued but never ran — work was stopped first. Given the
+trend across the three cells above it is unlikely to change the verdict, but it
+is genuinely untested.
 
 ---
 
@@ -239,6 +268,39 @@ everywhere, decode within 8%, plus DFlash2, current arch support, and a
    off by default.
 3. `ik`'s `-sm attn` (`LLAMA_SPLIT_MODE_ATTN = 2`) — reachable from
    `llama-cli`/`llama-server` but not `llama-bench`. Lower priority now.
+
+---
+
+### `buun` also has `-sm tensor`, and it is slower (2026-08-25)
+
+Tensor split is not unique to the rebased tree. `buun` offers it and the arch
+gate is the same denylist (`src/llama-arch.cpp:1023`, `default: return true`),
+so `qwen35` is permitted there too. It runs — and loses:
+
+| test | mainline rebased | buun | delta |
+|---|---|---|---|
+| pp2048 | 222.75 | 193.50 | −13.1% |
+| pp4096 | 223.43 | 191.86 | −14.1% |
+| pp8192 | 214.88 | 188.57 | −12.2% |
+| pp16384 | 208.25 | 182.75 | −12.3% |
+| tg128 | 20.34 | 20.67 | +1.6% |
+
+A 12–14% prefill deficit for 1.6% of decode. Too large to be the per-stream
+cuBLAS commit alone (measured at +1.0–3.6% in the rebase validation), so
+`buun`'s base is materially older than current master in the prefill path.
+
+With a drafter attached at 16k the decode advantage reverses as well: `buun` +
+MTP gives 28.12 t/s against the rebased tree's 29.26 (−3.9%), at 178.2 vs 198.4
+prefill (−10.2%).
+
+**So H6's answer is not just "tensor" but "tensor on `mainline-rebased`".**
+
+⚠️ Acceptance rates are **not** comparable across engines. `buun` reports 82.4%
+against the rebased tree's 73.3% on the same drafter, prompt, and token budget,
+while drafting fewer tokens (`draft_n` 301 vs 374) — its speculative defaults
+differ. End-to-end decode t/s is the fair comparison; acceptance is not, unless
+`n_max`/`p_min` are pinned on both.
+
 
 ---
 
@@ -418,6 +480,31 @@ t/s control), DFlash2 now has to beat MTP-on-tensor from a hole that deep. The
 H8 comparison is therefore no longer drafter-vs-drafter; it is
 `tensor + MTP` vs `layer + DFlash2` as whole configurations.
 
+**Status: REFUTED as a configuration, at 16k depth.** DFlash2 does beat MTP
+head-to-head on layer split — but that contest no longer decides anything,
+because it cannot follow MTP onto tensor split.
+
+| Configuration | Decode t/s | Prefill t/s | Acceptance |
+|---|---|---|---|
+| **tensor + MTP** | **29.26** | 198.4 | 73.3% |
+| layer + MTP | 19.05 | 162.9 | 77.5% |
+| layer + DFlash2-Q4 | 17.08 | 159.7 | 64.8% |
+| layer control | 12.35 | 183.9 | — |
+
+**`tensor + MTP` beats `layer + DFlash2` by +71.3% on decode and +24.2% on
+prefill.** No amount of DFlash2's drafter quality closes a gap created by the
+split mode it cannot use.
+
+The original H8 claim — "DFlash2 gives a materially better decode speedup than
+the MTP head" — is not what was tested here and remains unmeasured on equal
+footing, because equal footing does not exist: there is no split mode both can
+use where either is competitive. On layer at 16k, DFlash2 is *behind* MTP
+(17.08 vs 19.05), which is the reverse of the claim, though acceptance differs
+enough (64.8% vs 77.5%) that spec-parameter defaults may account for it.
+
+**What stands from H8:** DFlash2 runs, on both cards, with clean output, and the
+"no engine supports it" verdict was wrong. What falls: any reason to use it.
+
 ---
 
 ## H9 — Drafter quantisation: Q8 vs Q4
@@ -593,6 +680,14 @@ wash, tilted positive.
 The `p2p=off` cell also reproduced the earlier `phase1-rebased-tensor-q4km` run
 to within 0.06% on all five cells across separate invocations — a useful check
 on harness repeatability, independent of the P2P question.
+
+**Not confirmed: that P2P stacks with MTP.** Both levers were measured alone —
+P2P on a drafter-free `llama-bench` tg128, MTP on a `llama-server` run at depth.
+A cell combining them (`p2-tensor-mtp-16k-p2p`) was queued twice and ran
+neither time: the first attempt died to a harness defect (a script edited while
+that job was executing it), the second was stopped before it started. **Do not
+quote ~30 t/s for tensor + MTP + P2P** — the measured figure remains 29.26
+without P2P, and the +2.9% is measured in a different regime.
 
 ---
 
