@@ -5,3 +5,16 @@ hottest card: 49C
 === running: h14-ubatch-sweep-q4km ===
 ub=128,256,512,1024,2048  p=2048,4096  r=2  -sm tensor  ALLREDUCE=none
 NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 462s | exit 0 | peak 68C ===
+--- results ---
+ n_ubatch  n_batch  n_prompt       t/s   stddev
+      128     2048      2048    197.01     0.01
+      128     2048      4096    194.78     0.02
+      256     2048      2048    249.68     0.09
+      256     2048      4096    241.66     0.04
+      512     2048      2048    218.85     0.06
+      512     2048      4096    221.76     0.13
+     1024     2048      2048    278.82     0.56
+     1024     2048      4096    276.46     0.18
+     2048     2048      2048    357.53     0.36
+     2048     2048      4096    351.06     0.10
