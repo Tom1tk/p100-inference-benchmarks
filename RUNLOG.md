@@ -902,3 +902,45 @@ the pessimistic end of the 64k/100k bracket. Note its `pflash_turbo3` rows are
 Docs updated: README (Phase 7 + the open TTFT problem), HYPOTHESES (H13–H21),
 METHODOLOGY (hybrid architecture, the length-vs-depth defect, the hardware
 floor, the power cap), RUNBOOK (Phase 7 ordering, nine new closed lines).
+
+## 2026-08-25 — H14 ubatch sweep: +63% prefill; PFlash closed; 220 W approved
+
+**Two benchmark runs, both committed** (`22ca967` ok, `431eb0a` FAILED-by-design).
+
+Ran the first `-ub` sweep in the project's history — the batch-sweep phase did not
+exist before today, it was created as H14 / Phase 7 cell 3 in yesterday's research
+pass. New script `scripts/run-ubatch-sweep.sh` puts the whole sweep in **one**
+`llama-bench` invocation so the 4–8 min model load is paid once; both runs together
+took 705 s against a 30 min budget. Peak 68/69 °C against the 83 °C limit.
+
+**Result: `-ub 2048` is worth +63% on prefill** (357.5 vs 218.9 t/s at p=2048).
+Sweep 2 at `-b 8192` found the plateau: 2048 → 342.9, 4096 → 347.5, 8192 → **OOM**
+in `ggml_cuda_pool_vmm::alloc` under `ggml_cuda_mul_mat_cublas_impl`. That abort is
+a legitimate result — it locates the ceiling — and was committed as a failed run per
+the standing protocol. Chose `-ub 2048`: 4096's extra 1.3% is not worth doubling
+activation memory that must coexist with a 6.25 GiB KV cache at 100k.
+
+The curve is **non-monotonic** — `-ub 256` (249.7) beats `-ub 512` (218.9) at both
+prompt lengths, stddev < 0.15. The default sits in a dip. Not explained; flagged.
+
+**Three consequences.**
+1. Every prefill number in Phases 1–6 was taken at `-ub 512` and is ~35% low. Still
+   valid as relative engine comparisons; not valid as this rig's capability.
+2. 347 t/s = 18.8 TFLOP/s = **52% of FP16 peak**, up from 30%. The research doc
+   predicted 45–55% as the realistic ceiling for *all* config tuning combined, so
+   one flag has claimed most of the remaining rate headroom. Further rate tuning is
+   now low-yield; the work-reducing levers (prompt-cache reuse, fewer tokens,
+   smaller model) matter more.
+3. H18's GDN-bound thesis is weakened, not settled. H14 was designed so a null
+   result would support H18; we got the opposite. Re-run H18 at `-ub 2048`.
+
+**PFlash closed outright** by user instruction — product, fork and technique. H21
+withdrawn one day after being opened. Also corrected a claim this repo was carrying:
+the earlier "PFlash is too lossy" verdict was formed on a **7900 XTX**, not on these
+P100s, so the sm_60 arithmetic bug (H17) never confounded it — which was the entire
+argument for reopening the technique.
+
+**H15 power cap approved to 220 W** (not 250 W). 175 W was conservative, not
+measured. One human gate before any run above 175 W: PSU wall draw must be checked
+with a plug-socket meter in person, as it is not readable from this host. When
+cleared: step 175 → 200 → 220, one step per run, temperature log as primary output.

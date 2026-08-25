@@ -370,7 +370,7 @@ and the most work. See H21, and note it is gated on NIAH, which we already have.
 | Technique | Applicable? | Note |
 |---|---|---|
 | **Prompt / prefix cache reuse** | **Yes — free** | `-cram/--cache-ram` (default only 8192 MiB), `--cache-idle-slots`, `-ctxcp`, `-cms`. Eliminates prefill entirely on a stable prefix. Bounded by 28 GB host RAM. **Highest practical value for the agentic loop.** See H19. |
-| **ubatch/batch tuning** | **Yes — free, untested** | Never swept. See H14. |
+| **ubatch/batch tuning** | **Yes — CONFIRMED, +63%** | Swept 2026-08-25. `-ub 2048` beats the `-ub 512` default by 63%; `-ub 8192` OOMs. See H14. |
 | **Power limit 175→220 W** | **Yes — approved to 220 W** | Prefill is clock-bound. Ceiling is 220 W, not 250 W; gated on an in-person PSU plug-meter check. See H15. |
 | **Pipelined multi-GPU prefill** | Yes | TurboPrefill, §5.2. |
 | **Chunked GDN kernel** | Yes, but it's a build | §3. Largest lever we control. |
@@ -393,7 +393,9 @@ and the most work. See H21, and note it is gated on NIAH, which we already have.
 3. **There is no 10× available at fixed work.** The floor is ~2.5 min for 100k. Getting
    materially under ~5 min means prefilling fewer tokens or a smaller model.
 4. **The cheap wins are configuration, not engines**: ubatch, prompt-cache reuse, and
-   possibly the power cap. None have been tried.
+   possibly the power cap. **Ubatch has since been tried and was worth +63%** —
+   confirming this line of reasoning, and taking the rig from 30% to 52% of FP16
+   peak, i.e. most of the rate headroom §2 predicted was available at all.
 5. **We are running numerically degraded** relative to buun, for free, and it confounds
    every quality comparison we have made.
 6. **PFlash is closed completely** — product, fork and technique (§5.3). Its "too lossy"
@@ -408,7 +410,7 @@ Full text in `HYPOTHESES.md`. Ordered by (value ÷ cost).
 | ID | Claim | Cost |
 |---|---|---|
 | H13 | 27B prefill holds ≥150 t/s at 100k (decays less than the 9B did, because 49/65 layers are linear) | 1 run — **do first** |
-| H14 | Raising `-ub` 512→1024/2048 improves prefill ≥10% | 1 sweep |
+| ~~H14~~ | Raising `-ub` 512→1024/2048 improves prefill ≥10% | **DONE 2026-08-25 — +63%** |
 | H17 | The sm_60 FP16 fast-path fix is free (prefill flat, decode +1.4%) and changes output | 3-line patch + rebuild |
 | H18 | GDN layers, not GEMMs, dominate prefill (>50% of a 16k prefill) | instrumentation |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | 1 server config |

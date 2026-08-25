@@ -343,15 +343,22 @@ phase is aimed at the right target.
 
 | # | Cell | Hypothesis | Why this order |
 |---|---|---|---|
-| 1 | `-p 16384,32768,65536,100000 -n 0`, tensor, f16 KV | H13 | We have no data past 16k. Everything else is planned against a 7.8–15.9 min bracket |
-| 2 | `GGML_CUDA_CUBLAS_COMPUTE_TYPE=f32` vs `f16` at 16k | H18 | One run. If prefill doesn't move, prefill isn't GEMM-bound and cells 3 and 6 are dead ends |
-| 3 | `-ub 512/1024/2048` × `-b 2048/4096` at 16k | H14 | Cheap. A null result is positive evidence for H18 |
+| 1 | `-p 16384,32768,65536,100000 -n 0`, tensor, f16 KV, **`-b 2048 -ub 2048`** | H13 | We have no data past 16k, and no data at all at the new ubatch. **Highest-value run in the project** |
+| 2 | `GGML_CUDA_CUBLAS_COMPUTE_TYPE=f32` vs `f16` at 16k, **at `-ub 2048`** | H18 | One run. Must be re-based on the new ubatch — running it at `-ub 512` measures the wrong regime |
+| ~~3~~ | ~~`-ub` sweep~~ | H14 | **DONE 2026-08-25 — CONFIRMED, +63%.** `-ub 2048` is the new default; `-ub 8192` OOMs. Re-baseline everything else on it |
 | 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
 | 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
 | 6 | 9B single-GPU vs 27B, NIAH 8k→100k | H20 | Harness and fixtures already exist |
 | 7 | TurboPrefill build, 4 cells at 64k | H16 | Build cost; forces `-sm layer`, so report TTFT *and* decode |
 | 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
 | ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
+
+**`-ub 2048` is now mandatory in every Phase 7 cell.** H14 found the old default
+`-ub 512` to be a local minimum of the throughput curve, worth 63% less than 2048.
+Any cell run at the old default measures the wrong regime and will have to be
+repeated. Use `scripts/run-ubatch-sweep.sh` (env-overridable: `LABEL`, `BATCH`,
+`UBATCHES`, `PROMPTS`, `REPS`) for further sweeps; note `-ub` is capped by `-b`,
+so raising ubatch above 2048 requires raising `-b` too.
 
 **Thermal note, and it is new.** A 100k prefill is 8–16 minutes of *sustained*
 compute — several times longer than any run this repo has done, and prefill loads
