@@ -18,7 +18,7 @@ run label so the evidence is traceable.
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
 | H8 | DFlash2 is worth using on this rig | **Constrained — aborts under `-sm tensor` (borrowed axis-0-split `output.weight`); layer-split-only, so it must beat MTP-on-tensor from a 37% hole** |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
-| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **AllReduce half CLOSED — only butterfly works on Pascal (`internal` needs sm70+ `__nanosleep`); NCCL aborts.** P2P untested |
+| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **CLOSED — AllReduce: no lever (only butterfly runs on Pascal). P2P: real but small, +2.9% decode / −0.3% prefill** |
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 
@@ -543,13 +543,36 @@ backend that works. The full P100 picture:
 what runs and skips a failed init. Every tensor-split number in this project was
 measured on the butterfly path.
 
-**Remaining test — the one that could still pay off:**
+**Finding 4 — P2P is a real but small decode lever. H10 is now CLOSED.**
 
-`GGML_CUDA_P2P=1` vs unset on `-sm tensor` at fixed everything else. Peer
-access is off by default, these cards peer in both directions (verified with
-`cudaDeviceCanAccessPeer`), and tensor split moves far more cross-GPU data than
-layer split does — so this is a better test bed than the `-sm layer` config
-originally proposed here.
+`mainline-rebased` · `UD-Q4_K_M` · `-sm tensor` · `GGML_CUDA_ALLREDUCE=none` ·
+`-r 3`. Only `GGML_CUDA_P2P` differs.
+
+| test | p2p=off | p2p=on | delta |
+|---|---|---|---|
+| pp2048 | 222.75 ±0.04 | 221.91 ±0.16 | −0.38% |
+| pp4096 | 223.43 ±0.11 | 222.77 ±0.17 | −0.29% |
+| pp8192 | 214.88 ±0.03 | 214.19 ±0.06 | −0.32% |
+| pp16384 | 208.25 ±0.01 | 207.63 ±0.04 | −0.30% |
+| **tg128** | 20.34 ±0.05 | **20.92 ±0.04** | **+2.86%** |
+
+Peer access **costs ~0.3% of prefill and buys ~2.9% of decode**. Both effects are
+small, but both are outside the noise: the prefill loss is consistent in sign and
+size across all four depths against stddevs of 0.01–0.17, and the decode gain is
+12× the stddev.
+
+The asymmetry fits the mechanism. Decode is latency-bound — many small cross-GPU
+exchanges per token — so removing the host-memory bounce from each one pays.
+Prefill is throughput-bound on large batched transfers, where the staged path is
+already efficient and enabling peering just adds mapping overhead.
+
+**Verdict: set `GGML_CUDA_P2P=1` for decode-dominated work** (the agentic phase),
+leave it off for prefill-dominated work. On a mixed workload it is close to a
+wash, tilted positive.
+
+The `p2p=off` cell also reproduced the earlier `phase1-rebased-tensor-q4km` run
+to within 0.06% on all five cells across separate invocations — a useful check
+on harness repeatability, independent of the P2P question.
 
 ---
 
