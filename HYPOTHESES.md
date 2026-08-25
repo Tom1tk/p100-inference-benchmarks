@@ -13,12 +13,12 @@ run label so the evidence is traceable.
 | H2 | XL quants stall one GPU on the split | Untested |
 | H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
 | H4 | TurboQuant KV avoids the q4_0 KV penalty | Untested |
-| H5 | NCCL is harmful for split inference | **CONFIRMED — not a slowdown, an abort** |
-| H6 | `-sm graph` is the best split mode | **Partly confirmed — a trade: +76% decode, -23% deep prefill.** `-sm tensor` cell still open |
+| H5 | NCCL is harmful for split inference | **CONFIRMED and rig-wide — an abort, in both `ik` and mainline** |
+| H6 | `-sm graph` is the best split mode | **REFUTED — mainline `-sm tensor` wins: fastest prefill at every depth, decode within 8%** |
 | H7 | `(turbo*, F16)` KV combo aborts | Untested |
 | H8 | DFlash2 is worth using on this rig | **Runs on both GPUs, 57% acceptance** — speedup unquantified |
 | H9 | Q8 drafter beats Q4 by more than it costs | Untested — no longer gated |
-| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | Untested |
+| H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **Half settled — AllReduce backend is correctness-only (`internal`==`none`, NCCL aborts).** P2P untested |
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 
@@ -139,8 +139,21 @@ default build is the broken one.
 Evidence: `logs/phase1-driver.log` (`phase1-ik-graph-q4km` vs
 `phase1-iknonccl-graph-q4km`), `logs/phase0-ik-graph-q6k.log`.
 
-**Not applicable to other engines.** `pflash`/`buun`/`mainline` don't offer
-graph split and don't link NCCL; H5 is an `ik` finding only.
+**Rig-wide, not `ik`-specific.** Superseded the earlier note here that called
+this "an `ik` finding only" — mainline's `-sm tensor` aborts the same way, in
+`ggml_backend_cuda_comm_allreduce_nccl`, 5s in. Any mode on any engine that
+performs a cross-GPU AllReduce fails on this hardware. Layer split is unaffected
+because it never calls AllReduce, which is why every `-sm layer` cell in Phase 1
+ran fine on NCCL-linked builds.
+
+The engines differ only in the escape route:
+
+| Engine | Mode needing AllReduce | Escape |
+|---|---|---|
+| `ik` | `-sm graph` | rebuild with `-DGGML_NCCL=OFF` |
+| mainline | `-sm tensor` | `GGML_CUDA_ALLREDUCE=internal` or `none` at runtime |
+
+See H10 for the transport measurements.
 
 ---
 
@@ -149,48 +162,53 @@ graph split and don't link NCCL; H5 is an `ik` finding only.
 **Claim:** `ik_llama`'s `-sm graph` was the prior known-good baseline for this
 rig (on the much older build `286ce324`).
 
-**Status: partly confirmed — graph is a trade, not a win.** Phase 1 settled
-the no-MTP half on `UD-Q4_K_M`.
+**Status: REFUTED as stated — `-sm graph` is not the best split mode.**
+Mainline's `-sm tensor` is.
 
-| | pp2048 | pp16384 | tg128 |
-|---|---|---|---|
-| ik `graph` | **199.14** | 153.04 | **22.05** |
-| ik `layer` | 116.49 | 80.08 | 13.54 |
-| pflash `layer` | 184.31 | 187.87 | 12.53 |
-| buun `layer` | 178.47 | **198.67** | 13.10 |
-| mainline `layer` | 180.38 | 188.69 | 12.88 |
+| | pp2048 | pp4096 | pp8192 | pp16384 | tg128 |
+|---|---|---|---|---|---|
+| **mainline `tensor`** | **214.83** | **219.13** | **212.70** | **206.32** | 20.34 |
+| ik `graph` | 199.14 | 198.45 | 179.56 | 153.04 | **22.05** |
+| buun `layer` | 178.47 | 194.31 | 200.73 | 198.67 | 13.10 |
+| mainline `layer` | 180.38 | 190.96 | 192.14 | 188.69 | 12.88 |
+| pflash `layer` | 184.31 | 191.64 | 192.33 | 187.87 | 12.53 |
+| ik `layer` | 116.49 | 109.50 | 96.99 | 80.08 | 13.54 |
 
-**Graph owns decode.** 22.05 vs 12.53–13.54 — every layer implementation in
-every engine sits in a 1.0 t/s band, and graph is 63–76% clear of all of them.
+**Tensor split wins prefill at every depth** and holds shape (−6% from its 4k
+peak out to 16k, vs graph's −23%), beating graph by **+35% at pp16384**. It
+costs **7.8%** of graph's decode. Telemetry confirms real parallelism: both
+cards at 97–99% utilisation, 170–180W each.
 
-**Graph loses deep prefill.** It is the only mode that decays with depth
-(199 → 153, −23% out to 16k) while the others stay flat or rise. Crossover
-is near 6k.
+**What actually separates the modes** is whether the *computation* is split or
+merely the *layers*. Graph (22.05) and tensor (20.34) both break out; all five
+layer-split cells sit at 12.53–13.54 regardless of fork. Layer split is the
+slow thing — the engine is incidental.
 
-**Correction on the record:** the first reading of this ("graph +91% over
-layer") compared graph to *ik's own* layer, which Phase 1 shows is anomalously
-broken — 80.08 at pp16384 against 187.87–198.67 for three other engines on
-identical work. Comparing within one engine was the wrong control; the
-cross-engine comparison is the honest one, and it turns a blowout into a trade.
+**Two corrections on the record.**
 
-**Consequence for engine choice:** pflash / buun / mainline are within 5% of
-each other at every depth, so layer-split engine choice is a *feature*
-decision, not a performance one. The only thing `ik` uniquely buys is decode
-throughput via graph — at the cost of deep prefill, an NCCL-disabled custom
-build (H5), and an older feature set.
+1. The first reading ("graph +91% over layer") compared graph to *ik's own*
+   layer, which is anomalously broken — 80.08 at pp16384 against 187.87–198.67
+   for three other engines on identical work. Wrong control.
+2. `-sm tensor` was recorded here as arch-blocked for `qwen35`. Wrong twice
+   over: `llm_arch_supports_sm_tensor()` is a **denylist** (`default: return
+   true`), so `qwen35` is permitted; and when `-sm tensor` did fail, the cause
+   was NCCL (see H10), not the arch gate.
+
+**Consequence — `ik` lock-in is not real.** Mainline gives better prefill
+everywhere, decode within 8%, plus DFlash2, current arch support, and a
+*runtime* escape from the NCCL bug instead of `ik`'s custom-build requirement.
+
+**Required flag:** `-sm tensor` needs `GGML_CUDA_ALLREDUCE=internal` (or
+`none`) on this rig. NCCL is the Linux default and aborts in 5s.
 
 **Still open:**
-1. **`-sm tensor` on mainline** — the decisive cell. `-sm tensor` was
-   previously recorded here as unusable for `qwen35`; **that was wrong**.
-   `llm_arch_supports_sm_tensor()` is a *denylist* (`default: return true`)
-   and `qwen35` is not on it, on our built branch as well as upstream tip. The
-   binary at `/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench` already
-   advertises `<none|layer|row|tensor>`. No rebuild needed. If tensor reaches
-   graph's decode, the case for `ik` collapses.
-2. `ik`'s `-sm attn` (`LLAMA_SPLIT_MODE_ATTN = 2`) — reachable from
-   `llama-cli`/`llama-server` but not `llama-bench`. Untested.
-3. Phase 2 re-tests the combination with MTP, which is the comparison that
-   actually decides the rig's configuration.
+1. Phase 2 re-tests the combination with MTP — tensor split's interaction with
+   speculative decoding is unmeasured and could still move the ranking.
+2. `GGML_CUDA_P2P=1` on tensor split (H10 test 3). Now the highest-value cheap
+   test in the project: tensor split is communication-heavy, and peer access is
+   off by default.
+3. `ik`'s `-sm attn` (`LLAMA_SPLIT_MODE_ATTN = 2`) — reachable from
+   `llama-cli`/`llama-server` but not `llama-bench`. Lower priority now.
 
 ---
 
@@ -391,18 +409,52 @@ rebuild. The `h8-loadcheck-df2q4` run succeeded on `-sm layer` because layer
 split needs no AllReduce — the NCCL path is not exercised there. A `-sm row`
 run on mainline may well hit the same failure `ik` did.
 
-**Test:**
+**Status: half settled.** Tests 1 and 2 are done — run on `-sm tensor` rather
+than `-sm row`, which is the better target since tensor is the mode that won
+Phase 1. Test 3 (P2P) is untested and is now the highest-value cheap test left.
 
-1. `-sm row` on mainline with `GGML_CUDA_ALLREDUCE` unset (NCCL, default) —
-   does it reproduce `ik`'s abort? Cheap and settles whether H5 is
-   engine-specific or rig-wide.
-2. Same, with `GGML_CUDA_ALLREDUCE=internal`, then `=none`. Three-way.
-3. `GGML_CUDA_P2P=1` vs unset on `-sm layer` at fixed everything else. This one
-   applies to the *current* working config, so it is the highest-value cheap
-   test in this hypothesis.
+**Finding 1 — H5 is rig-wide, not `ik`-specific.** Mainline's `-sm tensor` on
+the NCCL default aborts in 5s, the same way `ik`'s `-sm graph` does:
 
-Record `nvidia-smi` per-GPU utilization alongside throughput — the mechanism
-claim is about transfer stalls, so utilization is the evidence, not just t/s.
+```
+ggml-cuda.cu:106: CUDA error
+#4  ggml_backend_cuda_comm_allreduce_nccl(...)
+#5  ggml_backend_meta_graph_compute(...)
+```
+
+This confirms the prediction recorded above ("a `-sm row` run on mainline may
+well hit the same failure"). NCCL AllReduce is broken on this hardware
+regardless of engine. The difference is the *escape hatch*: mainline switches
+by env var, `ik` needs `-DGGML_NCCL=OFF` at build time.
+
+**Finding 2 — the transport choice does not affect throughput.**
+
+| test | `internal` | `none` | delta |
+|---|---|---|---|
+| pp2048 | 214.83 ±0.08 | 214.68 ±0.16 | −0.1% |
+| pp4096 | 219.13 ±0.13 | 219.12 ±0.11 | −0.0% |
+| pp8192 | 212.70 ±0.02 | 212.71 ±0.13 | 0.0% |
+| pp16384 | 206.32 ±0.02 | 206.40 ±0.04 | 0.0% |
+| tg128 | 20.34 ±0.05 | 20.38 ±0.03 | +0.2% |
+
+Identical to within 0.2%, most cells within 0.05%, against stddevs of
+0.02–0.16. Both cells took exactly 608s. No `internal AllReduce init failed`
+warning was logged, so the dedicated two-device pipeline really did initialise
+and still made no difference — AllReduce volume is simply not a bottleneck for
+this model in this mode.
+
+**So the H10 claim is half wrong as stated:** the AllReduce backend is *not*
+leaving performance on the table. It is a correctness switch. Pick `internal`
+(it initialises cleanly and is purpose-built for a 2-device rig); `none` is an
+equally valid fallback. Only `nccl` is wrong.
+
+**Remaining test — the one that could still pay off:**
+
+`GGML_CUDA_P2P=1` vs unset on `-sm tensor` at fixed everything else. Peer
+access is off by default, these cards peer in both directions (verified with
+`cudaDeviceCanAccessPeer`), and tensor split moves far more cross-GPU data than
+layer split does — so this is a better test bed than the `-sm layer` config
+originally proposed here.
 
 ---
 

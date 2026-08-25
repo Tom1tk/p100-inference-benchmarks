@@ -1,0 +1,6 @@
+=== benches clear, building 2026-08-25T11:53:00+01:00 ===
+
+-- Generating embedded license file for target: llama-app
+-- Configuring done (5.9s)
+-- Generating done (0.3s)
+-- Build files have been written to: /root/dflash2-rebased/build-cuda-p100
