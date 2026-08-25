@@ -54,3 +54,5 @@ p2-layer-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,19.00,162.89,400,
 p2-layer-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,19.00,162.97,400,360,278,77.2,9079,11525,65,10,ok
 p3-buun-mtp-16k-f16,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,27.94,178.31,400,319,255,79.9,10031,11521,69,20,ok
 p3-buun-mtp-16k-f16,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,28.22,178.21,400,301,248,82.4,10031,11521,70,20,ok
+p3-buun-mtp-16k-f16,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,28.20,178.15,400,301,248,82.4,10031,11521,70,20,ok
+p3-buun-mtp-16k-h7,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,24.76,177.68,400,333,247,74.2,9835,11325,70,20,ok

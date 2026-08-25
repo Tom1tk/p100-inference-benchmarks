@@ -1,0 +1,30 @@
+0.00.034.643 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.346.305 W srv  llama_server: -----------------
+0.00.346.309 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.346.309 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.346.309 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.346.310 W srv  llama_server: -----------------
+0.00.347.781 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+VMEAN tap: no live V layers — add disabled
+VMEAN tap: no live V layers — add disabled
+0.02.851.135 W srv    load_model: [spec] failed to measure draft model memory: MTP and target memory devices differ
+TCQ1 decode: K/V codebooks (K=baked-in V=baked-in) hotswap=0
+TCQ decode: context-adaptive V alpha enabled
+TCQ1 decode: K/V codebooks (K=baked-in V=baked-in) hotswap=0
+0.08.406.490 I srv    load_model: tensor-split target: draft model falls back to layer split (use --spec-draft-device to pin it to one GPU)
+0.09.287.317 I srv    load_model: computation-frontier ratchet: legacy reads authoritative, flip after 1024 qualifying agreements
+0.09.287.325 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 16384, kv_unified = 'true'
+0.09.288.095 I slot   load_model: id  0 | task -1 | speculative decoding context initialized
+0.09.288.104 I slot   load_model: id  1 | task -1 | speculative decoding context initialized
+0.09.288.104 I slot   load_model: id  2 | task -1 | speculative decoding context initialized
+0.09.288.105 I slot   load_model: id  3 | task -1 | speculative decoding context initialized
+0.09.297.700 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.09.297.754 I srv  llama_server: model loaded
+0.09.297.759 I srv  llama_server: listening on http://127.0.0.1:8300
+0.10.128.567 I slot cache_plan_s: id  0 | task -1 | selected slot by LRU, t_last = -1 (best rejected sim = 0.000)
+0.10.128.684 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.10.128.704 I slot   operator(): id  0 | task 0 | edit/divergence sample (cached/incoming/lcp/reusable/rewind/append/cache_prompt) = (0/14187/0/0/0/14187/0)
+0.11.098.536 W slot   operator(): id  0 | task 0 | created context checkpoint 1 of 32 (pos_min = 41, pos_max = 41, n_tokens = 42, size = 149.626 MiB)
+0.21.748.217 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   2090, progress = 0.15, t =  11.62 s / 179.87 tokens per second
+0.32.723.919 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   4138, progress = 0.29, t =  22.60 s / 183.14 tokens per second
+0.43.862.579 I slot print_timing: id  0 | task 0 | prompt processing, n_tokens =   6186, progress = 0.44, t =  33.73 s / 183.38 tokens per second

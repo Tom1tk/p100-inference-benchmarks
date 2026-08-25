@@ -84,3 +84,21 @@ TCQ1 decode: K/V codebooks (K=baked-in V=baked-in) hotswap=0
 4.01.617.542 I slot print_timing: id  0 | task 317 | prompt processing, n_tokens =   6186, progress = 0.44, t =  33.51 s / 184.61 tokens per second
 4.12.969.710 I slot print_timing: id  0 | task 317 | prompt processing, n_tokens =   8234, progress = 0.58, t =  44.86 s / 183.55 tokens per second
 4.24.498.049 I slot print_timing: id  0 | task 317 | prompt processing, n_tokens =  10282, progress = 0.72, t =  56.39 s / 182.34 tokens per second
+4.36.239.867 I slot print_timing: id  0 | task 317 | prompt processing, n_tokens =  12330, progress = 0.87, t =  68.13 s / 180.98 tokens per second
+4.44.330.738 I slot print_timing: id  0 | task 317 | prompt processing, n_tokens =  13671, progress = 0.96, t =  76.22 s / 179.36 tokens per second
+4.44.460.806 W slot   operator(): id  0 | task 317 | created context checkpoint 2 of 32 (pos_min = 13670, pos_max = 13670, n_tokens = 13671, size = 149.626 MiB)
+4.47.482.460 I slot print_timing: id  0 | task 317 | prompt processing, n_tokens =  14183, progress = 1.00, t =  79.37 s / 178.69 tokens per second
+4.47.613.090 W slot   operator(): id  0 | task 317 | created context checkpoint 3 of 32 (pos_min = 14182, pos_max = 14182, n_tokens = 14183, size = 149.626 MiB)
+4.51.244.191 I slot print_timing: id  0 | task 317 | n_decoded =    102, tg =  29.14 t/s, tg_3s =  29.14 t/s
+4.54.267.809 I slot print_timing: id  0 | task 317 | n_decoded =    189, tg =  28.97 t/s, tg_3s =  28.77 t/s
+4.57.342.110 I slot print_timing: id  0 | task 317 | n_decoded =    276, tg =  28.75 t/s, tg_3s =  28.30 t/s
+5.00.411.367 I slot print_timing: id  0 | task 317 | n_decoded =    355, tg =  28.02 t/s, tg_3s =  25.74 t/s
+5.01.823.593 W slot   operator(): id  0 | task 317 | draft size 2 exceeds max 1, truncating
+5.01.929.355 I slot print_timing: id  0 | task 317 | prompt eval time =   79634.32 ms / 14187 tokens (    5.61 ms per token,   178.15 tokens per second)
+5.01.929.363 I slot print_timing: id  0 | task 317 |        eval time =   14185.86 ms /   400 tokens (   35.46 ms per token,    28.20 tokens per second)
+5.01.929.364 I slot print_timing: id  0 | task 317 |       total time =   93820.18 ms / 14587 tokens
+5.01.929.365 I slot print_timing: id  0 | task 317 |    graphs reused =        436
+5.01.929.371 I slot print_timing: id  0 | task 317 | draft acceptance = 0.82392 (  248 accepted /   301 generated), mean len =  2.64
+5.01.929.375 I slot print_timing: id  0 | task 317 | verify/rollback histogram (draft/rejected:cycles) = (1/0:1, 2/0:112, 2/1:23, 2/2:15)
+5.01.930.168 I slot      release: id  0 | task 317 | stop processing: n_tokens = 14586, truncated = 0
+5.01.967.117 I srv    operator(): operator(): cleaning up before exit...
