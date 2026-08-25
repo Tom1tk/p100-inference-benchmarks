@@ -1,0 +1,36 @@
+build_commit,build_number,cpu_info,gpu_info,backends,model_filename,model_type,model_size,model_n_params,n_batch,n_ubatch,n_threads,cpu_mask,cpu_strict,poll,type_k,type_v,n_gpu_layers,n_cpu_moe,split_mode,main_gpu,no_kv_offload,flash_attn,devices,tensor_split,tensor_buft_overrides,load_mode,embeddings,no_op_offload,no_host,fit_target,fit_min_ctx,n_prompt,n_gen,n_depth,test_time,avg_ns,stddev_ns,avg_ts,stddev_ts
+"57affa09","1183","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","8192","1024","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","8192","0","0","2026-08-25T14:52:58Z","30129062148","31606801","271.897096","0.285224"
+"57affa09","1183","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","8192","2048","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","8192","0","0","2026-08-25T14:54:29Z","23889677727","9361290","342.909633","0.134334"
+"57affa09","1183","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","8192","4096","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","8192","0","0","2026-08-25T14:55:41Z","23574310677","238065","347.496905","0.001439"
+[New LWP 96434]
+[New LWP 96433]
+[New LWP 96432]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x000070a726310813 in __GI___wait4 (pid=96903, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+#0  0x000070a726310813 in __GI___wait4 (pid=96903, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x000070a72654a703 in ggml_print_backtrace () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#2  0x000070a72654a8ab in ggml_abort () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#3  0x000070a71ea3ca47 in ggml_cuda_error(char const*, char const*, char const*, int, char const*) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-cuda.so.0
+#4  0x000070a71ea55507 in ggml_cuda_pool_vmm::alloc(unsigned long, unsigned long*) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-cuda.so.0
+#5  0x000070a71ea45d88 in void ggml_cuda_mul_mat_cublas_impl<(ggml_type)1>(ggml_backend_cuda_context&, ggml_tensor const*, ggml_tensor const*, ggml_tensor*) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-cuda.so.0
+#6  0x000070a71ea51bd9 in ggml_backend_cuda_graph_compute(ggml_backend*, ggml_cgraph*) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-cuda.so.0
+#7  0x000070a72657b24d in ggml_backend_meta_graph_compute(ggml_backend*, ggml_cgraph*) () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#8  0x000070a726569337 in ggml_backend_sched_graph_compute_async () from /root/dflash2-rebased/build-cuda-p100/bin/libggml-base.so.0
+#9  0x000070a7258fedd1 in llama_context::graph_compute(ggml_cgraph*, bool) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#10 0x000070a725902f3a in llama_context::process_ubatch(llama_ubatch const&, llm_graph_type, llama_memory_context_i*, ggml_status&) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#11 0x000070a72590a0cd in llama_context::decode(llama_batch const&) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#12 0x000070a72590b5ff in llama_decode () from /root/dflash2-rebased/build-cuda-p100/bin/libllama.so.0
+#13 0x000070a726998d31 in test_prompt(llama_context*, int, int, int) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama-bench-impl.so
+#14 0x000070a7269a7cbe in llama_bench(int, char**) () from /root/dflash2-rebased/build-cuda-p100/bin/libllama-bench-impl.so
+#15 0x000070a72622a1ca in __libc_start_call_main (main=main@entry=0x619021e19270 <main>, argc=argc@entry=27, argv=argv@entry=0x7fff11e4f4d8) at ../sysdeps/nptl/libc_start_call_main.h:58
+#16 0x000070a72622a28b in __libc_start_main_impl (main=0x619021e19270 <main>, argc=27, argv=0x7fff11e4f4d8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7fff11e4f4c8) at ../csu/libc-start.c:360
+#17 0x0000619021e192a5 in _start ()
+[Inferior 1 (process 96392) detached]

@@ -18,3 +18,4 @@ NOTE: model load takes 4-8 min with no output. This is not a hang.
      1024     2048      4096    276.46     0.18
      2048     2048      2048    357.53     0.36
      2048     2048      4096    351.06     0.10
+pushed
