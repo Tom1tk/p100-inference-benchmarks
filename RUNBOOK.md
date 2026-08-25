@@ -235,6 +235,12 @@ No MTP, no TurboQuant. Establishes the apples-to-apples comparison.
 **Done when:** every engine has `none` and `layer` numbers, and the
 single-vs-dual comparison is recorded. Answers part of H6.
 
+**Status (2026-08-25): complete except the `none` leg**, which the operator
+deferred. It needs `UD-IQ3_S` — the only target that fits one 16 GiB card.
+Everything else is in RESULTS.md, on `UD-Q4_K_M` rather than `Q6_K_M`.
+Selected configuration: **`mainline-rebased` · `-sm tensor` ·
+`GGML_CUDA_ALLREDUCE=none`**.
+
 ### Phase 2 — MTP on/off
 Winning engine(s) from Phase 1 × `UD-Q6_K_M` × MTP on vs off.
 
@@ -243,6 +249,21 @@ decoding. Per-engine flags are in METHODOLOGY.md and **differ meaningfully**
 (`buun` uses `draft-mtp`, not `mtp`). Record acceptance rate, not just t/s.
 
 **Done when:** H1 has a verdict with an acceptance rate to support it.
+
+**Status (2026-08-25): complete.** H1 has a verdict — refuted as stated, and
+the speedup is depth-dependent (1.05× at 4k, 1.48× at 16k) rather than a single
+number. Best configuration: **`-sm tensor` + MTP-Q4_0 + `f16` KV, 29.26 t/s at
+16k depth.**
+
+Two measurement rules this phase established, both learned the hard way:
+
+- **Never size a speculative-decoding run at 64 tokens.** A short generation
+  overstated the MTP speedup by 13x (90.0% acceptance vs 40.1% at 400 tokens).
+  Use `N_PREDICT=400` minimum, and quote depth alongside every acceptance rate.
+- **Acceptance rate is not comparable across engines** unless `n_max`/`p_min`
+  are pinned on both. `buun` reported 82.4% where `mainline-rebased` reported
+  73.3% on an identical drafter, prompt, and budget — different defaults, not a
+  better drafter. Compare end-to-end decode t/s instead.
 
 ### Phase 3 — quant sweep
 Winning engine/split from Phases 1–2 × `IQ3_S` / `Q4_K_M` / `Q5_K_M` / `Q6_K_M`
@@ -313,4 +334,22 @@ hypotheses are about transfer stalls, so utilization is the evidence.
 ### Deferred
 Context depths beyond 16k; power-limit experiment (175W vs 200W+ — log as a
 separate row, don't silently change the cap mid-matrix); fine-grained
-row-vs-layer comparison.
+row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
+
+### Closed — do not spend runs here
+
+| Line of enquiry | Why it's closed |
+|---|---|
+| TurboQuant KV | −14.3% decode for 788 MiB. H4/H7 |
+| `buun` as an engine | Behind `mainline-rebased` on prefill (12–14%) and on decode with MTP (3.9%); its one exclusive feature is TurboQuant. H6 |
+| DFlash2 | Layer-split-only, and `tensor + MTP` beats `layer + DFlash2` by +71% decode. H8 |
+| `GGML_CUDA_ALLREDUCE` tuning | Only butterfly runs on Pascal; `internal` and `none` are the same path. Use `none`. H10 |
+| Drafter placement (`-devd`) | Moves VRAM, not throughput. H11 |
+| `ik` `-sm graph` knobs (H12) | Low value now — `-sm tensor` beats graph on prefill at every depth and is within 8% on decode, and `ik` has no path to tensor split |
+
+### Unmeasured — do not quote
+
+**`tensor + MTP + GGML_CUDA_P2P=1` was never measured.** P2P (+2.9% decode) was
+measured drafter-free on `llama-bench`; MTP (29.26 t/s) on `llama-server` at
+depth. The combined cell was queued twice and ran neither time. The defensible
+best-measured number is **29.26 t/s**, without P2P.
