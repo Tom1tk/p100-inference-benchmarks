@@ -1,0 +1,30 @@
+=============================== NCCL main communicator initialized
+build_commit,build_number,cuda,vulkan,metal,sycl,rpc,gpu_blas,blas,cpu_info,gpu_info,model_filename,model_type,model_size,model_n_params,n_batch,n_ubatch,n_threads,type_k,type_v,n_gpu_layers,split_mode,main_gpu,no_kv_offload,flash_attn,mla_attn,attn_max_batch,ser,reuse,tensor_split,use_mmap,embeddings,repack,mqkv,muge,defer_experts,fused_moe,grouped_er,no_fused_up_gate,use_thp,no_ooae,rcache,sas,max_gpu,cuda_params,override_tensor,n_prompt,n_gen,test_time,avg_ns,stddev_ns,avg_ts,stddev_ts,test
+[New LWP 51037]
+[New LWP 51036]
+[New LWP 51035]
+[New LWP 51034]
+[New LWP 51000]
+[New LWP 50997]
+[New LWP 50995]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x000071237f910813 in __GI___wait4 (pid=51096, stat_loc=0x7ffe90a50624, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+#0  0x000071237f910813 in __GI___wait4 (pid=51096, stat_loc=0x7ffe90a50624, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x00007123800dfe82 in ggml_abort () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#2  0x00007123802f5573 in ggml_cuda_op_reduce(ggml_backend_cuda_context&, ggml_tensor*) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#3  0x000071238035f953 in ggml_cuda_compute_forward(ggml_backend_cuda_context&, ggml_tensor*, ggml_cgraph const*, int&) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#4  0x0000712380369078 in ggml_backend_cuda_graph_compute(ggml_backend*, ggml_cgraph*) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#5  0x0000712380154c90 in ggml_backend_sched_compute_splits(ggml_backend_sched*) () from /root/ik_llama.cpp/build/ggml/src/libggml.so
+#6  0x00007123a84ef950 in llama_decode_internal(llama_context&, llama_batch) [clone .isra.0] () from /root/ik_llama.cpp/build/src/libllama.so
+#7  0x00007123a84f2d5d in llama_decode () from /root/ik_llama.cpp/build/src/libllama.so
+#8  0x00005c4fb57f4706 in test_prompt(llama_context*, int, int, int, int) [clone .constprop.0] ()
+#9  0x00005c4fb57ed713 in main ()
+[Inferior 1 (process 50988) detached]
