@@ -331,9 +331,42 @@ hypotheses are about transfer stalls, so utilization is the evidence.
 **Trap:** any `-ot` override silently disables pipeline parallelism. Compare
 `-ot` runs against a no-`-ot` control, never against the Phase 1 baseline.
 
+### Phase 7 — prefill and TTFT (H13–H21)
+
+**The current priority.** Opened 2026-08-25 from
+[Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) —
+read it before running anything here; it closes several obvious-looking knobs at
+the source level and establishes the hardware floor that bounds every result.
+
+Run in this order. The first two are gates: they decide whether the rest of the
+phase is aimed at the right target.
+
+| # | Cell | Hypothesis | Why this order |
+|---|---|---|---|
+| 1 | `-p 16384,32768,65536,100000 -n 0`, tensor, f16 KV | H13 | We have no data past 16k. Everything else is planned against a 7.8–15.9 min bracket |
+| 2 | `GGML_CUDA_CUBLAS_COMPUTE_TYPE=f32` vs `f16` at 16k | H18 | One run. If prefill doesn't move, prefill isn't GEMM-bound and cells 3 and 6 are dead ends |
+| 3 | `-ub 512/1024/2048` × `-b 2048/4096` at 16k | H14 | Cheap. A null result is positive evidence for H18 |
+| 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
+| 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
+| 6 | 9B single-GPU vs 27B, NIAH 8k→100k | H20 | Harness and fixtures already exist |
+| 7 | TurboPrefill build, 4 cells at 64k | H16 | Build cost; forces `-sm layer`, so report TTFT *and* decode |
+| 8 | Power cap 175→200 W | H15 | **Ask first** — deferred by standing instruction, and thermally the riskiest |
+| 9 | PFlash-style selection spike | H21 | Largest upside, largest cost. Gate on NIAH before quoting throughput |
+
+**Thermal note, and it is new.** A 100k prefill is 8–16 minutes of *sustained*
+compute — several times longer than any run this repo has done, and prefill loads
+the cards harder than decode. The 83 °C limit has never been tested under this
+profile. Monitor cell 1 actively; do not background it and walk away.
+
+**Reuse what exists.** `/root/niah_test/` has a working harness, generated
+fixtures at 8k/32k/64k/100k (single and multi-needle) and a July baseline for
+Qwen3.5-9B. `pflash-llama.cpp` ships a built `llama-niah` with fixtures to 128k.
+H20 and H21 are mostly re-runs, not new harness work.
+
 ### Deferred
-Context depths beyond 16k; power-limit experiment (175W vs 200W+ — log as a
-separate row, don't silently change the cap mid-matrix); fine-grained
+~~Context depths beyond 16k~~ — **now Phase 7 cell 1, the top priority**.
+Power-limit experiment (175W vs 200W+ — log as a separate row, don't silently
+change the cap mid-matrix) is **H15, and still needs explicit approval**; fine-grained
 row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
 
 ### Closed — do not spend runs here
@@ -346,6 +379,15 @@ row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
 | `GGML_CUDA_ALLREDUCE` tuning | Only butterfly runs on Pascal; `internal` and `none` are the same path. Use `none`. H10 |
 | Drafter placement (`-devd`) | Moves VRAM, not throughput. H11 |
 | `ik` `-sm graph` knobs (H12) | Low value now — `-sm tensor` beats graph on prefill at every depth and is within 8% on decode, and `ik` has no path to tensor split |
+| **PFlash** (as shipped) | Requires **sm_80+** — the `mean_K → score → select → sparse_fwd` kernels plus BSA target Ampere. No v2 exists. Architecturally unavailable regardless of the earlier quality verdict. The *technique* is reopened as H21 |
+| **vLLM / vllm-pascal / pascal-pkgs-ci** | vLLM needs cc ≥ 7.0; `vllm-pascal` is discontinued, its successor tops out at vLLM **0.10.0** and is "soft-broken due to PyTorch". 0.10 long predates `qwen35` hybrid-SSM support |
+| **SGLang, TensorRT-LLM, ExLlamaV3, ktransformers** | sm_75 / sm_80+ minimum |
+| **MLC-LLM / TVM** | No `qwen35` hybrid support; we would be writing GDN kernels in TVM with worse tooling, and MLC prefill trails llama.cpp where measured |
+| **tinygrad** | Not an inference engine — no GGUF loader, no gated-delta-net op, no hybrid-SSM support, no quantised Pascal kernels, no TP serving. Parity means rewriting the stack we already have |
+| **FlashQLA** | Hopper SM90 + TMA + warpgroup MMA only |
+| `GGML_CUDA_FORCE_MMQ` | `__dp4a` needs cc 6.1; P100 is 6.0. `mmq.cu:316` returns false unconditionally. Quantised prefill always goes dequant → cuBLAS |
+| `GGML_CUDA_F16` | Already effectively on — `ggml-cuda.cu:1626` picks `CUBLAS_COMPUTE_16F` for cc 600, and `prefer_f32_output` is set only for cc == 700 |
+| KV quant to reach 100k | Unnecessary: f16 KV at 100k is 6.25 GiB, and 100k fits VRAM. KV quant doesn't affect prefill at all |
 
 ### Unmeasured — do not quote
 

@@ -842,3 +842,63 @@ are not comparable to anything.
   measured best remains **29.26 t/s without P2P**.
 - `turbo3`/`q8_0` — queued, never ran.
 - Phase 1's single-GPU (`none`) leg on `UD-IQ3_S` — deferred by the operator.
+
+---
+
+## 2026-08-25 — Prefill/TTFT research pass (no runs)
+
+Research only, at the user's direction: *"What can we do for time to first token
+and prefill speeds on these GPUs?"* No benchmarks executed; the rig stayed idle.
+Output is [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md)
+plus H13–H21 and Phase 7.
+
+**Two defects found in our own measurement record**, both of which change how
+existing numbers should be read:
+
+1. **`run-bench.sh` passes prompt lengths to `-p`, not depths to `-d`.** Every
+   prefill figure in all 16 raw CSVs was taken at `n_depth = 0`. For a TTFT
+   question that is the right measurement, but it means **we have never prefilled
+   this model past 16,384 tokens**, and "200 t/s at 64k" was an extrapolation
+   that had entered conversation as a measurement.
+2. **Every prefill number is at `-ub 512` / `-b 2048`, the defaults.** Never
+   swept. No prefill figure in this repo is tuned.
+
+**Three findings from the source tree**, which matter more than anything found
+externally:
+
+- The target model is a **hybrid, not a transformer** — `full_attention_interval
+  = 4`, so only ~16 of 65 layers are full attention. This explains the flat
+  2k→16k prefill curve that nobody had questioned, caps what sparse attention
+  could ever buy, and makes 100k f16 KV only 6.25 GiB.
+- `gated_delta_net.cu:63` walks tokens **one at a time**, with the author's
+  `//TODO: Add chunked kernel for even faster pre-fill` at line 180. That kernel
+  runs ~49 of 65 layers and is the prime suspect for the prefill bottleneck (H18).
+- **MMQ is unavailable on P100** (`mmq.cu:316`, dp4a needs cc 6.1) and
+  **FP16 cuBLAS compute is already on** (`ggml-cuda.cu:1626`). Both closed at the
+  source level before a run was spent on either.
+
+**Externally:** [issue #25593](https://github.com/ggml-org/llama.cpp/issues/25593)
+— sm_60 is wrongly routed into the FP16 fast path, flipping ~1 in 20 greedy
+tokens, and **`buun` has merged the fix while our `mainline-rebased` has not**.
+Every cross-engine *quality* comparison in this repo is therefore confounded;
+throughput comparisons survive, the fix being throughput-neutral. This also
+bears on the "PFlash is too lossy" verdict, which was formed with the bug live.
+
+**PFlash is closed as a product** — it requires sm_80+ and there is no v2 — and
+**reopened as a technique** (H21): its sm_80 dependency is concentrated in the
+kernel that accelerates the *drafter*, not the one that saves the target's work.
+
+Also: the cards are **power-capped at 175 W of a 250 W default**, which is a
+prefill-specific tax since prefill is clock-bound and decode is bandwidth-bound.
+Logged as H15 and **not acted on** — power work above 175 W remains deferred
+pending an explicit decision.
+
+**Recovered prior data:** `/root/niah_test/` holds an unreferenced 8k→100k NIAH
+sweep from 2026-07-16 (Qwen3.5-9B, 12/12 needle hits per engine at every tier).
+It is the only long-context scaling data measured on these cards and now anchors
+the pessimistic end of the 64k/100k bracket. Note its `pflash_turbo3` rows are
+*not* PFlash working — `run_engine.py` passes no `--pflash-*` flags at all.
+
+Docs updated: README (Phase 7 + the open TTFT problem), HYPOTHESES (H13–H21),
+METHODOLOGY (hybrid architecture, the length-vs-depth defect, the hardware
+floor, the power cap), RUNBOOK (Phase 7 ordering, nine new closed lines).

@@ -262,6 +262,33 @@ has NCCL linked in. This is the open blocker — see H5.
 
 ## 4. Models
 
+### The target model is a hybrid, not a transformer — this drives everything
+
+`Qwen3.8-27B` (`general.architecture = qwen35`) GGUF metadata:
+
+```
+qwen35.block_count             = 65     qwen35.full_attention_interval = 4
+qwen35.ssm.state_size          = 128    qwen35.ssm.inner_size          = 6144
+qwen35.ssm.group_count         = 16     qwen35.ssm.conv_kernel         = 4
+qwen35.attention.head_count    = 24     qwen35.attention.head_count_kv = 4
+qwen35.attention.key_length    = 256    qwen35.attention.value_length  = 256
+```
+
+`full_attention_interval = 4` means **only ~16 of 65 layers are full attention;
+the other ~49 are gated-delta-net (linear attention).** Consequences:
+
+- **Prefill is near-linear in prompt length**, not quadratic — measured −6.4%
+  from 2k to 16k. Do not reason about this model with transformer intuitions.
+- **KV is small**: 16 layers × (4×256 + 4×256) × 2 B = **64 KiB/token** →
+  6.25 GiB at 100k, f16. **100k fits in VRAM without KV quantisation.**
+- **Sparse-attention techniques have a low ceiling here** — they can only touch a
+  quarter of the layers.
+- The ~49 GDN layers run `gated_delta_net.cu`, whose CUDA kernel walks tokens
+  **one at a time** (`for (int t = 0; t < n_tokens; t++)`, line 63) with an
+  author `//TODO: Add chunked kernel for even faster pre-fill` at line 180.
+  This is the prime suspect for the prefill bottleneck (H18).
+
+
 Target: **Qwen3.8-27B** — 27.32B dense params, 262k native context,
 architecture string `qwen35`, multimodal.
 
@@ -382,7 +409,7 @@ exception; `llama-bench` can't drive speculative decoding.)
 | `-t` | `8` | Thread count found irrelevant in prior work (6/8/10/12 within noise — fully GPU-bound). Fixed, not re-tuned |
 | `-ctk` / `-ctv` | `f16` | f16 KV was previously "mandatory" (q4_0 cost 31–58%). TurboQuant KV types tested separately per H4 |
 | `-r` | `3` | Mean ± stddev as `llama-bench` reports natively. Smoke tests used `-r 1` and are marked as such |
-| `-p` | `0,2048,4096,8192,16384` | Prefill depths to 16k. `-p 0` yields no output row — expected |
+| `-p` | `0,2048,4096,8192,16384` | Prompt **lengths** to 16k — *not* depths. `llama-bench` takes depth via `-d`, which we have never used, so `n_depth` is 0 in every raw CSV. See "Prefill is measured at length, not depth" below. `-p 0` yields no output row — expected |
 | `-n` | `128` | tg128, standard comparison point |
 | `-o` | `csv` | Machine-readable. Aggregated into `results/all-results.csv` |
 | `CUDA_VISIBLE_DEVICES` | `0,1` | Both P100s. Re-confirm enumeration each session — the chassis has been reconfigured before |
@@ -400,6 +427,52 @@ CUDA_VISIBLE_DEVICES=0,1 <engine-bin>/llama-bench \
 
 `scripts/run-bench.sh` wraps this — prefer it over running by hand, since it
 also handles telemetry, logging, and the commit/push protocol.
+
+### Prefill is measured at length, not depth — and only at `-ub 512`
+
+Two limits on every prefill number in this repo, both discovered 2026-08-25.
+
+**1. Length, not depth.** `-p N` prefills an N-token prompt into an *empty*
+cache. `-d N` prefills with N tokens already resident. We have only ever passed
+`-p`, so `n_depth` is 0 in all 16 raw CSVs. For "what does a cold prefill of N
+tokens cost", which is the TTFT question, `-p` is the correct measurement — but
+it means **we have no data at all past 16,384 tokens**, and nothing about the
+cost of extending an existing context.
+
+**2. `-ub 512`, always.** Every number was taken at the defaults `-ub 512` /
+`-b 2048`. The ubatch/batch sweep has never been run (H14). Do not describe any
+existing prefill figure as tuned.
+
+When quoting prefill, state the length and the ubatch. "208 t/s" alone is
+ambiguous and has already been extrapolated to 64k and 100k in conversation,
+where the honest bracket is 5.0–8.1 min and 7.8–15.9 min respectively.
+
+### Prefill has a hardware floor — check it before chasing a speedup
+
+Prefill is compute-bound at roughly `2 × N_params` FLOPs per token: **54
+GFLOP/token** for the 27B. Two P100s peak at **37.4 TFLOPS FP16** (18.7 each,
+stock 250 W). So:
+
+- 100k prefill at 100% of peak: **144 s**. Nothing beats this.
+- At a realistic 45–55% of peak: **260–320 s**.
+- Measured today: 208 t/s = **11.2 TFLOP/s = 30% of peak**.
+
+Any proposal claiming a large TTFT win at 100k must either reduce the token
+count prefilled, shrink the model, or skip the prefill (cache reuse). Kernel and
+flag tuning is bounded by the gap between 30% and ~55% of peak — worth roughly
+1.5–2×, not 10×.
+
+### The cards are power-capped at 175 W of a 250 W default
+
+```
+0, Tesla P100-PCIE-16GB, 175.00 W, default 250.00 W, max 250.00 W
+1, Tesla P100-PCIE-16GB, 175.00 W, default 250.00 W, max 250.00 W
+```
+
+This is a prefill-specific tax: prefill is clock-bound, decode is
+bandwidth-bound. Raising it is deferred by standing instruction and collides
+with the 83 °C rule (H15). **Never change the cap silently — record it as a
+column.**
 
 ### MTP measurement (Phase 2)
 
