@@ -1015,3 +1015,40 @@ covered only 2k/4k/8k.
 
 **Paused here at user request.** Next action when work resumes: Phase 7 cell 1
 (H13, the 100k curve at `-ub 2048`), then cell 2 (H18) to size H22.
+
+## 2026-08-26 — H13: the 100k curve, and the +63% doesn't survive to depth
+
+One run, `scripts/run-ubatch-sweep.sh`, `UB=2048`, `-p 16384,65536,100000
+-n 0 -r 1`. 1743 s, peak 70 °C, `results/raw/h13-prefill-depth-q4km.csv`.
+Committed and pushed (`6d10bb8`).
+
+| depth | t/s | TTFT |
+|---|---|---|
+| 16k | 327.1 | 50 s |
+| 64k | 250.1 | 4.4 min |
+| 100k | 215.4 | **7.7 min** |
+
+**H13 confirmed** (≥150 t/s at 100k) but the assumption it was framed against
+was wrong: prefill is not flat with `-ub 2048` at depth, it falls 34% from
+16k to 100k. H14's 8k gain (+63%) has mostly evaporated by 100k — 7.7 min
+lands near the *best case* of the old `-ub 512` bracket (7.8–15.9 min) that
+H14 was supposed to beat.
+
+**Opened H23** from this result: a GDN kernel's cost is linear in tokens and
+cannot on its own produce *falling* t/s with depth — something super-linear
+is responsible, and the arithmetic (GGUF: `embedding_length=5120`,
+`head_count=24`, `key_length=256` → attention width 6144) says the ~16
+full-attention layers' O(n²) cost is a plausible fit: ≈2.0 PFLOP at 100k,
+which alone would be ~11% of aggregate FP16 peak — lower than the "31% of
+peak" figure the standing linear FLOP estimate implies, and consistent with
+super-linear growth. **Not measured, arithmetic only — flagged as such in
+H23.** If it holds, it reverses README's "sparse attention has a low ceiling
+here" claim, which was argued from layer-count share (16/65) rather than
+FLOP-count share. Also revises H18: the GDN kernel and the attention
+quadratic term are probably both real, at different depths — GDN-bound
+short, attention-bound long. Next test for either is the same one: `nsys`
+per-kernel timing on a 100k prefill.
+
+**User: "no more tests today, document and commit."** All of the above
+written into HYPOTHESES.md (H13 result, H18 update, new H23) and README.md
+(TTFT table, hardware-floor and sparse-attention bullets). Paused here.
