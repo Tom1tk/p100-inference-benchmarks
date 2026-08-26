@@ -23,7 +23,7 @@ difficulty; almost every lever trades one against another:
 |---|---|
 | **100k context** | Fits VRAM at f16 KV (6.25 GiB). Never run past 16k |
 | **Highest possible decode** | 29.26 t/s at 16k (`tensor` + MTP) |
-| **Highest possible prefill / TTFT** | 347 t/s at 8k after H14. Unmeasured at depth |
+| **Highest possible prefill / TTFT** | 215.4 t/s / 7.7 min TTFT at 100k, measured (H13) |
 | **Output quality indistinguishable from baseline** | Not yet measured against anything |
 
 The fourth is the constraint that makes the other three hard, and it is the one
@@ -60,7 +60,7 @@ item: it is the lever that matches how the rig will actually be used.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H22)** | **Open — the current priority.** H14 confirmed (+63% from `-ub`); H16 and H21 withdrawn; H22 opened. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 and H23 opened, H23 reframes H22's priority. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
 
 ### Best measured configuration
 
@@ -71,8 +71,9 @@ Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 ```
 
 ⚠️ **`-ub 2048` is new (2026-08-25, H14) and its effect on decode is untested.**
-It is worth **+63% on prefill**; the 29.26 t/s decode figure below was measured at
-the old `-ub 512`.
+It is worth **+63% on prefill at 2–8k, but that gain largely evaporates by
+100k** (H13, 2026-08-26) — see below. The 29.26 t/s decode figure below was
+measured at the old `-ub 512`.
 
 **29.26 t/s decode · 198.4 t/s prefill at 16k context**, 73.3% draft acceptance.
 For comparison, the best layer-split configuration reaches 19.05 t/s and the
@@ -92,48 +93,47 @@ combination with MTP was never measured — **do not quote ~30 t/s.**
 | DFlash2 | Layer-split-only, so it cannot be used. See H8 |
 | AllReduce | `none`. `internal` needs Volta and silently falls back on Pascal |
 
-### The open problem: TTFT at 64k–100k
+### TTFT at 64k–100k — now measured, not projected
 
-Everything above optimises **decode at 4k–16k**. The workload target is 100k, and
-at that depth the binding constraint is prefill, which we have never measured
-past 16,384 tokens.
-
-**Updated 2026-08-25 — H14 moved these numbers substantially.** Prefill had only
-ever been measured at `-ub 512`, which the sweep found to be a local *minimum*.
-At `-ub 2048` the same rig does **357.5 t/s at 2k and 347.5 t/s at 8k, +63%.**
+**Updated 2026-08-26 — H13, real numbers at `-ub 2048`.** 1743 s run, peak
+70 °C, `results/raw/h13-prefill-depth-q4km.csv`:
 
 | | 16k | 64k | 100k |
 |---|---|---|---|
-| prefill t/s, old `-ub 512` | 208 (measured) | 128–208 (est.) | 102–208 (est.) |
-| TTFT, old `-ub 512` | 79 s | 5.0–8.1 min | 7.8–15.9 min |
-| **prefill t/s, `-ub 2048`** | **not yet measured** | — | — |
-| **TTFT if ~347 t/s holds** | **47 s** | **3.1 min** | **4.8 min** |
+| prefill t/s, `-ub 2048` | **327.1** | **250.1** | **215.4** |
+| TTFT, `-ub 2048` | **50 s** | **4.4 min** | **7.7 min** |
 
-The last row is a projection from an 8k measurement, not data — it assumes the
-gain survives to depth, where activation memory competes with a 6.25 GiB KV cache.
-**Re-measuring the curve at `-ub 2048` is Phase 7 cell 1** and is now the single
-highest-value run in the project.
+The 8k measurement's +63% gain (H14) does **not** hold at depth: prefill falls
+34% from 16k to 100k at the same settings. The 100k TTFT (7.7 min) lands close
+to the *best case* of the old `-ub 512` bracket (7.8–15.9 min) — most of H14's
+win is gone by the time it matters for the actual target.
 
 Three facts that bound every proposed fix:
 
-- **Hardware floor.** 54 GFLOP/token × 100k ÷ 37.4 TFLOPS = **144 s minimum**, at
-  100% of FP16 peak. A realistic 45–55% is 260–320 s. Tuning is worth ~1.5–2×,
-  not 10× — a step change requires prefilling *fewer tokens*, a *smaller model*,
-  or *cache reuse*. **H14 has now spent most of that tuning budget:** 347 t/s is
-  18.8 TFLOP/s, **52% of peak**, up from 30%. Treat further rate tuning as
-  low-yield and prioritise the work-reducing levers.
-- **The model is a hybrid.** `full_attention_interval = 4` — only ~16 of 65 layers
-  are attention. Prefill is near-linear (−6.4% from 2k to 16k), KV is only
-  64 KiB/token, and sparse-attention techniques have a low ceiling here.
-- **The gated-delta-net kernel is still the kernel-level suspect, and the fix
-  already exists.** Its grid contains no `n_tokens` — 1536 blocks whether the
-  prefill is 512 tokens or 100,000, with tokens as a sequential loop inside, in
-  scalar FP32 with no GEMM and no FP16. H14 *raised* its importance rather than
-  lowering it: the kernel is invariant to `-ub`, so the +63% came from the GEMM
-  side, and Amdahl makes GDN a bigger share of what remains. **The chunked
-  algorithm is already implemented as a ggml graph and every op it needs runs on
-  sm_60** — it is a ~2-line patch, not a kernel project. H18 sizes the prize, H22
-  collects it. See [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md).
+- **Hardware floor — revise downward.** The standing "54 GFLOP/token ×
+  100k ÷ 37.4 TFLOPS = 144 s minimum" figure is the linear `2×params`
+  approximation, and it is **wrong at 100k**: it treats attention as
+  negligible, true at the 2–8k depths it was fit against, false once
+  n (100,000) ≫ d_model (5120). A quadratic term this large changes what
+  "% of peak" and "tuning budget left" even mean at depth — see H23. Don't
+  quote the 52%/30%-of-peak figures for 100k; they were computed against the
+  wrong FLOP count.
+- **The model is a hybrid, and layer-count share is not FLOP-count share.**
+  `full_attention_interval = 4` — only ~16 of 65 layers are attention, which
+  is why sparse attention was written off as low-ceiling. **That reasoning
+  is now suspect at 100k specifically** (H23): those 16 layers' O(n²) cost
+  may dominate total prefill FLOPs at depth even though they're a minority of
+  layers. Back-of-envelope, not measured — see H23 before acting on it.
+- **The gated-delta-net kernel is still a real, separate suspect for the
+  short-context number, but is probably not what's causing the depth decay.**
+  Its grid contains no `n_tokens` and its cost is linear in tokens — a linear
+  kernel cannot on its own produce the *falling* t/s H13 just measured; only
+  a super-linear (quadratic) term can. H18 (GDN-bound) and H23
+  (attention-bound) are likely both true at different depths — GDN matters
+  more at 2–16k, attention more at 64k–100k. **The chunked GDN algorithm
+  already exists as a ggml graph and runs on sm_60** — still worth sizing
+  (H18) before building (H22), but H23 may be the bigger 100k-specific prize.
+  See [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md).
 
 Also newly known and not yet acted on: **the cards are power-capped at 175 W of a
 250 W default** — raising it is now **approved to a 220 W ceiling** (H15), blocked

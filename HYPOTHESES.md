@@ -815,6 +815,26 @@ VRAM at 100k is ~22.8 GB of 31.8 GB, so it fits (§2 of the research doc).
 **Watch:** the 83 °C limit. A 100k prefill is ~8–16 minutes of sustained
 compute, far longer than any run this repo has done. Do not leave it unmonitored.
 
+### Result — CONFIRMED, but the flat-curve assumption behind it was wrong (2026-08-26)
+
+`scripts/run-ubatch-sweep.sh`, `UB=2048`, `-p 16384,65536,100000 -n 0 -r 1`,
+`mainline-rebased 57affa09`, `-sm tensor`, `UD-Q4_K_M`, f16 KV,
+`ALLREDUCE=none`. 1743 s, peak 70 °C. `results/raw/h13-prefill-depth-q4km.csv`.
+
+| depth | t/s | TTFT |
+|---|---|---|
+| 16k | 327.1 | 50 s |
+| 64k | 250.1 | 4.4 min |
+| 100k | **215.4** | **7.7 min** |
+
+The numeric claim holds (215.4 ≥ 150 t/s), but the shape it was framed against
+does not: prefill is **not** flat with depth at `-ub 2048` (−34% from 16k to
+100k). H14's +63% gain at 2–8k has largely **evaporated by 100k** — the real
+100k TTFT (7.7 min) is close to the *best case* of the old `-ub 512` bracket
+(7.8–15.9 min) that H14 was supposed to beat. Whether the decay is shallower
+than the 9B July NIAH shape was not re-checked — deprioritized in favor of
+finding out *why* it decays (see H23, opened from this result).
+
 ---
 
 ## H14 — ubatch is mis-tuned for prefill
@@ -982,6 +1002,17 @@ path in the same tree *did* get its chunked kernel (`SSM_SSD_CHUNK_SIZE 256`).
 Three observations fit: prefill is flat 2k→16k (−6.4%), we sit at 30% of FP16
 peak, and upstream reports FP32 compute costs no prefill throughput.
 
+**Update 2026-08-26 — the flat-curve premise breaks at depth.** H13's real
+100k measurement shows −34% from 16k to 100k at the same `-ub`, not flat. A
+kernel whose cost is linear in tokens (this one) cannot produce *super-linear*
+time growth on its own — something else is scaling worse than linearly with
+depth. See H23: the arithmetic points at the ~16 full-attention layers'
+O(n²) cost, not the GDN kernel, as the better fit for the depth decay
+specifically. This doesn't clear H18 — the kernel is still sequential scalar
+FP32 with the author's own TODO — but it means H18 and H23 are probably both
+true at different depths: GDN-bound short, attention-bound long. Test both
+together, at 100k, not 16k.
+
 **Why it decides the plan:** if true, H14 and the whole family of quant/GEMM
 knobs are dead ends, and the largest lever we control is writing a chunked GDN
 kernel — plausibly **1.5–2.5× on those layers, ~1.3–1.7× end-to-end** (the
@@ -1068,6 +1099,58 @@ PFlash is now closed in every sense: **the product** (sm_80-only, §8 of the
 research doc), **the fork** (`pflash-llama.cpp` stays only as the source of the
 built `llama-niah` binary and its fixtures, which remain useful for H13 and H20),
 and **the technique** (this hypothesis).
+
+---
+
+## H23 — quadratic full-attention cost, not the GDN kernel, drives the depth decay
+
+**Claim:** at 100k tokens, the ~16 full-attention layers' O(n²) cost is a
+larger share of total prefill FLOPs than the linear GDN scan across the other
+49 — the opposite of what layer-count share (16/65 ≈ 25%) suggests, and the
+better explanation for H13's −34% decay from 16k to 100k.
+
+**Reasoning (arithmetic, not measured — opened from H13's result).** From the
+GGUF: `embedding_length = 5120`, `attention.head_count = 24`,
+`attention.head_count_kv = 4` (6× GQA), `attention.key_length =
+attention.value_length = 256`. Attention width = `head_count × key_length` =
+6144. Causal full-attention FLOPs per layer ≈ `2 × n² × 6144`; at n=100,000
+that's ≈1.23e14/layer, ×16 layers ≈ **2.0 PFLOP** for attention alone.
+
+The repo's standing "54 GFLOP/token" hardware-floor figure (§ README, § H13)
+is the linear `2 × params` approximation. It implicitly treats attention as
+negligible — true at the 2–8k depths H14 was measured at, false at 100k where
+n (100,000) ≫ d_model (5120). Sanity check against H13's real 100k number: if
+the 2.0 PFLOP attention term were the whole bottleneck, achieved rate =
+2.0e15 / 464s ≈ 4.3 TFLOP/s ≈ **11% of the 37.4 TFLOPS aggregate peak** — well
+below the "31% of peak" figure the linear estimate implies, and consistent
+with a term that grows faster than tokens (only quadratic attention can
+produce falling t/s from a decoder whose other layers are all O(n)).
+
+**Why it decides the plan, if true.** README currently says sparse attention
+"has a low ceiling here" because only 16/65 layers are attention — that
+reasoning used *layer count* share. If FLOP share flips at depth (16 layers
+could be >90% of prefill FLOPs at 100k, not ~25%), windowed/sparse attention
+on just those 16 layers — not a chunked GDN kernel (H22) — is the largest
+100k-specific prefill lever, while H18/H22 would still matter for decode and
+short-context prefill, where the quadratic term is small.
+
+**Caveat, stated plainly:** this is back-of-envelope arithmetic from GGUF
+metadata, done to sanity-check H13's result, not a measurement. It has not
+been isolated from the GDN kernel's own contribution, or from VRAM-pressure
+confounds at `-ub 2048` + a growing KV cache (H14 was never tested at depth
+either). Do not act on it as settled.
+
+**Test, cheapest first:**
+1. `nsys`/`ncu` per-kernel timing on a 100k prefill — this was already H18's
+   proposed test 3; it now separates GDN-bound from attention-bound time in
+   one profile instead of needing two hypotheses' worth of runs.
+2. Re-run H14's `f16`/`f32` GEMM-compute-type toggle (test 1) at 100k instead
+   of 16k — if prefill barely moves, the bottleneck at depth is not GEMM
+   (neither GDN's launch geometry nor attention's matmuls), which would argue
+   against this hypothesis.
+
+**Not started.** Opened 2026-08-26, ranked after H18/H22 since it changes
+which of those two is worth building.
 
 ---
 
