@@ -37,7 +37,7 @@ throughput win from a lossy technique has to clear a NIAH gate before it counts.
 |---|---|
 | **Context** | TurboQuant and other KV-cache quantisation; f16 baseline; cache reuse |
 | **Decode** | MTP, DFlash2, split mode, lower weight quantisation, P2P |
-| **Prefill / TTFT** | ubatch/batch (H14 ✓), chunked GDN (H22), power cap (H15), cache reuse (H19) |
+| **Prefill / TTFT** | ubatch/batch (H14 ✓), chunked GDN (H22 — crashes on `-sm tensor`), power cap (H15), cache reuse (H19) |
 | **Quality** | Quantisation tiers and speculative-decoding settings, benchmarked against baseline |
 
 **Deployment mitigation, decided 2026-08-25.** Long TTFT at 100k is partly a
@@ -60,7 +60,7 @@ item: it is the lever that matches how the rig will actually be used.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 and H23 opened, H23 reframes H22's priority. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; H20 reframed from a 9B fallback to a 27B-IQ3 single-card fallback. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
 
 ### Best measured configuration
 

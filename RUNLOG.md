@@ -1052,3 +1052,31 @@ per-kernel timing on a 100k prefill.
 **User: "no more tests today, document and commit."** All of the above
 written into HYPOTHESES.md (H13 result, H18 update, new H23) and README.md
 (TTFT table, hardware-floor and sparse-attention bullets). Paused here.
+
+## 2026-08-26 — H20 replaced (9B -> 27B IQ3), H22 tested: crashes on tensor split
+
+**H20 reframed at user request.** The 9B-on-one-card fallback defeated the
+point of the project — a different model isn't a fallback for "serve the
+27B". Replaced with Qwen3.8-27B-IQ3 on a single card: same model, aggressive
+quant, same single-GPU footprint the 9B version was chasing. Not started.
+
+**H22 run — one test, as requested, not a sweep.** Patched
+`dflash2-rebased/src/llama-context.cpp`: `getenv("LLAMA_GDN_FORCE_CHUNKED")`
+forces `cparams.fused_gdn_ch = false` after the auto-resolve block (has to go
+after — auto-resolve overwrites the value from its device probe regardless of
+what it was set to earlier). Env-gated, off by default, same pattern as the
+file's existing `LLAMA_GRAPH_REUSE_DISABLE`. Rebuilt `llama-bench` only
+(incremental, ~1 min). Not committed to the fork — local working copy, not
+pushed, per that repo's own AGENTS.md.
+
+One run: `-ub 2048 -b 2048 -p 16384 -n 0 -r 1 -sm tensor`, chunked path
+forced. **Crashed in graph allocation before the first token:**
+`GGML_ASSERT(ret.axis != GGML_BACKEND_SPLIT_AXIS_UNKNOWN)` in
+`ggml_backend_meta_get_split_state`. The chunked graph's ops aren't wired
+with split-axis metadata for `-sm tensor` — a different failure than the
+anticipated "loses without tensor cores" outcome; it never got far enough to
+measure that. Peak 50 °C, aborted in under 30 s, no thermal event.
+
+Doesn't settle whether the chunked algorithm is actually faster on sm_60 —
+only that it's unwired for our specific two-card split mode. Recorded in
+H20 and H22 in HYPOTHESES.md; not chased further today.
