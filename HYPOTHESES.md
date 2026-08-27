@@ -121,7 +121,10 @@ Needs a coherence/perplexity measure, not `llama-bench`. Define the measure
 before running, and note that the two models differ in more than quantizer
 (one is an "Uncensored" fine-tune), so this is suggestive rather than clean.
 
-**Status:** Untested. Confounded comparison — see caveat above.
+**Status:** Untested. Confounded comparison — see caveat above. **Scheduled as
+the last arm of Sweep Q in [QUALITY-PLAN.md](QUALITY-PLAN.md) §2.5**, behind the
+arms that can actually change the serve command, and only if there is appetite —
+it differs in fine-tune as well as quantizer, so it can suggest and never prove.
 
 ---
 

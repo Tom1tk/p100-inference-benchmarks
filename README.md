@@ -29,7 +29,7 @@ difficulty; almost every lever trades one against another:
 | **100k context** | **MET (H26).** Serves at 100k with `q8_0` KV and MTP, 12,147 MiB/card, 4,122 MiB/card spare |
 | **Highest possible decode** | **20.02 t/s at 100k** (H26); 27.41 at 16k, 29.39 at 16k/`-ub 512` (H24) |
 | **Highest possible prefill / TTFT** | **207.4 t/s / ~7.8 min TTFT at 100k** (H26); 310.5 t/s at 16k (H24) |
-| **Output quality indistinguishable from baseline** | **Still not measured against anything.** The only target with zero data |
+| **Output quality indistinguishable from baseline** | **Still not measured against anything.** The only target with zero data — planned as Phase 8 in [QUALITY-PLAN.md](QUALITY-PLAN.md), scheduled last on purpose |
 
 Three of the four now have numbers at the target depth, taken together in one
 run rather than inferred from separate ones. The fourth is the constraint that
@@ -86,7 +86,10 @@ Same config at 16k (H24): 27.41 t/s decode · 310.5 t/s prefill, 66.4%
 acceptance, 10,973 MiB/card. Going from 16k to 100k costs **27% of decode and
 33% of prefill**, and drops acceptance 6 points.
 
-Still unmeasured at any depth: **quality**. Everything above is speed.
+Still unmeasured at any depth: **quality**. Everything above is speed. It is
+planned in full in **[QUALITY-PLAN.md](QUALITY-PLAN.md)** (Phase 8) and is
+deliberately scheduled **last** — the remaining levers do not change what the
+model outputs, but they change how long it takes to measure it, by roughly 7x.
 
 `-ub 2048` **costs 6.7% of decode** against the old `-ub 512` (29.39 t/s /
 198.5 t/s / 73.3%) and buys **+56.4% of prefill**. The decode loss is not the
@@ -191,6 +194,7 @@ mode are confirmed applied.
 | [HYPOTHESES.md](HYPOTHESES.md) | H1–H24 — the open questions each run is meant to answer, with current status |
 | `Research/` | Deep-dive research documents, distilled into the hypotheses above |
 | [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 — the agentic web-build benchmark: port scheme, metrics, quality scoring |
+| [QUALITY-PLAN.md](QUALITY-PLAN.md) | Phase 8 — the quality gate: quant sweep, drafter equivalence check, baseline definition, abort rules. **Plan only, nothing run** |
 | [RESULTS.md](RESULTS.md) | Curated result tables, one section per phase |
 | [RUNLOG.md](RUNLOG.md) | Chronological log — what ran, what broke, what changed |
 | `results/all-results.csv` | Machine-readable aggregate of every run |
