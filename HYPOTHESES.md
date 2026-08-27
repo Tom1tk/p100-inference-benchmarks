@@ -1070,16 +1070,35 @@ is a much more aggressive quant than anything tested here so far, and the
 existing quality tooling (NIAH harness) was validated against the 9B, not
 against a 27B this low.
 
-**Test:** re-run the existing NIAH harness (`/root/niah_test/run_engine.py`,
-fixtures already generated) with `CUDA_VISIBLE_DEVICES=0` and an IQ3 GGUF of
-the 27B (needs quantising if not already on disk — check first), prefill at
-64k for the speed comparison, quality gate at the same depth.
+**Confirmed on disk (2026-08-26):** `/root/Qwen3.8-27B-UD-IQ3_S.gguf`,
+11,483 MiB (11.2 GiB). No quantising needed — this is a re-run, not a build.
 
-**Watch:** IQ3 27B size and 100k KV cache both need checking against 16 GB
-before assuming it fits — unlike the 9B case this hasn't been confirmed.
-Quality is the real question; NIAH single-needle is a weak proxy for agentic
-tool use — use the multi-needle fixtures (`niah_*_multi.jsonl`) and WEB_BENCH
-if this looks promising.
+**VRAM math, and it changes the depth this fallback can actually reach.** One
+P100 is 16,269 MiB. Weights alone leave **4,786 MiB** for KV + activations +
+overhead:
+
+| context | f16 KV size | fits in 4,786 MiB? |
+|---|---|---|
+| 64k | 4,096 MiB | barely — ~690 MiB left for activations, likely too tight at `-ub 2048` (H14 hit VRAM limits with far more headroom on two cards) |
+| 100k | 6,250 MiB | **no** — 1,464 MiB over budget at f16 KV |
+
+So as specced, this fallback **cannot reach 100k on one card at f16 KV** —
+it tops out somewhere below that, or needs a smaller `-ub`, or needs KV
+quantisation. The last option reopens the TurboQuant quality question this
+repo already priced at 14.3% of decode on the two-card config — worth
+revisiting here since removing KV quant may not be optional this time, not
+just a cost/benefit choice.
+
+**Test:** re-run the existing NIAH harness (`/root/niah_test/run_engine.py`,
+fixtures already generated) with `CUDA_VISIBLE_DEVICES=0`. First find the
+actual achievable depth at f16 KV (start at 32k, step up, watch VRAM — don't
+assume 64k fits until measured), then prefill speed at that depth for the
+comparison, then the NIAH quality gate at the same depth.
+
+**Watch:** quality is still the deeper question — IQ3 is a much more
+aggressive quant than anything tested here, and the NIAH harness was
+validated against the 9B, not a 27B this low. Use the multi-needle fixtures
+(`niah_*_multi.jsonl`) and WEB_BENCH if this looks promising.
 
 **Not started.**
 
