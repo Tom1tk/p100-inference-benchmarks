@@ -33,6 +33,10 @@ N_PREDICT="${N_PREDICT:-400}"
 CTK="${CTK:-f16}"
 CTV="${CTV:-f16}"
 REPS="${REPS:-3}"
+# H24: -ub/-b are server launch params, so a ubatch arm needs a reload.
+# Empty means "leave llama-server at its defaults" (-b 2048 -ub 512).
+BATCH="${BATCH:-}"
+UB="${UB:-}"
 PORT=8300
 LOAD_TIMEOUT=900
 ABORT_TEMP=83
@@ -103,6 +107,8 @@ SERVER_CMD=(
     -ctk "$CTK" -ctv "$CTV"
     -sm "$SPLIT" -c "$CTX"
 )
+[[ -n "$BATCH" ]] && SERVER_CMD+=( -b "$BATCH" )
+[[ -n "$UB"    ]] && SERVER_CMD+=( -ub "$UB" )
 if [[ "$DRAFTER" != none ]]; then
     SERVER_CMD+=( --spec-type "$SPEC_TYPE" -md "$DRAFTER" )
     [[ "$PLACEMENT" != default ]] && SERVER_CMD+=( -devd "$PLACEMENT" )
