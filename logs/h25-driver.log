@@ -5,3 +5,9 @@ hottest card: 51C
 === running: h25-iq3-1card-kv-q8 ===
 Qwen3.8-27B-UD-IQ3_S.gguf  ub=2048  b=2048  p=4096,16384  n=128  r=2  -sm none  dev=CUDA0  kv=q8_0/q8_0
 NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 354s | exit 0 | peak 69C ===
+--- results ---
+ split    kv  n_ubatch         test       t/s   stddev
+  none  q8_0      2048       pp4096    202.44     0.41
+  none  q8_0      2048      pp16384    184.13     0.30
+  none  q8_0      2048        tg128     11.21     0.00
