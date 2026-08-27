@@ -26,13 +26,15 @@ difficulty; almost every lever trades one against another:
 
 | Target | Currently |
 |---|---|
-| **100k context** | Fits VRAM at f16 KV (6.25 GiB). Never run past 16k |
-| **Highest possible decode** | 27.41 t/s at 16k at `-ub 2048`; 29.39 t/s at `-ub 512` (H24) |
-| **Highest possible prefill / TTFT** | 310.5 t/s at 16k (H24); 215.4 t/s / 7.7 min TTFT at 100k (H13) |
-| **Output quality indistinguishable from baseline** | Not yet measured against anything |
+| **100k context** | **MET (H26).** Serves at 100k with `q8_0` KV and MTP, 12,147 MiB/card, 4,122 MiB/card spare |
+| **Highest possible decode** | **20.02 t/s at 100k** (H26); 27.41 at 16k, 29.39 at 16k/`-ub 512` (H24) |
+| **Highest possible prefill / TTFT** | **207.4 t/s / ~7.8 min TTFT at 100k** (H26); 310.5 t/s at 16k (H24) |
+| **Output quality indistinguishable from baseline** | **Still not measured against anything.** The only target with zero data |
 
-The fourth is the constraint that makes the other three hard, and it is the one
-with the least data behind it today. It is why PFlash and DFlash v1 are excluded,
+Three of the four now have numbers at the target depth, taken together in one
+run rather than inferred from separate ones. The fourth is the constraint that
+makes the other three hard, and it is the one with **no** data behind it today —
+it is now the only thing standing between this repo and its deliverable. It is why PFlash and DFlash v1 are excluded,
 why TurboQuant's 14.3% decode cost was judged not worth 788 MiB, and why any
 throughput win from a lossy technique has to clear a NIAH gate before it counts.
 
@@ -65,18 +67,26 @@ item: it is the lever that matches how the rig will actually be used.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; H24 priced `-ub 2048`'s decode cost at 6.7% and kept it; **H20/H25 closed 2026-08-27 — a single P100 is not feasible for real-world use** (56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k), and H25 corrected the KV-quant penalty from 14.3% to 1.5%. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; **H26 served the target depth end to end for the first time (20.02 t/s decode, 207.4 prefill, 12,147 MiB/card, 70 C sustained)**; H24 priced `-ub 2048`'s decode cost at 6.7% and kept it; **H20/H25 closed 2026-08-27 — a single P100 is not feasible for real-world use** (56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k), and H25 corrected the KV-quant penalty from 14.3% to 1.5%. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
 
 ### Best measured configuration
 
 ```
 mainline-rebased (57affa09)  ·  -sm tensor  ·  GGML_CUDA_ALLREDUCE=none
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
--ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -b 2048 -ub 2048
+-ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1
 ```
 
-**Measured end to end at 16k (H24, 2026-08-27): 27.41 t/s decode · 310.5 t/s
-prefill**, 66.4% draft acceptance, 10,973 MiB/card.
+**Measured end to end at 100k (H26, 2026-08-27): 20.02 t/s decode · 207.4 t/s
+prefill**, 60.3% draft acceptance, 12,147 MiB/card, 70 C peak, ~7.8 min TTFT.
+This is the first time the target depth has been served rather than simulated,
+and it leaves **4,122 MiB/card spare** — `q4_0` KV is not needed.
+
+Same config at 16k (H24): 27.41 t/s decode · 310.5 t/s prefill, 66.4%
+acceptance, 10,973 MiB/card. Going from 16k to 100k costs **27% of decode and
+33% of prefill**, and drops acceptance 6 points.
+
+Still unmeasured at any depth: **quality**. Everything above is speed.
 
 `-ub 2048` **costs 6.7% of decode** against the old `-ub 512` (29.39 t/s /
 198.5 t/s / 73.3%) and buys **+56.4% of prefill**. The decode loss is not the

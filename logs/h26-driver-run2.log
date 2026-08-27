@@ -1,0 +1,8 @@
+
+########## h26-100k-mtp-kvq8 (KV q8_0/q8_0, drafter draft-mtp) ##########
+=== h26-100k-mtp-kvq8 === (idle 50C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -sm tensor -c 100000 -b 2048 -ub 2048 -np 1 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 20s | VRAM 12147/12147 MiB
+  rep1: decode 20.00 t/s | prefill 207.71 t/s | accept 257/426 = 60.3% | peak 70C
+  rep2: decode 20.03 t/s | prefill 207.13 t/s | accept 257/426 = 60.3% | peak 70C
+ARM A SUCCEEDED: q8_0 KV + MTP serves at 100k. Skipping arms B and C.

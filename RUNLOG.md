@@ -1248,3 +1248,77 @@ The 100k NIAH quality gate (the fourth objective still has zero data), H19
 confounds every quality comparison), H15 (power cap, gated on the user's
 in-person PSU meter check), and now **q8_0 KV on the two-card 100k config** —
 newly cheap, and not yet run.
+
+---
+
+## 2026-08-27 — H26: the config actually serves at 100k
+
+**The rig serves the target depth.** `-c 100000 -ub 2048 -sm tensor -ctk q8_0
+-ctv q8_0` with the MTP drafter: **20.02 t/s decode, 207.4 t/s prefill, 60.3%
+acceptance, 12,147 MiB/card, 70 C peak, ~7.8 min TTFT.** Two reps, arm A only —
+it fit, so the `q4_0` and no-drafter fallbacks never ran.
+
+Until today every serve-side number in this repo was 16k. H13's `pp100000` was
+`llama-bench`: no drafter, no server, no decode, no VRAM, no thermals. The
+config had never been shown to *load* at 100k, let alone run.
+
+### Five gaps closed on one request
+
+1. **It fits** — 12,147 MiB/card, ~4.1 GiB spare. The pre-run estimate was
+   12.0–12.5 GiB, so the memory model is sound. `q4_0` KV withdrawn as
+   unnecessary.
+2. **Decode at 100k: 20.02 t/s** — 73% of the 16k figure.
+3. **Acceptance at 100k: 60.3%** — and it is **not monotonic in depth**: 40.1%
+   at 4k, 66.4% at 16k, 60.3% at 100k. It peaks in the middle. No drafter
+   conclusion transfers across depths in either direction.
+4. **`q8_0` KV works on two cards**, as H25 predicted from one card. The 100k
+   cache cost ~1,174 MiB/card against ~2,350 at f16.
+5. **Sustained thermals are a non-issue** — 70 C across two consecutive
+   ~8-minute prefills, identical to the 3-minute 16k runs, 13 C under the abort
+   limit. The 175 W cap is doing the work. This was the run's real risk and it
+   did not materialise.
+
+**Cross-harness agreement, checked for the first time.** `llama-server` gave
+207.4 t/s prefill at 100k against `llama-bench`'s 215.4 — 96% agreement on
+different days with different tooling. The gap is about what the chat template
+and HTTP path should cost.
+
+### The hypothesis missed its own threshold
+
+H26 claimed decode would stay within 25% of the 16k figure. It is **26.9%**
+down. Recorded as a miss rather than rounded away — but the question the run
+existed to answer is settled, and the answer is yes.
+
+### A harness bug that looked like a model failure
+
+The first attempt loaded fine and then returned HTTP 500 with
+`parse error ... attempting to parse an empty input` on both reps. Nothing to do
+with VRAM or the model: the ~340 KB prompt was passed through **argv** to
+`python3 -c` and then to `curl -d`, which overflows **E2BIG**, so curl posted an
+empty body. Worse, `run-spec-placement.sh` returned 0 after every rep failed, so
+the arm ladder cheerfully printed "ARM A SUCCEEDED" over two failures.
+
+Both fixed: the request body is built once to `logs/<label>.payload.json` and
+posted with `-d @file`, and the script exits non-zero when no rep produces a
+measurement. The two `FAILED(request)` rows are kept in the CSV — they are a
+real recorded failure and the `outcome` column explains them. Cost: ~4 minutes
+of GPU, caught on the first arm.
+
+**Lesson worth keeping:** a 500 from the server is not evidence about the model
+until the request that produced it has been shown to be well-formed.
+
+### A predicted limitation that did not appear
+
+I expected rep 2's prefill to be contaminated by slot-level LCP prefix reuse —
+the trap that invalidated the whole H11 prefill column. It was not: 207.13 vs
+rep 1's 207.71, so prefill was genuinely re-done and both reps are valid. The
+H11 trap is therefore not universal. **Cause unconfirmed** — `-np 1` with
+`kv_unified = false` is the obvious suspect, but this run did not isolate it, so
+`cache_prompt: false` still should not be trusted on its own.
+
+### What this leaves
+
+Three of the four objectives now have numbers **at the target depth, from a
+single run**. The fourth — quality — still has none, at any depth, and is now
+the only thing between this repo and its deliverable. The next question is not
+how fast this rig is; it is whether what it produces at 100k is worth reading.

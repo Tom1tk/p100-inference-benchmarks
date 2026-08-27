@@ -444,12 +444,19 @@ only when the stated unblock happens.
 on two independent counts — speed and context ceiling — before quality was ever
 measured. Do not propose single-card arms again.
 
-**What is actually left that can change the serve command:** the 100k NIAH
-quality gate (the fourth objective has *no* data at all), H19 (prompt-cache
-reuse — a flag, not a sweep), H17 (the sm_60 arithmetic bug, which confounds
-every quality comparison), H15 (power cap, gated on the user's PSU check), and
-one newly-cheap item H25 handed us: **`q8_0` KV on the two-card 100k config**,
-which should halve the 6,250 MiB cache for ~1.5% of decode.
+**H26 (2026-08-27) closed the largest gap:** the deliverable config now serves
+at 100k — 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card,
+70 C sustained. That also settled `q8_0` KV on two cards, decode at depth, and
+the sustained-thermal question, and it retired the `-ctk q4_0` fallback as
+unnecessary.
+
+**What is actually left that can change the serve command:** the 100k **NIAH
+quality gate — now the only objective with no data at all, and the top item**;
+H19 (prompt-cache reuse — a flag, not a sweep); H17 (the sm_60 arithmetic bug,
+which confounds every quality comparison); H15 (power cap, gated on the user's
+PSU check); and a **drafter re-rank at the current config** — every MTP-vs-DFlash2
+comparison was taken at `-ub 512`/4k/layer, where DFlash2 won, and H26 showed
+acceptance is not monotonic in depth.
 That is a much shorter list than the hypothesis count suggests, and it is the
 list to work from.
 
