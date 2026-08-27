@@ -1,0 +1,19 @@
+0.00.035.030 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.035.979 W srv  llama_server: -----------------
+0.00.035.983 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.035.983 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.035.984 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.035.984 W srv  llama_server: -----------------
+0.00.037.326 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+0.00.037.503 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+2.47.582.669 I cmn          init: llama threadpool init, n_threads = 8
+2.47.949.617 I common_speculative_init_result: loading draft model '/root/mtp-Qwen3.8-27B-Q4_0.gguf'
+3.01.394.433 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 100096, kv_unified = 'false'
+3.01.394.615 W set_sampler: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU
+3.01.394.619 W spec common_specu: backend offload failed for seq_id=0; using CPU sampler
+3.01.510.981 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+3.01.534.807 I srv  llama_server: model loaded
+3.01.534.816 I srv  llama_server: listening on http://127.0.0.1:8300
+3.10.190.158 W srv    operator(): got exception: {"error":{"code":500,"message":"[json.exception.parse_error.101] parse error at line 1, column 1: attempting to parse an empty input; check that your input string or stream contains the expected JSON","type":"server_error"}}
+3.11.726.367 W srv    operator(): got exception: {"error":{"code":500,"message":"[json.exception.parse_error.101] parse error at line 1, column 1: attempting to parse an empty input; check that your input string or stream contains the expected JSON","type":"server_error"}}
+3.11.759.504 I srv    operator(): operator(): cleaning up before exit...
