@@ -1052,26 +1052,36 @@ list** for the stated use case, and it costs nothing but a flag.
 
 ---
 
-## H20 — a smaller model on a single P100
+## H20 — a lower-quant 27B on a single P100
 
-**Claim:** Qwen3.5-9B on one P100 delivers ≥2× the 27B's prefill at 64k with NIAH
-quality acceptable for the target workload.
+**Superseded 2026-08-26 (user call).** Originally framed around Qwen3.5-9B —
+withdrawn: a different model isn't a fallback for "serve the 27B", it's a
+different deliverable. **Replaced with a same-model fallback:** Qwen3.8-27B
+at **IQ3** quantisation, which fits on a single 16 GB card, same as the 9B did.
+This keeps the fallback on the actual target model.
 
-**Reasoning:** prefill FLOPs scale with parameter count, so a 9B should prefill
-~3× faster than a 27B at equal efficiency; a single card halves that, leaving
-~1.5×, plus whatever is recovered by removing all cross-GPU traffic. **We already
-hold half the data:** the July NIAH runs measured the 9B on two cards at 234.7 t/s
-at 64k and 187.9 t/s at 100k, scoring 12/12 needle hits at every tier and depth.
+**Claim:** Qwen3.8-27B-IQ3 on one P100 delivers ≥2× the two-card `UD-Q4_K_M`'s
+prefill at 64k, at NIAH quality acceptable for the target workload.
+
+**Reasoning:** single-card removes all cross-GPU tensor-split traffic, and
+IQ3 is roughly half the weight bytes of Q4_K_M, so both the memory-bandwidth
+and PCIe-transport terms shrink. The open question is entirely quality — IQ3
+is a much more aggressive quant than anything tested here so far, and the
+existing quality tooling (NIAH harness) was validated against the 9B, not
+against a 27B this low.
 
 **Test:** re-run the existing NIAH harness (`/root/niah_test/run_engine.py`,
-fixtures already generated) with `CUDA_VISIBLE_DEVICES=0`, and add a 27B leg for
-the comparison the July runs lack. The harness and fixtures exist; this is
-mostly a re-run.
+fixtures already generated) with `CUDA_VISIBLE_DEVICES=0` and an IQ3 GGUF of
+the 27B (needs quantising if not already on disk — check first), prefill at
+64k for the speed comparison, quality gate at the same depth.
 
-**Watch:** 9B Q4_K_XL is ~5.5 GB, plus 100k KV — comfortable in 16 GB. Quality is
-the real question, and NIAH single-needle is a weak proxy for agentic tool use.
-Use the multi-needle fixtures (`niah_*_multi.jsonl`) too, and the WEB_BENCH
-scenario if this looks promising.
+**Watch:** IQ3 27B size and 100k KV cache both need checking against 16 GB
+before assuming it fits — unlike the 9B case this hasn't been confirmed.
+Quality is the real question; NIAH single-needle is a weak proxy for agentic
+tool use — use the multi-needle fixtures (`niah_*_multi.jsonl`) and WEB_BENCH
+if this looks promising.
+
+**Not started.**
 
 ---
 
@@ -1217,6 +1227,50 @@ a throughput number — the two paths are different arithmetic.
 **Either result is worth having.** A win is a large free speedup. A loss explains
 the Turing+ gate and closes the last kernel-level lever, leaving only the power cap
 and the work-reducing levers.
+
+### Result — FAILED, crashes before running (2026-08-26)
+
+Patched `src/llama-context.cpp`: `if (getenv("LLAMA_GDN_FORCE_CHUNKED")) cparams.fused_gdn_ch = false;`
+right after the auto-resolve block (it has to run *after* — auto-resolve
+unconditionally overwrites `fused_gdn_ch` from its device-support probe, so
+setting it earlier is a no-op). Env-gated, off by default, matches the
+codebase's existing debug-flag pattern (same file already has
+`LLAMA_GRAPH_REUSE_DISABLE`). Rebuilt `llama-bench` only (incremental, ~1 min).
+
+One run: `LLAMA_GDN_FORCE_CHUNKED=1 llama-bench -ub 2048 -b 2048 -p 16384
+-n 0 -r 1 -sm tensor`, same params as H13's 16k measurement for direct
+comparison. **Crashed during graph allocation, before the first token:**
+
+```
+GGML_ASSERT(ret.axis != GGML_BACKEND_SPLIT_AXIS_UNKNOWN) failed
+  ggml_backend_meta_get_split_state(...)
+  ggml_backend_meta_buffer_init_tensor_impl(...)
+  ggml_gallocr_alloc_graph(...)
+  llama_context::process_ubatch(...)
+```
+
+**Verdict: the chunked graph's ops (`cumsum`/`tri`/`solve_tri`/etc.) don't
+carry split-axis metadata for `-sm tensor`.** The fused kernel is wired for
+tensor-split across two GPUs; the chunked graph, exercised elsewhere only on
+backends that don't do tensor-split, isn't. This is a **different failure
+than the anticipated one** — it's not that the chunked path is slow or that
+Pascal loses without tensor cores (the Turing+-gate worry), it never gets far
+enough to measure that. Peak temp 50 °C — aborted in <30 s, no thermal risk.
+
+**Does not settle the underlying question.** The chunked algorithm may still
+be faster on sm_60; this only shows it's unwired for our specific split mode.
+Two ways forward, neither attempted (user paused further chasing on this):
+1. Re-test with `-sm none` (single GPU, no split) or `-sm layer` — if it runs
+   there, the win/loss question becomes answerable, just not in the winning
+   two-card config, which limits how directly it transfers.
+2. Add split-axis annotation for the missing ops — real engineering, not a
+   2-line patch anymore; the "cheap to test" framing this hypothesis opened
+   with no longer holds.
+
+**Not committed to the fork** (`dflash2-rebased` is a local working copy, not
+pushed per this repo's own contribution rules); the 3-line patch is left in
+place, inert unless `LLAMA_GDN_FORCE_CHUNKED` is set, for whoever re-attempts
+this.
 
 **Ordering:** run **H18 first** (`GGML_CUDA_CUBLAS_COMPUTE_TYPE`, at `-ub 2048`).
 H18 sizes the prize; H22 collects it. Running H22 blind risks spending a rebuild
