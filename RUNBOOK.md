@@ -451,7 +451,11 @@ the sustained-thermal question, and it retired the `-ctk q4_0` fallback as
 unnecessary.
 
 **What is actually left that can change the serve command:** the 100k **NIAH
-quality gate — now the only objective with no data at all, and the top item**;
+quality gate — now the only objective with no data at all. Planned in full in
+[QUALITY-PLAN.md](QUALITY-PLAN.md) (Phase 8) and deliberately scheduled LAST**,
+because the levers below do not change what the model outputs but do change how
+long it takes to measure it — a ~2 h sweep with prompt-cache reuse against ~14 h
+without;
 H19 (prompt-cache reuse — a flag, not a sweep); H17 (the sm_60 arithmetic bug,
 which confounds every quality comparison); H15 (power cap, gated on the user's
 PSU check); and a **drafter re-rank at the current config** — every MTP-vs-DFlash2
@@ -516,3 +520,20 @@ target is the binding constraint and has the least data behind it; a throughput 
 from a lossy technique does not count until it clears a NIAH gate.
 
 See [README.md](README.md#the-objective) for the full statement and the lever map.
+
+### Phase 8 — the quality gate
+
+**Planned, not started.** See **[QUALITY-PLAN.md](QUALITY-PLAN.md)** for the
+full design: two sweeps (quants, drafters), the baseline definition, fixture
+shape, abort rules and order of operations.
+
+Three things from it that belong here because they constrain *other* phases:
+
+1. **H17 must be settled before any quality run.** It changes model numerics, so
+   landing it afterwards invalidates the whole sweep.
+2. **H19 is worth ~10x on the sweep's cost**, not just on the agentic loop. It is
+   a prerequisite, not a nice-to-have.
+3. **The drafter sweep is an equivalence check, not a quality sweep.** Greedy
+   speculative output is a property of the target model; four drafters should
+   produce four identical hashes in ~45 min. If they do, drafters are ranked on
+   speed alone, permanently.
