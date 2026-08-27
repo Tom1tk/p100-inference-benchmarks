@@ -32,6 +32,7 @@ run label so the evidence is traceable.
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | **Tried 2026-08-26, crashes** under `-sm tensor` (chunked ops carry no split-axis metadata). Now a kernel project, not a flag — **parked by rule zero** |
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
+| H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **RUNNING 2026-08-27** — first serve-side 100k measurement in the repo |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 
 ---
@@ -1533,3 +1534,59 @@ use.** The proposed follow-up — MTP at a smaller `-ub` — was declined and is
 not turn on it. Even the optimistic outcome (~15 t/s) leaves the fallback below
 the two-card drafter-free number while giving up prefill as well, and the
 pessimistic outcome is another OOM. Do not spend runs on single-GPU serving.
+
+
+---
+
+## H26 — does the config actually serve at 100k?
+
+**Claim:** `-c 100000 -ub 2048 -sm tensor -ctk q8_0 -ctv q8_0` with the MTP
+drafter loads and serves on two P100s, and decode at 100k stays within 25% of
+the 16k figure (27.41 t/s).
+
+**Why this outranks everything else open.** The objective is 100k. Every
+serve-side number in this repo is 16k. H13's `pp100000 = 215.4 t/s` came from
+`llama-bench`: no drafter, no server, no decode, no VRAM figure, no acceptance,
+no thermal profile. **We have never established that the deliverable config
+loads at 100k at all.** If it does not, the quant sweep and the quality gate are
+both aimed at the wrong config, and every hour spent on them is wasted.
+
+**Five open gaps close on one request,** which is why this is worth a long run
+under the electricity rule:
+
+1. Does it load? (VRAM at 100k, never measured)
+2. Decode at 100k (never measured above 16k)
+3. MTP acceptance at 100k (it moved 40.1% -> 73.3% from 4k to 16k; unknown at 100k)
+4. `q8_0` KV on **two** cards (H25 measured it on one)
+5. Sustained thermals — 100k prefill is ~8 min of continuous compute against an
+   83 C limit, and nothing here has ever run hot for more than ~3 min
+
+**VRAM arithmetic, done before spending the power.** H24 at 16k with MTP and f16
+KV used 10,973 MiB/card. The repo's figure for a 100k f16 KV cache is ~6,250 MiB
+total, so 16k f16 is ~512 MiB/card and the non-KV base is ~10,461 MiB/card. At
+100k with `q8_0` that base carries ~1,563 MiB/card of cache, landing near
+**12.0-12.5 GiB of the 15.9 GiB available**. It should fit, with the compute
+buffers as the main uncertainty. `-np 1` is passed explicitly: the server
+defaults to `n_slots = 4`, and a four-slot allocation at this depth is a
+needless risk.
+
+**Arms are a ladder, not a sweep** (`scripts/run-h26-100k-serve.sh`). Each runs
+only if the one above it failed:
+
+| Arm | KV | Drafter | Runs when |
+|---|---|---|---|
+| A | `q8_0` | MTP | always — this is the config we want |
+| B | `q4_0` | MTP | only if A cannot fit. H25 showed q4_0 is no faster than q8_0, so this is purely a VRAM fallback |
+| C | `q8_0` | none | only if both drafter arms fail — establishes whether 100k is reachable at all |
+
+**Prompt:** `prompts/h26-100k-prompt.txt`, 97,620 tokens of real llama.cpp
+source plus this repo's docs, ending in a question that requires reading the
+code. Real corpus rather than repeated filler, because repetition would flatter
+the drafter's acceptance rate and this rig is meant for coding at depth.
+
+**Known limitation:** `REPS=2`, and rep 2's *prefill* number will be
+contaminated by the server's slot-level LCP prefix reuse — the same trap that
+invalidated the H11 prefill column. Rep 1 is the honest prefill measurement.
+Rep 2 is kept anyway because decode is unaffected by prefix reuse, and because
+a second 8-minute prefill doubles the sustained-thermal exposure, which is
+itself one of the five things being measured.
