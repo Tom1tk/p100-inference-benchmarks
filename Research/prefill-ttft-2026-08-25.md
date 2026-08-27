@@ -376,7 +376,7 @@ and the most work. See H21, and note it is gated on NIAH, which we already have.
 | **Chunked GDN kernel** | Yes, but it's a build | §3. Largest lever we control. |
 | ~~**Speculative prefill**~~ | **No — closed** | §5.3. sm_80-only, no v2; H21's hand-port withdrawn 2026-08-25. |
 | **Sparse attention (MInference, XAttention, FlexPrefill)** | Marginal | All target the quadratic term, which here is ~16 of 65 layers. All ship sm_80+ kernels. Low ceiling, high cost. |
-| **Smaller model** | **Yes** | User explicitly opened this. See H20. |
+| ~~**Smaller model**~~ | **No — closed 2026-08-26** | User call: a different model is a different deliverable, not a fallback. H20 is now the same 27B at IQ3_S on one card, which cuts bytes but **not** prefill FLOPs — so it is no longer a prefill lever at all. |
 | **KV quantisation** | Doesn't help prefill | Already refuted for decode (H4). Not needed for 100k memory either (§2). |
 | **Chunked prefill (interactivity)** | No | Reorders work, doesn't reduce it. |
 
@@ -416,7 +416,7 @@ Full text in `HYPOTHESES.md`. Ordered by (value ÷ cost).
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | 1 server config |
 | H15 | 175→220 W lifts prefill ≥15%, decode <3% | approved; gated on a manual PSU check |
 | H16 | TurboPrefill nets a TTFT win at 64k despite forcing `-sm layer` | build + matrix |
-| H20 | A 9B on one P100 beats the 27B's TTFT by ≥2× at 64k at acceptable NIAH quality | 1 run, data partly exists |
+| H20 | ~~A 9B on one P100 beats the 27B's TTFT by ≥2×~~ — **reframed 2026-08-26** to 27B-IQ3_S on one card as a viability/decode question, not a prefill one | 1 run, data partly exists |
 | ~~H21~~ | ~~PFlash-style token selection is portable to sm_60~~ | **Withdrawn 2026-08-25** |
 
 ---

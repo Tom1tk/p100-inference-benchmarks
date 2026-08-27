@@ -59,3 +59,8 @@ p3-buun-mtp-16k-h7,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,24.76,177.68,40
 p3-buun-mtp-16k-t3t3,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,24.12,177.31,400,328,250,76.2,9637,11127,70,10,ok
 p3-buun-mtp-16k-t3t3,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,23.84,178.08,400,316,241,76.3,9637,11127,70,10,ok
 p3-buun-mtp-16k-t3t3,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,24.32,178.11,400,308,244,79.2,9637,11127,70,10,ok
+h24-ub512-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,29.37,198.19,400,374,274,73.3,10235,10235,66,20,ok
+h24-ub512-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,29.43,198.66,400,374,274,73.3,10235,10235,66,20,ok
+h24-ub512-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,29.36,198.65,400,374,274,73.3,10235,10235,67,20,ok
+h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,27.43,310.79,400,399,265,66.4,10973,10973,66,10,ok
+h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,27.38,310.65,400,399,265,66.4,10973,10973,67,10,ok
