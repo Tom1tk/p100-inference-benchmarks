@@ -64,3 +64,4 @@ h24-ub512-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,29.43,198.66,400
 h24-ub512-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,29.36,198.65,400,374,274,73.3,10235,10235,67,20,ok
 h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,27.43,310.79,400,399,265,66.4,10973,10973,66,10,ok
 h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,27.38,310.65,400,399,265,66.4,10973,10973,67,10,ok
+h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,27.42,310.13,400,399,265,66.4,10973,10973,68,10,ok
