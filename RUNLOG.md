@@ -1145,3 +1145,45 @@ removing all cross-GPU traffic actually helps.
 This also demotes H20 in the Phase 7 framing paragraph, which listed H19 and H20
 as the only remaining levers that reduce the amount of work done. H20 no longer
 reduces work. H19 is now the only one.
+
+## 2026-08-27 — H25: the IQ3_S single-card fallback, and a KV-quant prior that was wrong
+
+Three single-GPU arms at <=16k (`scripts/run-h25-iq3-single.sh`). Sized under the
+new run-economy rules: `-sm` not swept (a no-op on one card), the two-card
+control arms cited from H13/H24 instead of re-run, `-ub 512` cut as settled, reps
+at 2. Roughly 18 min of one card instead of the ~45 the first design would have
+burned across two.
+
+**Single card vs the pair at 16k:** prefill 184.1 vs 327.1 t/s (**56%**), decode
+drafter-free 10.4 vs 19.75 t/s (**53%**). Against the actual working config with
+MTP (27.41 t/s) the fallback is at **38%**.
+
+**MTP does not fit on one card**, and that is the finding that decides H20. The
+drafter loaded at 16,029 MiB of 16,269 and then OOM'd in `ggml_cuda_pool_vmm::alloc`
+on the first request — 240 MiB is not enough for the `-ub 2048` compute buffer.
+This was already with q8_0 KV, so the obvious mitigation was spent. The fallback
+loses the +48% decode lever, which is why the honest gap is 38%, not 53%.
+
+**The unexpected result: KV quantisation is nearly free on this rig.** At `-ub 2048`
+on one card, pp16384 is 183.80 (f16) / 184.13 (q8_0) / 184.05 (q4_0) — inside
+0.2% — and tg128 is 11.38 / 11.21 / 11.18, so **1.5% of decode**. q4_0 buys
+nothing over q8_0.
+
+The repo has been carrying H4's **14.3% decode cost** as the price of KV
+quantisation. That number was measured on **TurboQuant**, and has been quoted
+since as though it applied to KV quantisation generally. It does not. Stock
+`q8_0` costs 1.5%.
+
+**This matters for the two-card 100k target, not just the fallback.** q8_0 should
+halve the 100k KV cache from 6,250 to ~3,125 MiB for ~1.5% of decode — the
+cheapest headroom available, refused until now on the strength of a number
+measured on a different technique. Corrected in H4 and H25.
+
+Incidentally the run reconfirmed H24 from the other direction: drafter-free
+decode is 11.41 t/s at `-ub 512` and 11.38 at `-ub 2048`. A 4x ubatch change
+moves decode 0.3% once the drafter is out of the picture, which is exactly the
+null H24 predicted.
+
+**Parked, needs a go-ahead:** whether MTP fits on one card at a smaller `-ub`.
+One short arm, and it decides whether the fallback decodes at 10.4 or ~15 t/s,
+but it is an OOM-margin question that arithmetic cannot settle.
