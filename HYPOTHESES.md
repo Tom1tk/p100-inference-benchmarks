@@ -32,6 +32,7 @@ run label so the evidence is traceable.
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | Untested — **the last kernel-level lever** |
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
+| H25 | IQ3_S on one P100 vs the pair at <=16k | **MEASURED 2026-08-27 — 56% of the pair's prefill, 53% of its drafter-free decode, and MTP OOMs so the real gap is 38%. Bonus: `q8_0` KV costs 1.5% of decode, not H4's 14.3%** |
 
 ---
 
@@ -1402,3 +1403,76 @@ the figure can now be quoted against the current env.
 **Not tested:** whether the acceptance drop persists at 64k–100k (it may grow or
 vanish — H1 showed acceptance is strongly depth-dependent), and whether the
 +738 MiB activation arena is affordable once a 100k KV cache is resident.
+
+---
+
+## H25 — the IQ3_S single-card fallback, measured at short context
+
+**Claim (user-directed, 2026-08-27):** how does Qwen3.8-27B-UD-IQ3_S on **one**
+P100 compare to the two-card pair on speed, at <=16k, across the levers already
+in use — ubatch, KV cache type, and MTP?
+
+**Test:** three single-GPU arms (`-dev CUDA0`, so `-sm` is a no-op and was not
+swept; the two-card numbers already exist). `scripts/run-h25-iq3-single.sh`.
+The `-ub 512` cells were deliberately cut — H14 and the f16 arm both settle that
+2048 wins on prefill, and H24 settles that ubatch does not touch decode.
+
+### Result — the fallback is roughly half the pair, and it cannot use MTP (2026-08-27)
+
+**Single card vs the pair, at 16k:**
+
+| | 1x P100, IQ3_S | 2x P100, Q4_K_M | ratio |
+|---|---|---|---|
+| prefill | 184.1 t/s | 327.1 t/s (H13) | **56%** |
+| decode, no drafter | 10.4 t/s | 19.75 t/s (Phase 2) | **53%** |
+| decode, best available | **10.4 t/s** (MTP does not fit) | 27.41 t/s (H24) | **38%** |
+
+The prefill ratio is what the arithmetic predicted: IQ3 cuts weight **bytes**,
+not FLOPs, and prefill is compute-bound, so it scales with card count. Decode
+lands in the same place rather than better — halving the weight bytes did not
+buy back the lost card.
+
+**MTP does not fit on one card. This is the finding that decides the fallback.**
+The drafter loaded (16,029 MiB of 16,269) and then died on the first request:
+
+```
+common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 99, abort
+CUDA error: out of memory ... in ggml_cuda_pool_vmm::alloc
+```
+
+240 MiB free is not enough for the `-ub 2048` compute buffer — and this was
+**already with q8_0 KV**, so the usual mitigation is spent. The fallback
+therefore loses the single largest decode lever on this rig (+48% at 16k), which
+is why its realistic gap to the working config is 38%, not 53%.
+
+**KV quantisation is very nearly free here — and this matters well beyond the
+fallback.** One card, `-ub 2048`:
+
+| KV | pp4096 | pp16384 | tg128 |
+|---|---|---|---|
+| f16 | 200.96 | 183.80 | 11.38 |
+| q8_0 | 202.44 | **184.13** | 11.21 |
+| q4_0 | 202.05 | 184.05 | 11.18 |
+
+**Prefill is unchanged (inside 0.2%) and decode costs 1.5%**, for either quant.
+q4_0 buys nothing over q8_0 on speed, so q8_0 is the pick.
+
+This contradicts the prior this repo has been carrying. H4 priced KV
+quantisation at **14.3% of decode** — but that was measured on **TurboQuant**
+specifically, and it has been quoted since as if it applied to KV quantisation
+generally. Stock `q8_0` costs 1.5%. **The 14.3% figure is a TurboQuant number,
+not a KV-quant number**, and should not be used to argue against `-ctk q8_0`.
+
+**Consequence for the two-card 100k target, which is the actual deliverable:**
+q8_0 KV should halve the 100k KV cache from 6,250 MiB to ~3,125 MiB for ~1.5%
+of decode. That is the cheapest headroom on the table and it was being refused
+on the strength of a number measured on a different technique.
+
+**Ubatch confirms H24 independently:** drafter-free decode is 11.41 t/s at
+`-ub 512` and 11.38 at `-ub 2048`. A 4x ubatch change moves decode by 0.3%,
+which is the null H24 predicted once the drafter is removed.
+
+**Not tested, and parked:** whether MTP fits on one card at a smaller `-ub`.
+Worth one short arm (`-ub 512`, q8_0, 16k) because it decides whether the
+fallback's decode is 10.4 or ~15 t/s — but it is a real OOM margin question,
+not something arithmetic can settle, so it needs the user's go-ahead first.

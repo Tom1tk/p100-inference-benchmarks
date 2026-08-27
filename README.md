@@ -40,7 +40,7 @@ throughput win from a lossy technique has to clear a NIAH gate before it counts.
 
 | For | Options |
 |---|---|
-| **Context** | TurboQuant and other KV-cache quantisation; f16 baseline; cache reuse |
+| **Context** | KV-cache quantisation (`q8_0` ✓ H25 — 1.5% of decode, halves the cache); cache reuse |
 | **Decode** | MTP, DFlash2, split mode, lower weight quantisation, P2P |
 | **Prefill / TTFT** | ubatch/batch (H14 ✓, decode cost priced by H24 ✓), chunked GDN (H22 — crashes on `-sm tensor`), power cap (H15), cache reuse (H19) |
 | **Quality** | Quantisation tiers and speculative-decoding settings, benchmarked against baseline |
@@ -99,7 +99,7 @@ combination with MTP was never measured — **do not quote ~30 t/s.**
 | Split mode | `-sm tensor` wins, and it matters more than the drafter (+55–60% either way) |
 | Drafter | MTP. Its speedup is depth-dependent: 1.05× at 4k, 1.48× at 16k |
 | Engine | `mainline-rebased`. `buun` trails 12–14% on prefill; `ik` has no tensor split |
-| KV cache | `f16`. TurboQuant costs 14.3% of decode to save 788 MiB |
+| KV cache | **`q8_0`** — costs 1.5% of decode and halves the cache (H25). The 14.3% figure is **TurboQuant's**, not KV quantisation's, and was wrongly generalised |
 | DFlash2 | Layer-split-only, so it cannot be used. See H8 |
 | AllReduce | `none`. `internal` needs Volta and silently falls back on Pascal |
 
