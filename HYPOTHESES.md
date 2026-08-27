@@ -32,7 +32,7 @@ run label so the evidence is traceable.
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | **Tried 2026-08-26, crashes** under `-sm tensor` (chunked ops carry no split-axis metadata). Now a kernel project, not a flag — **parked by rule zero** |
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
-| H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **RUNNING 2026-08-27** — first serve-side 100k measurement in the repo |
+| H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 
 ---
@@ -1590,3 +1590,53 @@ invalidated the H11 prefill column. Rep 1 is the honest prefill measurement.
 Rep 2 is kept anyway because decode is unaffected by prefix reuse, and because
 a second 8-minute prefill doubles the sustained-thermal exposure, which is
 itself one of the five things being measured.
+
+_This limitation did not materialise — see the result below._
+
+### Result — 2026-08-27
+
+Arm A only. It fit, so arms B and C never ran.
+
+| Metric | 100k (H26) | 16k (H24) | Ratio |
+|---|---|---|---|
+| Decode | **20.02 t/s** | 27.41 | 73.0% |
+| Prefill | **207.4 t/s** | 310.5 | 66.8% |
+| MTP acceptance | **60.3%** | 66.4% | −6.1 pts |
+| VRAM | **12,147 MiB/card** | 10,973 | +1,174 |
+| Peak temp | **70 C** | 68 | +2 |
+| TTFT | **~7.8 min** | ~53 s | — |
+
+Mean of 2 reps (20.00/20.03 decode, 207.71/207.13 prefill). Load was 190 s cold,
+20 s warm. `n_slots = 1`, `n_ctx_slot = 100096`, `kv_unified = false`.
+
+**Verdict: the config serves at 100k, and the claim's numeric threshold fails.**
+Decode is **26.9%** below the 16k figure against a claimed ≤25%. That is a miss
+of 1.9 points, and it is recorded as a miss rather than rounded away — but the
+thing the run existed to establish is settled: **the deliverable config loads
+and serves at the target depth**, with 4,122 MiB/card to spare.
+
+**Five gaps closed on this one request:**
+
+1. **It fits.** 12,147 MiB/card, ~4.1 GiB/card headroom. The VRAM estimate made
+   before the run (12.0–12.5 GiB) was right, so the model of where the memory
+   goes is sound. `q4_0` KV is not needed — arm B is withdrawn.
+2. **Decode at 100k is 20.02 t/s**, the first such measurement here.
+3. **MTP acceptance at 100k is 60.3%** — and it is *not* monotonic in depth:
+   40.1% at 4k, 66.4% at 16k, 60.3% at 100k. It peaks somewhere in between.
+4. **`q8_0` KV works on two cards**, as H25 predicted from one. The 100k cache
+   cost ~1,174 MiB/card over the 16k run; at f16 it would have been ~2,350.
+5. **Sustained thermals are a non-issue.** 70 C peak across two consecutive
+   ~8-minute prefills — the same peak as the 3-minute 16k runs, 13 C under the
+   abort limit. The 175 W cap is doing the work.
+
+**Cross-harness agreement, which had never been checked.** `llama-server`
+measured 207.4 t/s prefill at 100k against `llama-bench`'s 215.4 (H13) — 96%
+agreement between two different harnesses on two different days. Neither number
+is obviously wrong, and the small gap is the expected cost of the chat template
+and HTTP path.
+
+**The rep-2 prefill contamination did not happen.** 207.13 vs rep 1's 207.71:
+prefill was genuinely re-done, so both reps are valid measurements. The H11
+prefix-reuse trap is therefore *not* universal. Cause unconfirmed — `-np 1` with
+`kv_unified = false` is the obvious suspect, but this run did not isolate it, so
+do not rely on `cache_prompt: false` working until something does.

@@ -122,6 +122,7 @@ _Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any ne
 | `h24-ub2048-mtp-16k` | rebased | Q4_K_M | tensor | 2 | **2048** | f16 | MTP-Q4_0 | 16k | 27.41 | **310.5** | 66.4% | 10973/10973 | 68 C |
 | `h25-iq3-1card-none-16k` | rebased | IQ3_S | none | **1** | 2048 | q8_0 | none | 16k | 10.42 | 183.8 | — | 12601 | 69 C |
 | `h25-iq3-1card-mtp-16k` | rebased | IQ3_S | none | **1** | 2048 | q8_0 | MTP-Q4_0 | 16k | **OOM** | — | — | 16029 at load | — |
+| `h26-100k-mtp-kvq8` | rebased | Q4_K_M | tensor | 2 | 2048 | **q8_0** | MTP-Q4_0 | **100k** | **20.02** | **207.4** | 60.3% | 12147/12147 | 70 C |
 
 **Reading notes.**
 
@@ -142,8 +143,17 @@ _Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any ne
 - **Q8 drafters are not worth it** (H9): DFlash2-Q8 accepted 44.4% vs Q4's 45.8%,
   identical decode, +0.87 GiB.
 - **The 175 W cap is doing the thermal work.** The hottest number anywhere in this
-  table is 70 C, against an 83 C abort limit — but no run here has ever sustained
-  compute for more than ~3 minutes.
+  table is 70 C against an 83 C abort limit — and `h26` shows that holds under
+  *sustained* load too: two consecutive ~8-minute 100k prefills peaked at the
+  same 70 C as the 3-minute 16k runs.
+- **`h26-100k-mtp-kvq8` is the deliverable config**, and the only row here at the
+  target depth. Ignore the two `FAILED(request)` rows for the same label in
+  `results/h11-placement.csv`: they are a harness bug (a ~340 KB prompt passed
+  through argv, overflowing E2BIG so curl posted an empty body), not a model or
+  VRAM failure. Fixed 2026-08-27.
+- **Acceptance is not monotonic in depth.** MTP goes 40.1% (4k) -> 66.4% (16k) ->
+  60.3% (100k). It peaks somewhere in the middle, so neither the 4k nor the 100k
+  figure can be extrapolated from the other.
 
 ## Table C — lever verdicts at a glance
 
@@ -161,7 +171,8 @@ _Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any ne
 | P2P | on, off | **No effect** (<=0.6%) | H10 |
 | GPUs | 1, 2 | **2 required.** One card = 56% prefill, 38% real decode, cannot reach 100k | H20/H25 |
 | Power cap | 175 W only | Untested above 175 W; approved to 220 W pending PSU check | H15 |
-| Context depth | 2k, 4k, 8k, 16k, 64k, 100k (prefill only) | Prefill -34% from 16k to 100k | H13 |
+| Context depth | 2k, 4k, 8k, 16k, 64k, **100k end to end** | Serves at 100k: decode -27%, prefill -33%, acceptance -6 pts vs 16k | H13, **H26** |
+| Sustained thermals | ~8 min continuous 100k prefill, x2 | **70 C peak**, same as the 3-min 16k runs. Not a constraint at 175 W | H26 |
 
 ## Table D — coverage: what has never been measured
 
@@ -170,15 +181,15 @@ change the serve command.
 
 | Gap | State | Why it matters | Cost |
 |---|---|---|---|
-| **100k on `llama-server`** | **Zero data.** H13 measured `pp100000` in `llama-bench` only — no drafter, no server, no decode, no VRAM figure, no acceptance | The entire objective is 100k. **We do not know that the deliverable config loads at all**, let alone what it decodes at. Every serve-side number in Table B is 16k | 1 run, but a long one (~8-16 min prefill) |
-| **Quality — all of it** | **Zero data.** No NIAH at any depth, no A/B against a baseline, Phase 5 quality table entirely `_pending_` | It is one of the four objectives and the only one with no measurement whatsoever. Every speed result above is unvalidated for output quality | NIAH tiers, cheap per run |
-| **Decode at depth >16k** | Never measured | Decode decays with KV depth and acceptance moves with depth (40.1% -> 73.3% from 4k to 16k). The 27.41 t/s headline may not survive to 100k | Folds into the 100k serve run |
-| **`q8_0` KV on two cards** | Measured on **one** card only (H25) | Should halve the 100k KV cache for ~1.5% of decode — plausibly what makes a drafter fit at 100k at all | 1 short run |
+| ~~**100k on `llama-server`**~~ | **CLOSED 2026-08-27 (H26).** Serves at 20.02 t/s decode / 207.4 prefill / 60.3% acceptance / 12,147 MiB per card / 70 C | — | — |
+| **Quality — all of it** _(now the top gap)_ | **Zero data.** No NIAH at any depth, no A/B against a baseline, Phase 5 quality table entirely `_pending_` | It is one of the four objectives and the only one with no measurement whatsoever. Every speed result above is unvalidated for output quality | NIAH tiers, cheap per run |
+| ~~**Decode at depth >16k**~~ | **CLOSED 2026-08-27 (H26).** 20.02 t/s at 100k, 73% of the 16k figure | — | — |
+| ~~**`q8_0` KV on two cards**~~ | **CLOSED 2026-08-27 (H26).** Works; the 100k cache cost ~1,174 MiB/card instead of ~2,350 at f16 | — | — |
 | **Model quant sweep** | **Never run.** Q4_K_M throughout; the only Q6_K row is on the dead PFlash engine at `-ub 512`/layer; IQ3_S only on one card | Q5_K_M/Q6_K are the obvious quality lever, and quality is the untested objective. Also decides whether 100k fits | Phase 3, 1 run per quant |
-| **Drafter re-rank at current config** | All drafter comparisons ran at `-ub 512`, 4k, `-sm layer`. DFlash2 **led** there (14.44 vs 14.04) | H24 showed acceptance is ubatch-sensitive, so the MTP-vs-DFlash2 ranking may not hold at `-ub 2048`/tensor/16k | 1 arm vs a banked control |
+| **Drafter re-rank at current config** | All drafter comparisons ran at `-ub 512`, 4k, `-sm layer`. DFlash2 **led** there (14.44 vs 14.04) | H24 showed acceptance is ubatch-sensitive, and H26 showed it is not monotonic in depth (40.1 -> 66.4 -> 60.3%). The MTP-vs-DFlash2 ranking is unverified at `-ub 2048`/tensor, and now doubly so at 100k | 1 arm vs a banked control |
 | **Prompt-cache reuse (H19)** | Never run | Highest practical value for the actual use case: an agentic harness re-sends a growing prefix every turn. Costs a flag | 1 multi-turn run |
 | **sm_60 FP16 fast-path fix (H17)** | Never run | Free by hypothesis, and it un-confounds every quality comparison between engines | Rebuild + 1 cell |
-| **Sustained thermals** | Never tested. Hottest observed is 70 C over ~3 min | A 100k prefill is 8-16 min of *sustained* compute against an 83 C abort. Untested regime | Folds into the 100k serve run |
+| ~~**Sustained thermals**~~ | **CLOSED 2026-08-27 (H26).** 70 C peak over two consecutive ~8-min 100k prefills — no different from the short runs | — | — |
 | **Power cap >175 W (H15)** | Never tested | Approved to 220 W; prefill is compute-bound so it is the one lever that could move it without a kernel | Blocked on the user's in-person PSU meter check |
 | **`--jinja` / agentic phase** | Never run (Phase 5 entirely `_pending_`) | It is the actual deployment target; throughput on synthetic prompts is a proxy for it | Long runs |
 | **Concurrency / multiple slots** | Never tested (`n_slots = 4` was in force and never exercised) | Only matters if the harness issues parallel requests — ask before spending anything here | Unknown |

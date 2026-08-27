@@ -71,3 +71,5 @@ h25-iq3-1card-none-16k,none,none,default,1,10.43,184.17,400,0,0,,12601,259,68,10
 h25-iq3-1card-none-16k,none,none,default,2,10.41,183.34,400,0,0,,12601,259,69,10,ok
 h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,,,,,,,12147,12147,,190,FAILED(request)
 h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,,,,,,,12147,12147,,190,FAILED(request)
+h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,20.00,207.71,400,426,257,60.3,12147,12147,70,20,ok
+h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,20.03,207.13,400,426,257,60.3,12147,12147,70,20,ok
