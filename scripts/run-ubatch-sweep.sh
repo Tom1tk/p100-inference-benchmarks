@@ -15,7 +15,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
 BIN=/root/dflash2-rebased/build-cuda-p100/bin/llama-bench
-MODEL=/root/Qwen3.8-27B-UD-Q4_K_M.gguf
+MODEL=${MODEL:-/root/Qwen3.8-27B-UD-Q4_K_M.gguf}
 LABEL=${LABEL:-h14-ubatch-sweep-q4km}
 
 # -ub is capped by -b, so raising BATCH is required to explore ub > 2048.
@@ -23,6 +23,13 @@ UBATCHES=${UBATCHES:-128,256,512,1024,2048}
 PROMPTS=${PROMPTS:-2048,4096}
 BATCH=${BATCH:-2048}
 REPS=${REPS:-2}
+# H25 knobs. GEN=0 keeps the original prefill-only behaviour. DEVICES picks the
+# cards; one device makes -sm a no-op, so pair DEVICES=CUDA0 with SPLIT=none.
+GEN=${GEN:-0}
+SPLIT=${SPLIT:-tensor}
+CTK=${CTK:-f16}
+CTV=${CTV:-f16}
+DEVICES=${DEVICES:-CUDA0,CUDA1}
 
 ABORT_TEMP=83
 PREFLIGHT_TEMP=70
@@ -47,17 +54,17 @@ MONITOR_PID=$!
 trap "kill $MONITOR_PID 2>/dev/null" EXIT
 
 echo "=== running: $LABEL ==="
-echo "ub=${UBATCHES}  b=${BATCH}  p=${PROMPTS}  r=${REPS}  -sm tensor  ALLREDUCE=none"
+echo "$(basename "$MODEL")  ub=${UBATCHES}  b=${BATCH}  p=${PROMPTS}  n=${GEN}  r=${REPS}  -sm ${SPLIT}  dev=${DEVICES}  kv=${CTK}/${CTV}"
 echo "NOTE: model load takes 4-8 min with no output. This is not a hang."
 
 START=$(date +%s)
 CUDA_VISIBLE_DEVICES=0,1 GGML_CUDA_ALLREDUCE=none "$BIN" \
     -m "$MODEL" \
     -ngl 99 -fa 1 -t 8 \
-    -ctk f16 -ctv f16 \
-    -sm tensor \
+    -ctk "$CTK" -ctv "$CTV" \
+    -sm "$SPLIT" -dev "$DEVICES" \
     -b "$BATCH" -ub "$UBATCHES" \
-    -p "$PROMPTS" -n 0 -r "$REPS" \
+    -p "$PROMPTS" -n "$GEN" -r "$REPS" \
     -o csv > "$CSV" 2> "$LOG"
 STATUS=$?
 ELAPSED=$(( $(date +%s) - START ))
@@ -84,10 +91,12 @@ if [[ "$STATUS" -eq 0 && -s "$CSV" ]]; then
     python3 - "$CSV" <<'PYEOF'
 import csv,sys
 rd=csv.reader(open(sys.argv[1])); hdr=next(rd); H={n:i for i,n in enumerate(hdr)}
-print(f"{'n_ubatch':>9} {'n_batch':>8} {'n_prompt':>9} {'t/s':>9} {'stddev':>8}")
+print(f"{'split':>6} {'kv':>5} {'n_ubatch':>9} {'test':>12} {'t/s':>9} {'stddev':>8}")
 for r in rd:
     if len(r)!=len(hdr): continue
-    print(f"{r[H['n_ubatch']]:>9} {r[H['n_batch']]:>8} {r[H['n_prompt']]:>9} "
+    npr, ngen = int(r[H['n_prompt']]), int(r[H['n_gen']])
+    test = f"pp{npr}" if ngen == 0 else f"tg{ngen}"
+    print(f"{r[H['split_mode']]:>6} {r[H['type_k']]:>5} {r[H['n_ubatch']]:>9} {test:>12} "
           f"{float(r[H['avg_ts']]):9.2f} {float(r[H['stddev_ts']]):8.2f}")
 PYEOF
 else
