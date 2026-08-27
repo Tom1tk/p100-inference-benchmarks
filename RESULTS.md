@@ -6,6 +6,188 @@ Curated results. The machine-readable source of truth is
 All figures t/s. Fixed parameters per [METHODOLOGY.md](METHODOLOGY.md) §6
 unless a row says otherwise.
 
+**Note:** `results/all-results.csv` is **stale** — it stops at the Phase 1 and
+H10 runs. The complete raw data is the per-run files in `results/raw/` plus
+`results/h11-placement.csv`; the master matrix below is generated from those.
+
+---
+
+# Master results matrix
+
+**Everything measured on this rig, in one place.** Rebuilt 2026-08-27 directly
+from `results/raw/*.csv` and `results/h11-placement.csv`, so it is the tables
+below that are derived, not this one. Two harnesses measure different things and
+their numbers are **not interchangeable**:
+
+- **Table A — `llama-bench`**: synthetic, no drafter, no server. Good for
+  engine/split/quant/ubatch comparisons. `pp*` = prefill at that prompt length,
+  `tg128` = decode.
+- **Table B — `llama-server`**: real HTTP requests, 400 tokens, temp 0, seed 42.
+  The only harness that measures drafters, acceptance and real VRAM. **This is
+  the one the serve command is built from.**
+
+Hardware is constant throughout: 2x Tesla P100-PCIE-16GB (16,269 MiB each,
+732.2 GB/s, sm_60, no NVLink, PCIe 3.0 PHB), Xeon E5-2680 v4, **175 W cap**,
+`-ngl 99 -fa 1 -t 8`. Any row marked GPUs=1 used `-dev CUDA0`.
+
+## Table A — `llama-bench` (no drafter)
+
+_Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any new sweep._
+
+| Run | Engine | Quant | `-sm` | GPUs | `-b` | `-ub` | KV | pp 2048 | pp 4096 | pp 8192 | pp 16384 | pp 65536 | pp 100000 | tg128 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `h10-p2p-off-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **222.8** | **223.4** | **214.9** | **208.3** | — | — | **20.3** |
+| `h10-p2p-on-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **221.9** | **222.8** | **214.2** | **207.6** | — | — | **20.9** |
+| `h13-prefill-depth-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 2048 | f16 | — | — | — | **327.1** | **250.1** | **215.4** | — |
+| `h14-ubatch-sweep-hi-q4km` | rebased | Q4_K_M | tensor | 2 | 8192 | 1024 | f16 | — | — | **271.9** | — | — | — | — |
+| `h14-ubatch-sweep-hi-q4km` | rebased | Q4_K_M | tensor | 2 | 8192 | 2048 | f16 | — | — | **342.9** | — | — | — | — |
+| `h14-ubatch-sweep-hi-q4km` | rebased | Q4_K_M | tensor | 2 | 8192 | 4096 | f16 | — | — | **347.5** | — | — | — | — |
+| `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 128 | f16 | **197.0** | **194.8** | — | — | — | — | — |
+| `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 256 | f16 | **249.7** | **241.7** | — | — | — | — | — |
+| `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **218.9** | **221.8** | — | — | — | — | — |
+| `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 1024 | f16 | **278.8** | **276.5** | — | — | — | — | — |
+| `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 2048 | f16 | **357.5** | **351.1** | — | — | — | — | — |
+| `h25-iq3-1card-kv-q4` | rebased | IQ3_S | none | 1 | 2048 | 2048 | q4_0 | — | **202.1** | — | **184.0** | — | — | **11.2** |
+| `h25-iq3-1card-kv-q8` | rebased | IQ3_S | none | 1 | 2048 | 2048 | q8_0 | — | **202.4** | — | **184.1** | — | — | **11.2** |
+| `h25-iq3-1card` | rebased | IQ3_S | none | 1 | 2048 | 512 | f16 | — | **132.3** | — | **125.9** | — | — | **11.4** |
+| `h25-iq3-1card` | rebased | IQ3_S | none | 1 | 2048 | 2048 | f16 | — | **201.0** | — | **183.8** | — | — | **11.4** |
+| `h25-iq3-2card-tensor` | rebased | IQ3_S | tensor | 1 | 2048 | 512 | f16 | — | **131.5** | — | **125.4** | — | — | **11.4** |
+| `h25-iq3-2card-tensor` | rebased | IQ3_S | tensor | 1 | 2048 | 2048 | f16 | — | **200.1** | — | — | — | — | — |
+| `phase1-buun-layer-q4km` | buun | Q4_K_M | layer | 2 | 2048 | 512 | f16 | **178.5** | **194.3** | **200.7** | **198.7** | — | — | **13.1** |
+| `phase1-buun-tensor-q4km` | buun | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **193.5** | **191.9** | **188.6** | **182.7** | — | — | **20.7** |
+| `phase1-iknonccl-graph-q4km` | ik | Q4_K_M | graph | 2 | 2048 | 512 | f16 | **199.1** | **198.4** | **179.6** | **153.0** | — | — | **22.1** |
+| `phase1-iknonccl-layer-q4km` | ik | Q4_K_M | layer | 2 | 2048 | 512 | f16 | **116.5** | **109.5** | **97.0** | **80.1** | — | — | **13.5** |
+| `phase1-mainline-layer-q4km` | mainline | Q4_K_M | layer | 2 | 2048 | 512 | f16 | **180.4** | **191.0** | **192.1** | **188.7** | — | — | **12.9** |
+| `phase1-mainline-tensor-internal-q4km` | mainline | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **214.8** | **219.1** | **212.7** | **206.3** | — | — | **20.3** |
+| `phase1-mainline-tensor-none-q4km` | mainline | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **214.7** | **219.1** | **212.7** | **206.4** | — | — | **20.4** |
+| `phase1-pflash-layer-q4km` | PFlash* | Q4_K_M | layer | 2 | 2048 | 512 | f16 | **184.3** | **191.6** | **192.3** | **187.9** | — | — | **12.5** |
+| `phase1-pflash-layer-q6k` | PFlash* | Q6_K_M | layer | 2 | 2048 | 512 | f16 | **188.5** | **197.1** | **198.2** | **193.4** | — | — | **9.5** |
+| `phase1-rebased-layer-q4km` | rebased | Q4_K_M | layer | 2 | 2048 | 512 | f16 | **180.8** | **190.8** | **192.1** | **187.1** | — | — | **12.9** |
+| `phase1-rebased-tensor-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **222.6** | **223.6** | **215.0** | **208.4** | — | — | **20.3** |
+
+`*` PFlash is closed (sm_60-incompatible, no v2) — rows kept for the record only.
+
+**Reading notes.**
+
+- **`-ub` is the single biggest prefill lever, and 512 is a local minimum.**
+  Look down the `h14-ubatch-sweep` block: 128 -> 197, 256 -> 250, **512 -> 219**,
+  1024 -> 279, 2048 -> **357**. The default is worse than its neighbours in *both*
+  directions. Every pre-H14 number in this repo was taken at 512 and is ~35% low.
+- **`-ub 4096` is not worth the `-b 8192` it needs**: 347.5 vs 342.9 at pp8192,
+  and `-ub 8192` aborts (the crash backtrace is still in
+  `h14-ubatch-sweep-hi-q4km.csv`).
+- **`-sm tensor` beats `-sm layer` on both axes** on the rebased engine: 208 vs
+  187 prefill, 20.3 vs 12.9 decode. That decode gap (**+58%**) is the largest
+  single-flag effect in the table.
+- **`ik` wins decode and loses everything else** (22.1 tg128, best in table, but
+  153 pp16384 and no tensor split at all). It also collapses hardest with depth.
+- **P2P makes no difference**: `h10-p2p-on` vs `off` agree within 0.6% on every
+  cell. Settled, do not re-run.
+- **KV quant is nearly free** (`h25-iq3-1card-kv-*`): f16/q8_0/q4_0 give
+  183.8/184.1/184.0 prefill and 11.38/11.21/11.18 decode. `q4_0` buys nothing
+  over `q8_0`.
+- `h25-iq3-2card-tensor` is mis-named: it ran `-sm tensor` with `-dev CUDA0`,
+  i.e. one card. It matches the `-sm none` single-card row to within 0.4%, which
+  is the useful result — **`-sm` is a no-op when only one device is visible.**
+
+## Table B — `llama-server` (real requests, drafters, VRAM)
+
+| Run | Engine | Quant | `-sm` | GPUs | `-ub` | KV | Drafter | Ctx | Decode | Prefill | Accept | VRAM/card | Peak |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `smoke-tensor-none` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | none | 4k | 20.13 | 66.5 | — | 8183/8183 | 50 C |
+| `smoke-tensor-mtp` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | MTP-Q4_0 | 4k | 32.60 | 55.5 | 90.0% | 9827/9827 | 53 C |
+| `smoke-tensor-df2q4` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | DFlash2-Q4 | 4k | **FAILED(load)** | — | — | — | — |
+| `p2-tensor-none` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | none | 4k | 20.30 | 67.6 | — | 8183/8183 | 65 C |
+| `p2-tensor-mtp` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | MTP-Q4_0 | 4k | 21.27 | 58.4 | 40.1% | 9827/9827 | 66 C |
+| `p2-tensor-none-16k` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | none | 16k | 19.75 | 199.0 | — | 8579/8579 | 68 C |
+| `p2-tensor-mtp-16k` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | MTP-Q4_0 | 16k | 29.26 | 198.4 | 73.3% | 10235/10235 | 70 C |
+| `p2-layer-none-16k` | rebased | Q4_K_M | layer | 2 | 512 | f16 | none | 16k | 12.35 | 183.9 | — | 8125/9201 | 66 C |
+| `p2-layer-mtp-16k` | rebased | Q4_K_M | layer | 2 | 512 | f16 | MTP-Q4_0 | 16k | 19.05 | 162.9 | 77.5% | 9079/11525 | 65 C |
+| `h11-none-control` | rebased | Q4_K_M | layer | 2 | 512 | f16 | none | 4k | 12.79 | _n/a_ | — | 7693/8769 | 59 C |
+| `h11-mtp-default` | rebased | Q4_K_M | layer | 2 | 512 | f16 | MTP-Q4_0 | 4k | 14.04 | _n/a_ | 44.6% | 8647/10997 | 59 C |
+| `h11-mtp-cuda0` | rebased | Q4_K_M | layer | 2 | 512 | f16 | MTP, `-devd CUDA0` | 4k | 14.16 | _n/a_ | 44.6% | 9569/9983 | 58 C |
+| `h11-mtp-cuda1` | rebased | Q4_K_M | layer | 2 | 512 | f16 | MTP, `-devd CUDA1` | 4k | 14.15 | _n/a_ | 44.6% | 8647/10905 | 60 C |
+| `h11-df2q4-default` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q4 | 4k | **14.44** | _n/a_ | 45.8% | 9679/10619 | 59 C |
+| `h11-df2q4-cuda1` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q4, CUDA1 | 4k | 14.48 | _n/a_ | 45.8% | 8647/11361 | 60 C |
+| `h11-df2q4-cuda0` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q4, CUDA0 | 4k | **FAILED(load)** | — | — | — | — |
+| `h11-df2q8-default` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q8 | 4k | 14.44 | _n/a_ | 44.4% | 10291/10879 | 59 C |
+| `h11-df2q8-cuda1` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q8, CUDA1 | 4k | 14.46 | _n/a_ | 44.4% | 8647/12233 | 60 C |
+| `h11-df2q8-cuda0` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q8, CUDA0 | 4k | **FAILED(load)** | — | — | — | — |
+| `h11-depth16k-df2q4-default` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q4 | 16k | 17.10 | _n/a_ | 64.8% | 10201/11087 | 63 C |
+| `h11-depth16k-df2q4-cuda1` | rebased | Q4_K_M | layer | 2 | 512 | f16 | DFlash2-Q4, CUDA1 | 16k | 17.06 | _n/a_ | 64.8% | 9079/11887 | 63 C |
+| `p3-buun-mtp-16k-f16` | buun | Q4_K_M | tensor | 2 | 512 | f16 | MTP-Q4_0 | 16k | **28.12** | 178.2 | 81.6% | 10031/11521 | 70 C |
+| `p3-buun-mtp-16k-h7` | buun | Q4_K_M | tensor | 2 | 512 | turbo3/f16 | MTP-Q4_0 | 16k | 24.76 | 177.7 | 74.2% | 9835/11325 | 70 C |
+| `p3-buun-mtp-16k-t3t3` | buun | Q4_K_M | tensor | 2 | 512 | turbo3 | MTP-Q4_0 | 16k | 24.09 | 177.8 | 77.2% | 9637/11127 | 70 C |
+| `h24-ub512-mtp-16k` | rebased | Q4_K_M | tensor | 2 | 512 | f16 | MTP-Q4_0 | 16k | **29.39** | 198.5 | 73.3% | 10235/10235 | 67 C |
+| `h24-ub2048-mtp-16k` | rebased | Q4_K_M | tensor | 2 | **2048** | f16 | MTP-Q4_0 | 16k | 27.41 | **310.5** | 66.4% | 10973/10973 | 68 C |
+| `h25-iq3-1card-none-16k` | rebased | IQ3_S | none | **1** | 2048 | q8_0 | none | 16k | 10.42 | 183.8 | — | 12601 | 69 C |
+| `h25-iq3-1card-mtp-16k` | rebased | IQ3_S | none | **1** | 2048 | q8_0 | MTP-Q4_0 | 16k | **OOM** | — | — | 16029 at load | — |
+
+**Reading notes.**
+
+- **`_n/a_` prefill in the `h11-*` block is not missing data — it is invalid
+  data.** `cache_prompt: false` did not defeat the server's slot-level LCP prefix
+  reuse (`f_sim_best = 1.000` in the logs), so reps 2-3 skipped most of prefill.
+  Decode and acceptance are unaffected. Never quote an h11 prefill number.
+- **`smoke-tensor-mtp` (32.60 t/s, 90% acceptance) is a single rep on a cold
+  cache and should not be treated as a record.** `p2-tensor-mtp` re-ran the same
+  config over 3 reps and got 21.27 at 40.1% acceptance.
+- **Acceptance is strongly depth-dependent**, and it is the mechanism behind most
+  of the decode spread here: MTP goes 40.1% at 4k -> 73.3% at 16k, and DFlash2-Q4
+  goes 45.8% -> 64.8%. Any drafter conclusion drawn at 4k does not transfer.
+- **DFlash2-Q4 beat MTP at 4k** (14.44 vs 14.04) but has **never been measured at
+  the current config** (tensor split, `-ub 2048`, 16k). That comparison is open.
+- **DFlash2 cannot be pinned to CUDA0** — `-devd CUDA0` aborts at load on both
+  DFlash2 quants while MTP is fine. Bug, not a speed result.
+- **Q8 drafters are not worth it** (H9): DFlash2-Q8 accepted 44.4% vs Q4's 45.8%,
+  identical decode, +0.87 GiB.
+- **The 175 W cap is doing the thermal work.** The hottest number anywhere in this
+  table is 70 C, against an 83 C abort limit — but no run here has ever sustained
+  compute for more than ~3 minutes.
+
+## Table C — lever verdicts at a glance
+
+| Lever | Values tested | Verdict | Evidence |
+|---|---|---|---|
+| Engine | mainline, rebased, buun, `ik`, PFlash | **rebased** (mainline + DFlash2, same speed as mainline) | Table A phase1 block |
+| `-sm` | `layer`, `tensor`, `graph` (`ik`), `none` (1 card) | **`tensor`** — +58% decode, +11% prefill over layer | H1/H6 |
+| `GGML_CUDA_ALLREDUCE` | NCCL default, `internal`, `none` | **`none`** (default aborts under tensor split; internal == none) | H5 |
+| `-ub` | 128, 256, 512, 1024, 2048, 4096, 8192 | **2048** — +63% prefill; 8192 aborts; 4096 needs `-b 8192` for +1% | H14, H24 |
+| `-b` | 2048, 8192 | **2048** — only matters as a ceiling on `-ub` | H14 |
+| KV `-ctk`/`-ctv` | f16, q8_0, q4_0, turbo3 | **`q8_0`** — 1.5% of decode, half the cache; q4_0 adds nothing; turbo3 costs 14.3% | H25, H4 |
+| Model quant | Q4_K_M, Q6_K (dead engine), IQ3_S (1 card) | **Q4_K_M** by default, **never actually swept** | Table A |
+| Drafter | none, MTP-Q4_0, DFlash2-Q4, DFlash2-Q8 | **MTP** at 16k/tensor; DFlash2 led at 4k/layer and is unretested | H8, H9, H11 |
+| Drafter placement `-devd` | default, CUDA0, CUDA1 | **No effect** (<=0.15%). DFlash2+CUDA0 aborts | H11 |
+| P2P | on, off | **No effect** (<=0.6%) | H10 |
+| GPUs | 1, 2 | **2 required.** One card = 56% prefill, 38% real decode, cannot reach 100k | H20/H25 |
+| Power cap | 175 W only | Untested above 175 W; approved to 220 W pending PSU check | H15 |
+| Context depth | 2k, 4k, 8k, 16k, 64k, 100k (prefill only) | Prefill -34% from 16k to 100k | H13 |
+
+## Table D — coverage: what has never been measured
+
+The gaps matter more than the numbers above. Ranked by whether the answer could
+change the serve command.
+
+| Gap | State | Why it matters | Cost |
+|---|---|---|---|
+| **100k on `llama-server`** | **Zero data.** H13 measured `pp100000` in `llama-bench` only — no drafter, no server, no decode, no VRAM figure, no acceptance | The entire objective is 100k. **We do not know that the deliverable config loads at all**, let alone what it decodes at. Every serve-side number in Table B is 16k | 1 run, but a long one (~8-16 min prefill) |
+| **Quality — all of it** | **Zero data.** No NIAH at any depth, no A/B against a baseline, Phase 5 quality table entirely `_pending_` | It is one of the four objectives and the only one with no measurement whatsoever. Every speed result above is unvalidated for output quality | NIAH tiers, cheap per run |
+| **Decode at depth >16k** | Never measured | Decode decays with KV depth and acceptance moves with depth (40.1% -> 73.3% from 4k to 16k). The 27.41 t/s headline may not survive to 100k | Folds into the 100k serve run |
+| **`q8_0` KV on two cards** | Measured on **one** card only (H25) | Should halve the 100k KV cache for ~1.5% of decode — plausibly what makes a drafter fit at 100k at all | 1 short run |
+| **Model quant sweep** | **Never run.** Q4_K_M throughout; the only Q6_K row is on the dead PFlash engine at `-ub 512`/layer; IQ3_S only on one card | Q5_K_M/Q6_K are the obvious quality lever, and quality is the untested objective. Also decides whether 100k fits | Phase 3, 1 run per quant |
+| **Drafter re-rank at current config** | All drafter comparisons ran at `-ub 512`, 4k, `-sm layer`. DFlash2 **led** there (14.44 vs 14.04) | H24 showed acceptance is ubatch-sensitive, so the MTP-vs-DFlash2 ranking may not hold at `-ub 2048`/tensor/16k | 1 arm vs a banked control |
+| **Prompt-cache reuse (H19)** | Never run | Highest practical value for the actual use case: an agentic harness re-sends a growing prefix every turn. Costs a flag | 1 multi-turn run |
+| **sm_60 FP16 fast-path fix (H17)** | Never run | Free by hypothesis, and it un-confounds every quality comparison between engines | Rebuild + 1 cell |
+| **Sustained thermals** | Never tested. Hottest observed is 70 C over ~3 min | A 100k prefill is 8-16 min of *sustained* compute against an 83 C abort. Untested regime | Folds into the 100k serve run |
+| **Power cap >175 W (H15)** | Never tested | Approved to 220 W; prefill is compute-bound so it is the one lever that could move it without a kernel | Blocked on the user's in-person PSU meter check |
+| **`--jinja` / agentic phase** | Never run (Phase 5 entirely `_pending_`) | It is the actual deployment target; throughput on synthetic prompts is a proxy for it | Long runs |
+| **Concurrency / multiple slots** | Never tested (`n_slots = 4` was in force and never exercised) | Only matters if the harness issues parallel requests — ask before spending anything here | Unknown |
+
+**Closed, do not spend runs:** single-GPU serving (H20/H25), PFlash (H21),
+TurboPrefill (H16), TurboQuant KV (H4), P2P (H10), drafter placement (H11),
+Q8 drafters (H9), `-ub` above 2048 (H14). Parked with reasons in
+[RUNBOOK.md](RUNBOOK.md): H18, H22, H23, H12.
+
 ---
 
 ## Phase 0 — smoke tests
