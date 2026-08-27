@@ -11,3 +11,18 @@ NOTE: model load takes 4-8 min with no output. This is not a hang.
   none  q8_0      2048       pp4096    202.44     0.41
   none  q8_0      2048      pp16384    184.13     0.30
   none  q8_0      2048        tg128     11.21     0.00
+pushed
+--- h25-iq3-1card-kv-q8 done (exit 0) ---
+=== preflight ===
+hottest card: 60C
+0, 175.00 W
+1, 175.00 W
+=== running: h25-iq3-1card-kv-q4 ===
+Qwen3.8-27B-UD-IQ3_S.gguf  ub=2048  b=2048  p=4096,16384  n=128  r=2  -sm none  dev=CUDA0  kv=q4_0/q4_0
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 355s | exit 0 | peak 69C ===
+--- results ---
+ split    kv  n_ubatch         test       t/s   stddev
+  none  q4_0      2048       pp4096    202.05     0.02
+  none  q4_0      2048      pp16384    184.05     0.03
+  none  q4_0      2048        tg128     11.18     0.00
