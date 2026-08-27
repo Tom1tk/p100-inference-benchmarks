@@ -1294,3 +1294,40 @@ this.
 **Ordering:** run **H18 first** (`GGML_CUDA_CUBLAS_COMPUTE_TYPE`, at `-ub 2048`).
 H18 sizes the prize; H22 collects it. Running H22 blind risks spending a rebuild
 on a 5% slice.
+
+---
+
+## H24 — `-ub 2048` costs decode
+
+**Claim:** raising `-ub` from 512 to 2048 changes decode throughput at 16k by
+less than 5%, so H14's prefill win is free.
+
+**Why this has to be tested before any serve command is written.** H14 measured
+`-ub 2048` as +63% on prefill and the README already carries it in the "best
+measured configuration" block — but every decode number in this repo, including
+the headline **29.26 t/s at 16k**, was taken at the old `-ub 512`. A serve
+command sets one ubatch for both phases. If 2048 costs decode materially, the
+command is a trade, not a free win, and the objective table's second and third
+rows cannot both be satisfied by the same flag.
+
+**Reasoning for the null:** decode processes one token (plus MTP draft tokens)
+per step, so `n_ubatch` should not enter the decode graph at all. The plausible
+mechanisms for a non-null are indirect: a larger activation arena changes
+allocator behaviour or VRAM pressure at depth, or the drafter's verify step
+batches differently.
+
+**Second thing this run settles:** the 29.26 t/s figure was measured at
+`GGML_CUDA_ALLREDUCE=internal`, which the repo has since replaced with `none`
+(H5/H10). The control arm re-measures it under the current env rather than
+quoting across a config change.
+
+**Test:** `scripts/run-h24-ubatch-decode.sh` — two arms, `-ub 512` and
+`-ub 2048`, identical otherwise (`-sm tensor`, `-b 2048`, MTP-Q4_0, `CTX=16384`,
+`prompts/h11-depth-prompt.txt`, `N_PREDICT=400`, r=3, `ALLREDUCE=none`). Both
+arms reload the server, because `-ub` is a launch parameter.
+
+**Watch:** decode t/s (the claim), and **acceptance rate** as a control — ubatch
+must not move it. If acceptance shifts, something other than ubatch differed
+between the arms and neither number is trustworthy. Also watch VRAM: the 512 arm
+loaded at 10235 MiB/card, and the extra activation arena at 2048 comes out of
+what a 100k KV cache will later need.
