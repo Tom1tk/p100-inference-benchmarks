@@ -7,6 +7,11 @@ Benchmarking four llama.cpp-family inference engines on a dual Tesla P100
 It is the operating procedure — exact commands, safety limits, failure handling,
 and the mandatory commit/push protocol. Everything else is reference.
 
+**Two hard limits before you launch anything:** never let a card exceed 83 °C,
+and remember that **every run costs the user real electricity**. Keep tests
+short, never re-measure a settled lever, and abort a sweep once its conclusion
+is clear — RUNBOOK §0 and §2.1.
+
 ---
 
 ## The objective

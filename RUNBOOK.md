@@ -15,6 +15,9 @@ order. It assumes no prior context beyond what's in this repo.
    mode per run. The whole point is attributable comparison.
 4. **Don't silently change fixed parameters** in [METHODOLOGY.md](METHODOLOGY.md).
    If a run needs different parameters, record why in [RUNLOG.md](RUNLOG.md).
+5. **Every run costs the user real electricity.** Prefer many short runs to few
+   long ones, never re-measure a settled lever, and abort a sweep as soon as its
+   conclusion is clear. See §2.1 — this is a hard requirement, not a preference.
 
 ---
 
@@ -68,6 +71,37 @@ Example:
 
 The script does preflight temp checks, starts telemetry, runs the benchmark,
 stops telemetry, writes logs and CSV, then commits and pushes.
+
+### 2.1 Run economy — every run costs electricity
+
+The user pays for the power these cards draw. A two-card run is ~350 W of draw
+for its whole duration, and a 100k prefill sweep is 30+ minutes of it. Design
+every sweep against these three rules **before** launching it:
+
+1. **Prefer many short tests over few long ones.** Short runs fail cheaply, give
+   an answer sooner, and let the cards idle back to ~45 W between arms.
+2. **Never re-run a settled lever.** Re-measure only when a lever under test has
+   actually changed. If a control arm already exists in `results/`, cite it —
+   do not re-take it for symmetry. Audit every arm against the existing results
+   before launching, and delete the ones that re-answer a closed question.
+3. **Abort early.** If the conclusion is already clear partway through a sweep
+   (two bad cells out of three, or a failure whose cause applies to the
+   remaining arms), cancel the rest.
+
+**Build the skip conditions into the driver script, not just the plan.** A run
+launched in the background must be able to stop itself — check the previous
+arm's exit status or numbers and `break`. `scripts/run-h25-iq3-single.sh` is the
+worked example: the `q4_0` arm is skipped automatically when the `q8_0` arm
+fails, because both use the same quantised-KV attention path and a second model
+load would only reconfirm the same failure.
+
+**What this does not license.** Do not drop an arm that produces a control the
+repo genuinely lacks, and do not cut reps below 2 — a number with no spread
+cannot be told apart from noise, which is how a run gets repeated. When you do
+trim an arm, say in [RUNLOG.md](RUNLOG.md) what assumption the saving rests on,
+so a surprising result later has somewhere to point.
+
+---
 
 ### Expected timing — read this before assuming a hang
 
