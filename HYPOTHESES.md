@@ -28,11 +28,11 @@ run label so the evidence is traceable.
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **decides the plan** |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
-| H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback: decode within 25% of the two-card Q4_K_M at acceptable NIAH quality | Untested — **reframed 2026-08-26**, was a 9B; the old ≥2× prefill claim does not carry over |
+| H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | Untested — **the last kernel-level lever** |
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
-| H25 | IQ3_S on one P100 vs the pair at <=16k | **MEASURED 2026-08-27 — 56% of the pair's prefill, 53% of its drafter-free decode, and MTP OOMs so the real gap is 38%. Bonus: `q8_0` KV costs 1.5% of decode, not H4's 14.3%** |
+| H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 
 ---
 
@@ -1058,7 +1058,28 @@ list** for the stated use case, and it costs nothing but a flag.
 
 ---
 
-## H20 — Qwen3.8-27B at IQ3_S on a single P100
+## H20 — Qwen3.8-27B at IQ3_S on a single P100 — **CLOSED, not feasible**
+
+### Verdict — measured and closed 2026-08-27 (user call)
+
+**A single P100 is not feasible for real-world use.** H25 measured it at <=16k:
+**56%** of the pair's prefill, **53%** of its drafter-free decode, and **MTP
+does not fit at all** (OOM at 16,029 of 16,269 MiB, already with q8_0 KV) — so
+against the config we actually serve with, the fallback runs at **38%**. The
+VRAM arithmetic below independently caps it below 100k. Two independent
+failures against the objective: it cannot reach the context target, and it
+cannot use the decode lever.
+
+**Do not spend further runs on single-GPU serving.** The remaining sub-question
+(does MTP fit at a smaller `-ub`?) was explicitly declined: even its best case
+leaves the fallback behind the two-card drafter-free number while also
+surrendering prefill.
+
+What survives from this line of work is not the fallback but H25's KV-quant
+result, which applies to the **two-card** config: `q8_0` costs 1.5% of decode,
+not the 14.3% the repo had been quoting from TurboQuant.
+
+**Original framing, kept for the record:**
 
 **Reframed 2026-08-26 (user call).** Originally a Qwen3.5-9B fallback —
 withdrawn. A different model, on an older architecture, is not a fallback for
@@ -1472,7 +1493,9 @@ on the strength of a number measured on a different technique.
 `-ub 512` and 11.38 at `-ub 2048`. A 4x ubatch change moves decode by 0.3%,
 which is the null H24 predicted once the drafter is removed.
 
-**Not tested, and parked:** whether MTP fits on one card at a smaller `-ub`.
-Worth one short arm (`-ub 512`, q8_0, 16k) because it decides whether the
-fallback's decode is 10.4 or ~15 t/s — but it is a real OOM margin question,
-not something arithmetic can settle, so it needs the user's go-ahead first.
+**Closed 2026-08-27 (user call). Single-GPU is not feasible for real-world
+use.** The proposed follow-up — MTP at a smaller `-ub` — was declined and is
+**not parked, it is closed**: the baseline is established and the verdict does
+not turn on it. Even the optimistic outcome (~15 t/s) leaves the fallback below
+the two-card drafter-free number while giving up prefill as well, and the
+pessimistic outcome is another OOM. Do not spend runs on single-GPU serving.

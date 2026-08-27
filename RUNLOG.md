@@ -1184,6 +1184,67 @@ decode is 11.41 t/s at `-ub 512` and 11.38 at `-ub 2048`. A 4x ubatch change
 moves decode 0.3% once the drafter is out of the picture, which is exactly the
 null H24 predicted.
 
-**Parked, needs a go-ahead:** whether MTP fits on one card at a smaller `-ub`.
-One short arm, and it decides whether the fallback decodes at 10.4 or ~15 t/s,
-but it is an OOM-margin question that arithmetic cannot settle.
+**Follow-up offered and declined:** whether MTP fits on one card at a smaller
+`-ub`. Not parked — closed with the rest of the single-GPU line (see below).
+
+
+---
+
+## 2026-08-27 — Closing the single-GPU line, and what today actually bought us
+
+User verdict, verbatim in effect: *"we've established the baseline for a single
+GPU and it's not feasible for real world use."* H20 and H25 are **closed, not
+parked** — parked means the question may still be worth power later; this one is
+answered. Recorded in HYPOTHESES.md (both sections and both summary rows),
+RUNBOOK Phase 7 cell 6 and the parked table, README's Phase 7 row, and
+RESULTS.md, which gained a Phase 7 section carrying the H24 and H25 tables it
+had been missing.
+
+### The day in four results
+
+**H24 — `-ub 2048` costs 6.7% of decode, and it is not the ubatch's fault.**
+27.41 vs 29.39 t/s, against +56.4% prefill. The acceptance control moved (73.3
+-> 66.4%), which normally voids a test; instead the token-accounting identity
+closed it exactly — 126 vs 135 target forward passes is +7.1% work, predicting
+-6.7% against -6.7% measured, no residual. There is no intrinsic ubatch penalty
+on the decode path. Break-even at ~11,800 output tokens, so `-ub 2048` stays.
+
+**H20's inherited claim did not survive its own reframe.** Finishing the 9B ->
+IQ3_S rewrite turned up a "at least 2x prefill" line that was a property of the
+9B having 3x fewer FLOPs, not of running on one card. IQ3 buys bytes, not FLOPs
+— weights dequantise to f16 before the GEMM — so prefill scales with card count
+regardless of quant. Deleted, not carried forward.
+
+**H25 — the fallback is at 38% of what we actually serve.** 56% of the pair's
+prefill, 53% of its drafter-free decode, and MTP OOMs outright at 16,029 of
+16,269 MiB with `q8_0` KV already spent. Two independent failures against the
+objective: it cannot use the decode lever and it cannot reach 100k. Quality was
+never measured and now never will be.
+
+**The one result that outlives the line of enquiry: KV quantisation is nearly
+free.** 0.2% of prefill, 1.5% of decode, and `q4_0` buys nothing over `q8_0`.
+The repo had been quoting 14.3% — TurboQuant's own number, generalised to all KV
+quantisation on no evidence. This is about the **two-card** config: `q8_0`
+should halve the 100k KV cache from ~6,250 to ~3,125 MiB for ~1.5% of decode.
+Cheapest headroom on the table, and it was refused for weeks on a wrong prior.
+
+### Process changes made permanent today
+
+Rule zero — **"do we really need to test this?"** — is now a hard limit in
+CLAUDE.md and RUNBOOK §2.1, alongside three design rules: prefer many short runs
+to few long ones; never re-measure a settled lever (cite the banked result as
+the control); and abort early, with the skip condition built into the driver so
+an unattended sweep stops itself. H25 was the first run designed under them —
+cut from 6 arms to 3, f16 KV dropped, reps 3 -> 2, and shipped with an
+early-abort that would have skipped the q4_0 arm had q8_0 failed.
+
+Applied retroactively: H18, H22, H23, H12 and the q8-KV-x-ubatch question are
+parked with written reasons so nobody re-spends the power on them.
+
+### What is left that can change the serve command
+
+The 100k NIAH quality gate (the fourth objective still has zero data), H19
+(prompt-cache reuse, a flag not a sweep), H17 (the sm_60 arithmetic bug that
+confounds every quality comparison), H15 (power cap, gated on the user's
+in-person PSU meter check), and now **q8_0 KV on the two-card 100k config** —
+newly cheap, and not yet run.

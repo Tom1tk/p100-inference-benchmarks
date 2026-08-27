@@ -65,7 +65,7 @@ item: it is the lever that matches how the rig will actually be used.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; H24 priced `-ub 2048`'s decode cost at 6.7% and kept it; H20 reframed from a 9B fallback to the same model at IQ3_S on one card. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; H24 priced `-ub 2048`'s decode cost at 6.7% and kept it; **H20/H25 closed 2026-08-27 — a single P100 is not feasible for real-world use** (56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k), and H25 corrected the KV-quant penalty from 14.3% to 1.5%. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
 
 ### Best measured configuration
 
