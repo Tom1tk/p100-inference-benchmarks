@@ -22,8 +22,8 @@ difficulty; almost every lever trades one against another:
 | Target | Currently |
 |---|---|
 | **100k context** | Fits VRAM at f16 KV (6.25 GiB). Never run past 16k |
-| **Highest possible decode** | 29.26 t/s at 16k (`tensor` + MTP) |
-| **Highest possible prefill / TTFT** | 215.4 t/s / 7.7 min TTFT at 100k, measured (H13) |
+| **Highest possible decode** | 27.41 t/s at 16k at `-ub 2048`; 29.39 t/s at `-ub 512` (H24) |
+| **Highest possible prefill / TTFT** | 310.5 t/s at 16k (H24); 215.4 t/s / 7.7 min TTFT at 100k (H13) |
 | **Output quality indistinguishable from baseline** | Not yet measured against anything |
 
 The fourth is the constraint that makes the other three hard, and it is the one
@@ -37,7 +37,7 @@ throughput win from a lossy technique has to clear a NIAH gate before it counts.
 |---|---|
 | **Context** | TurboQuant and other KV-cache quantisation; f16 baseline; cache reuse |
 | **Decode** | MTP, DFlash2, split mode, lower weight quantisation, P2P |
-| **Prefill / TTFT** | ubatch/batch (H14 ✓), chunked GDN (H22 — crashes on `-sm tensor`), power cap (H15), cache reuse (H19) |
+| **Prefill / TTFT** | ubatch/batch (H14 ✓, decode cost priced by H24 ✓), chunked GDN (H22 — crashes on `-sm tensor`), power cap (H15), cache reuse (H19) |
 | **Quality** | Quantisation tiers and speculative-decoding settings, benchmarked against baseline |
 
 **Deployment mitigation, decided 2026-08-25.** Long TTFT at 100k is partly a
@@ -60,7 +60,7 @@ item: it is the lever that matches how the rig will actually be used.
 | Phase 4 — hypothesis tests | **9 of 12 settled**; 9 new opened (H13–H21) |
 | Phase 5 — agentic web build | Not started (tooling ready) |
 | Phase 6 — dual-GPU transport (H10–H12) | H10 and H11 closed; H12 open but low value |
-| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; H20 reframed from a 9B fallback to a 27B-IQ3 single-card fallback. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
+| **Phase 7 — prefill & TTFT (H13–H23)** | **Open.** H13 and H14 confirmed (100k measured: 215.4 t/s, 7.7 min TTFT); H16 and H21 withdrawn; H22 tested and crashes on `-sm tensor` (unwired split-axis metadata, not a speed verdict); H23 opened, may outrank H22 as the 100k-specific lever; H24 priced `-ub 2048`'s decode cost at 6.7% and kept it; H20 reframed from a 9B fallback to the same model at IQ3_S on one card. See [Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) and [Research/chunked-gdn-2026-08-25.md](Research/chunked-gdn-2026-08-25.md) |
 
 ### Best measured configuration
 
@@ -70,14 +70,19 @@ Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -b 2048 -ub 2048
 ```
 
-⚠️ **`-ub 2048` is new (2026-08-25, H14) and its effect on decode is untested.**
-It is worth **+63% on prefill at 2–8k, but that gain largely evaporates by
-100k** (H13, 2026-08-26) — see below. The 29.26 t/s decode figure below was
-measured at the old `-ub 512`.
+**Measured end to end at 16k (H24, 2026-08-27): 27.41 t/s decode · 310.5 t/s
+prefill**, 66.4% draft acceptance, 10,973 MiB/card.
 
-**29.26 t/s decode · 198.4 t/s prefill at 16k context**, 73.3% draft acceptance.
+`-ub 2048` **costs 6.7% of decode** against the old `-ub 512` (29.39 t/s /
+198.5 t/s / 73.3%) and buys **+56.4% of prefill**. The decode loss is not the
+decode path — it is entirely a 6.9 pp drop in drafter acceptance, and the
+generated tokens are byte-identical between the two settings. At 16k the trade
+saves 29 s per turn and breaks even only at ~11,800 output tokens, so `-ub 2048`
+stays. A **drafter-free** config should get it for free. See H24.
+
 For comparison, the best layer-split configuration reaches 19.05 t/s and the
-Phase 1 drafter-free best was 22.05.
+Phase 1 drafter-free best was 22.05. H14's +63% prefill at 2–8k **largely
+evaporates by 100k** (H13) — see below.
 
 ⚠️ `GGML_CUDA_P2P=1` measured +2.9% decode *on its own*, drafter-free. The
 combination with MTP was never measured — **do not quote ~30 t/s.**
@@ -168,7 +173,7 @@ mode are confirmed applied.
 |---|---|
 | [RUNBOOK.md](RUNBOOK.md) | **Start here.** How to run a benchmark, safety limits, failure handling, git protocol, phase completion criteria |
 | [METHODOLOGY.md](METHODOLOGY.md) | Hardware, engines, models, fixed parameters, and why each was chosen |
-| [HYPOTHESES.md](HYPOTHESES.md) | H1–H22 — the open questions each run is meant to answer, with current status |
+| [HYPOTHESES.md](HYPOTHESES.md) | H1–H24 — the open questions each run is meant to answer, with current status |
 | `Research/` | Deep-dive research documents, distilled into the hypotheses above |
 | [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 — the agentic web-build benchmark: port scheme, metrics, quality scoring |
 | [RESULTS.md](RESULTS.md) | Curated result tables, one section per phase |

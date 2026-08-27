@@ -1080,3 +1080,68 @@ measure that. Peak 50 °C, aborted in under 30 s, no thermal event.
 Doesn't settle whether the chunked algorithm is actually faster on sm_60 —
 only that it's unwired for our specific two-card split mode. Recorded in
 H20 and H22 in HYPOTHESES.md; not chased further today.
+
+## 2026-08-27 — H24: `-ub 2048` costs 6.7% of decode, and it is the drafter's fault
+
+Ran the matched two-arm decode test the README has been carrying a warning about
+since H14. `scripts/run-h24-ubatch-decode.sh` — two server loads, identical in
+everything but `-ub`, `-sm tensor`, `ALLREDUCE=none`, MTP-Q4_0, 16k prompt,
+400 tokens, r=3. Both arms went to plan; peak 68 °C.
+
+| | `-ub 512` | `-ub 2048` |
+|---|---|---|
+| decode | 29.39 t/s | 27.41 t/s (−6.7%) |
+| prefill | 198.5 t/s | 310.5 t/s (+56.4%) |
+| acceptance | 73.3% | 66.4% |
+| VRAM/card | 10,235 MiB | 10,973 MiB |
+
+The hypothesis said <5%, so it is refuted — but the interesting part is where the
+6.7% comes from. Acceptance was written into H24 as a **control**: ubatch should
+not be able to move it. It moved 6.9 points. Following that thread accounts for
+the entire result: 400 tokens cost `400 − accepted` target forward passes, which
+is 126 steps at 512 and 135 at 2048, +7.1% of work, predicting −6.7% decode.
+Measured −6.7%. There is no residual — **the decode graph itself is unaffected by
+ubatch**, exactly as the null reasoning predicted; the drafter simply proposes
+worse when its own prefill is chunked differently.
+
+Checked the obvious follow-up rather than assuming it: the 400 generated tokens
+are **byte-identical between the two arms** and across all three reps in each
+arm. So this is an efficiency change, not a quality change — the target model
+corrects the worse drafts to the same output, which is what speculative decoding
+is supposed to do.
+
+Kept `-ub 2048`. At 16k it saves 29 s of prefill per turn and costs 2.45 ms per
+output token; break-even is ~11,800 tokens in one turn, which no coding turn
+reaches. A drafter-free config should take `-ub 2048` for free.
+
+Incidental but useful: the standing 29.26 t/s headline reproduced at 29.39 t/s
+under `ALLREDUCE=none` with identical VRAM and identical 73.3% acceptance. That
+figure was measured at `ALLREDUCE=internal` and had never been re-taken since
+the switch, so it was being quoted across a config change. It survives.
+
+Two small pieces of infrastructure: `run-spec-placement.sh` gained `BATCH`/`UB`
+env knobs (empty = llama-server defaults, so every earlier arm is unchanged), and
+`scripts/run-h24-ubatch-decode.sh` drives the pair.
+
+## 2026-08-27 — H20: finishing the 9B -> IQ3_S reframe, and a claim that did not survive it
+
+The 2026-08-26 reframe changed the H20 section body but left the 9B version
+standing in the places that are actually read first: the HYPOTHESES summary
+table, RUNBOOK Phase 7 cell 6, the "reuse what exists" note, and the
+prefill-TTFT research doc's lever table and hypothesis table. All corrected —
+the single-GPU arm of this project is `Qwen3.8-27B-UD-IQ3_S` everywhere now, and
+the 9B survives only as July NIAH history in H13's decay reasoning. (The rest of
+RUNBOOK already named IQ3_S as the single-card target; H20 was the outlier.)
+
+Rewriting it properly surfaced a claim that should not have been carried across:
+the old hypothesis promised **≥2× prefill**, and that was a property of the 9B,
+not of running on one card. A 9B cuts the FLOP count roughly 3×. IQ3 does not —
+same 27e9 parameters, same arithmetic, weights dequantised to f16 before the GEMM
+either way. IQ3 buys **bytes, not FLOPs**, so on one card prefill should get
+*worse* (same work, 18.7 TFLOPS instead of 37.4). The hypothesis is now about
+single-card viability and about decode, where halving the weight bytes and
+removing all cross-GPU traffic actually helps.
+
+This also demotes H20 in the Phase 7 framing paragraph, which listed H19 and H20
+as the only remaining levers that reduce the amount of work done. H20 no longer
+reduces work. H19 is now the only one.

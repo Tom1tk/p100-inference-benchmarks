@@ -31,6 +31,7 @@ run label so the evidence is traceable.
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback: decode within 25% of the two-card Q4_K_M at acceptable NIAH quality | Untested — **reframed 2026-08-26**, was a 9B; the old ≥2× prefill claim does not carry over |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | Untested — **the last kernel-level lever** |
+| H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
 
 ---
 
@@ -1347,3 +1348,57 @@ must not move it. If acceptance shifts, something other than ubatch differed
 between the arms and neither number is trustworthy. Also watch VRAM: the 512 arm
 loaded at 10235 MiB/card, and the extra activation arena at 2048 comes out of
 what a 100k KV cache will later need.
+
+### Result — REFUTED, but the cause is the drafter, not the decode path (2026-08-27)
+
+`scripts/run-h24-ubatch-decode.sh`, `mainline-rebased`, `-sm tensor`,
+`ALLREDUCE=none`, MTP-Q4_0, 16k prompt, 400 tokens, r=3, peak 68 °C. Raw:
+`results/h11-placement.csv` (labels `h24-ub512-*`, `h24-ub2048-*`).
+
+| | `-ub 512` | `-ub 2048` | delta |
+|---|---|---|---|
+| decode t/s | 29.39 | 27.41 | **−6.7%** |
+| prefill t/s | 198.5 | 310.5 | **+56.4%** |
+| acceptance | 73.3% | 66.4% | **−6.9 pp** |
+| draft_n / accepted | 374 / 274 | 399 / 265 | |
+| VRAM per card | 10,235 MiB | 10,973 MiB | **+738 MiB** |
+
+Spread inside each arm is under 0.06 t/s on decode and 0.7 t/s on prefill, so
+the deltas are far outside noise. The claim was <5%; 6.7% refutes it.
+
+**The control variable moved, and following it explains the whole result.**
+Acceptance was specified as the control precisely because ubatch should not
+touch it — it did. Working it through:
+
+- Every output token is either an accepted draft or a target forward pass, so
+  400 tokens cost `400 − accepted` target steps: **126** at `-ub 512`, **135**
+  at `-ub 2048`, i.e. **+7.1% more work**.
+- That alone predicts a **−6.7%** decode change. Measured: **−6.7%.**
+
+**So there is no intrinsic ubatch penalty on the decode path** — as the null
+reasoning said, `n_ubatch` does not enter the decode graph. The entire loss is
+the drafter proposing worse. Two consequences: a **drafter-free** config should
+take `-ub 2048` for free, and the right fix is to tune the drafter at this
+ubatch rather than to give back 56% of prefill.
+
+**Quality is unaffected — verified, not assumed.** The 400 generated tokens are
+**byte-identical** between the two arms, and identical across all three reps in
+each arm. The target model corrects the worse drafts to exactly the same output,
+which is what a correct speculative implementation must do. What changed is only
+the drafter's own numerics (its prefill is chunked differently at a different
+ubatch), and therefore only its efficiency.
+
+**The trade is lopsided in favour of `-ub 2048` for any realistic turn.** At 16k
+a prefill costs 81 s at 512 and 52 s at 2048 — **29 s saved per turn** — while
+decode costs 2.45 ms/token more. Break-even is at **~11,800 output tokens in a
+single turn**; coding turns are one to two orders of magnitude short of that.
+`-ub 2048` stays in the serve command.
+
+**Second thing this settles:** the standing 29.26 t/s headline reproduced at
+**29.39 t/s** under `ALLREDUCE=none` with identical VRAM (10,235 MiB/card) and
+identical acceptance (73.3%). The internal→none change did not cost decode, and
+the figure can now be quoted against the current env.
+
+**Not tested:** whether the acceptance drop persists at 64k–100k (it may grow or
+vanish — H1 showed acceptance is strongly depth-dependent), and whether the
++738 MiB activation arena is affordable once a 100k KV cache is resident.
