@@ -993,6 +993,82 @@ for H18: halving the GEMM rate should be visible if prefill were GEMM-bound.
 **Test:** patch, rebuild, re-run one Phase 2 cell for throughput, then a NIAH
 tier for quality. Free by hypothesis, so if throughput holds, adopt it.
 
+### Investigation — 2026-08-27 (patch located, built, not yet measured)
+
+**The patch is exactly three sites**, all in `ggml/src/ggml-cuda/common.cuh`, and
+`buun` (`39d97a876`) already carries all three. Copied verbatim from there rather
+than reinvented, so the two engines become comparable on quality as well as
+throughput. Saved as `patches/h17-sm60-fp16-fastpath.patch`; built into
+`/root/dflash2-rebased/build-h17` as engine `rebased-h17`, leaving the
+H26-validated `build-cuda-p100` untouched for a clean A/B.
+
+**"Free by hypothesis" is the part that does not survive contact with this
+hardware.** The reason sm_61 has the carve-out is that GP104 runs FP16 at **1/64
+rate**, so excluding it costs nothing. **GP100 runs FP16 at 2:1** — 18.7 against
+9.3 TFLOPS, the card's headline advantage. This patch therefore moves real work
+off a genuinely fast path, which sm_61 never had. **The throughput cost is the
+thing under test, not an assumption**, and the original framing above understates
+the risk.
+
+**Where it bites.** Five consumers, of which one is on the prefill critical path:
+
+| Site | Path | Effect of the patch |
+|---|---|---|
+| `ggml-cuda.cu:1626` `ggml_cuda_mul_mat_cublas` | **prefill GEMMs** | cuBLAS compute type F16 -> F32 **for quantized `src0`** — i.e. for our Q4_K_M weights |
+| `mmvf.cu:650,741` | decode mat-vec | forces `GGML_PREC_F32` |
+| `fattn-tile.cuh:322` | flash-attention tile | FP32 accumulate |
+| `vecdotq.cuh`, `mmq-load-tiles.cuh` | quantized dot products | compile-time `FAST_FP16_AVAILABLE` |
+
+### Pre-registered prediction, from data already banked
+
+`buun` carries the fix and `mainline-rebased` does not. Against the two engines'
+own `-sm tensor`, `ALLREDUCE=none` rows:
+
+| | buun (has fix) | rebased (no fix) | delta |
+|---|---|---|---|
+| pp2048 | 193.50 | 222.75 | **-13.1%** |
+| tg128 | 20.67 | 20.34 | **+1.6%** |
+
+H17 predicts **+1.4% decode**; buun is **+1.6%** ahead. That is close enough to
+be worth stating in advance: **the fix may be most of why buun trails rebased by
+12-14% on prefill**, in which case the claim that "throughput comparisons survive,
+the fix being throughput-neutral" is **wrong** and this repo has been reading a
+13% prefill gap as an engine difference when it is an arithmetic-mode difference.
+
+**So the prediction is: patched rebased lands near 193 t/s on pp2048 and near
+20.7 t/s on tg128** — i.e. it converges on buun. If it instead stays near 222,
+the buun gap is a real engine difference and the fix is genuinely free.
+
+### It is also the cheapest H18 probe we have
+
+H18 (GDN layers dominate prefill) was parked because no cheap test existed. This
+patch **halves the theoretical GEMM rate as a side effect**, which is exactly the
+lever H18 needs:
+
+- Prefill barely moves -> prefill is **not** GEMM-bound -> **H18 supported**.
+- Prefill drops ~40% -> it is GEMM-bound -> **H18 refuted**.
+
+One build, two answers, and the build costs no GPU time at all.
+
+### Test design
+
+- **Test A — paired throughput A/B**, both binaries back to back in one session
+  with identical flags, `-p 2048,16384 -n 128 -r 2`. Paired rather than compared
+  against the banked control because the entire adoption decision rests on this
+  one delta, and the extra arm costs ~5 minutes.
+- **Test B — is the patch actually live**: same short prompt, greedy
+  (`temp 0, top_k 1, seed 42`), 200 tokens, both binaries, `diff` the output.
+  Expect it to differ; roughly 1 greedy token in 20 should flip.
+
+**Not run: a local KL-divergence measurement.** Upstream already measured it
+(0.004962 -> 0.000001, top-token 95.00% -> 99.89%) and a local number would not
+change the adoption decision, which turns entirely on the throughput cost. Rule
+zero.
+
+**Decision rule, fixed before the numbers arrive:** if prefill loss is under ~2%,
+adopt — it is a correctness fix for free. If it costs 13% of prefill, it is a
+real trade against the 100k TTFT and the call is the user's, not mine.
+
 ---
 
 ## H18 — GDN layers dominate prefill
