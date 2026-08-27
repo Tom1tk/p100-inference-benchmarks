@@ -1,0 +1,16 @@
+=== preflight ===
+hottest card: 50C
+0, 175.00 W
+1, 175.00 W
+=== running: h25-iq3-1card ===
+Qwen3.8-27B-UD-IQ3_S.gguf  ub=512,2048  b=2048  p=4096,16384  n=128  r=2  -sm none  dev=CUDA0  kv=f16/f16
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== finished in 965s | exit 0 | peak 69C ===
+--- results ---
+ split    kv  n_ubatch         test       t/s   stddev
+  none   f16       512       pp4096    132.32     0.07
+  none   f16       512      pp16384    125.95     0.04
+  none   f16       512        tg128     11.41     0.00
+  none   f16      2048       pp4096    200.96     0.11
+  none   f16      2048      pp16384    183.80     0.04
+  none   f16      2048        tg128     11.38     0.01

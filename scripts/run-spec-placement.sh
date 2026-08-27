@@ -18,7 +18,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
 # --- Fixed parameters -------------------------------------------------------
-MODEL=/root/Qwen3.8-27B-UD-Q4_K_M.gguf
+MODEL="${MODEL:-/root/Qwen3.8-27B-UD-Q4_K_M.gguf}"
 # Phase 1 selected -sm tensor, so SPLIT is now an env knob rather than a
 # constant. Tensor split needs GGML_CUDA_ALLREDUCE=internal (or none) -- the
 # NCCL default aborts. See H5/H10.
