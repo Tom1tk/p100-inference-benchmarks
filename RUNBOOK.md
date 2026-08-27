@@ -75,8 +75,27 @@ stops telemetry, writes logs and CSV, then commits and pushes.
 ### 2.1 Run economy — every run costs electricity
 
 The user pays for the power these cards draw. A two-card run is ~350 W of draw
-for its whole duration, and a 100k prefill sweep is 30+ minutes of it. Design
-every sweep against these three rules **before** launching it:
+for its whole duration, and a 100k prefill sweep is 30+ minutes of it.
+
+**Rule zero: "do we really need to test this?"** Ask it of every arm, every
+sweep, and every open hypothesis — not just of the ones that look expensive. A
+test earns its electricity only if it can **change what goes in the serve
+command**. Work through it in this order and stop at the first "no":
+
+1. **Do we already know the answer?** Search `results/`, RESULTS.md and RUNLOG.md
+   before designing anything. Cite the banked number as the control.
+2. **Would either outcome change the serve command?** If the result is
+   interesting but leads to no lever we can actually pull on sm_60, it is a
+   diagnostic, not a test. Write down the reasoning instead of running it.
+3. **Is there a cheaper way to get the same confidence?** Arithmetic, a source
+   read, or a shorter proxy run at lower context often settles it for free.
+4. **Is this the smallest run that answers it?** Cut depths, reps and sweep
+   points that do not change the verdict.
+
+A hypothesis that fails rule zero is not deleted — it is **parked with the
+reason**, so nobody re-opens it in three weeks and spends the power anyway.
+
+Then design the sweep against these three rules **before** launching it:
 
 1. **Prefer many short tests over few long ones.** Short runs fail cheaply, give
    an answer sooner, and let the cards idle back to ~45 W between arms.
@@ -383,13 +402,13 @@ phase is aimed at the right target.
 
 | # | Cell | Hypothesis | Why this order |
 |---|---|---|---|
-| 1 | `-p 16384,32768,65536,100000 -n 0`, tensor, f16 KV, **`-b 2048 -ub 2048`** | H13 | We have no data past 16k, and no data at all at the new ubatch. **Highest-value run in the project** |
-| 2 | `GGML_CUDA_CUBLAS_COMPUTE_TYPE=f32` vs `f16` at 16k, **at `-ub 2048`** | H18 | One run. Must be re-based on the new ubatch — running it at `-ub 512` measures the wrong regime |
+| ~~1~~ | ~~`-p 16384,65536,100000 -n 0`, tensor, `-ub 2048`~~ | H13 | **DONE 2026-08-26.** 327.1 / 250.1 / 215.4 t/s; 7.7 min TTFT at 100k |
+| ~~2~~ | ~~`GGML_CUDA_CUBLAS_COMPUTE_TYPE` toggle at 16k~~ | H18 | **Parked by rule zero.** Diagnostic: it tells us *why* prefill is slow, but the only lever it feeds is cell 7, which is itself parked. Re-open if cell 7 becomes runnable |
 | ~~3~~ | ~~`-ub` sweep~~ | H14 | **DONE 2026-08-25 — CONFIRMED, +63%.** `-ub 2048` is the new default; `-ub 8192` OOMs. Re-baseline everything else on it |
 | 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
 | 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
 | 6 | **27B-IQ3_S single-GPU** vs two-card 27B-Q4_K_M — depth ceiling, then speed, then NIAH | H20 | Harness and fixtures exist. **Reframed 2026-08-26: the fallback is the same model at a lower quant, never a different model.** Needs a two-card Q4_K_M NIAH control or the quality leg measures nothing |
-| 7 | **Chunked GDN path** — patch `fused_gdn_ch=false` behind an env var, rebuild, A/B at `-ub 2048` | H22 | The last kernel-level lever. ~2-line patch, not a kernel project. **Run cell 2 first** — H18 sizes the prize. Check the load log for CPU-fallback warnings before trusting any number |
+| ~~7~~ | ~~**Chunked GDN path** A/B~~ | H22 | **Tried 2026-08-26, crashes.** The chunked graph's ops carry no split-axis metadata, so it aborts under `-sm tensor` before producing a number. Wiring that up is real kernel work, not a 2-line patch. **Parked by rule zero** — it is no longer a cheap test |
 | 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
 | ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
 | ~~—~~ | ~~TurboPrefill build~~ | ~~H16~~ | **Withdrawn 2026-08-25** — user call. Forces `-sm layer`, costing 35% of decode to buy prefill; wrong trade against the four simultaneous targets |
@@ -405,6 +424,27 @@ so raising ubatch above 2048 requires raising `-b` too.
 compute — several times longer than any run this repo has done, and prefill loads
 the cards harder than decode. The 83 °C limit has never been tested under this
 profile. Monitor cell 1 actively; do not background it and walk away.
+
+### Parked by rule zero — reasoning recorded so nobody re-spends the power
+
+These are not closed (the questions may still be true); they simply cannot
+change the serve command today, so they do not earn their electricity. Re-open
+only when the stated unblock happens.
+
+| Item | Why it's parked | What would unpark it |
+|---|---|---|
+| H18 — GDN-bound prefill | Diagnostic. It sizes a prize that only H22 can collect, and H22 is parked | H22 becoming runnable |
+| H22 — chunked GDN | Crashes under `-sm tensor`: the chunked ops have no split-axis metadata. Now a kernel project, not a flag | Someone annotating the split axes, or a run on `-sm none`/`layer` being worth it on its own |
+| H23 — quadratic attention at 100k | Diagnostic. Explains the depth decay, but every sparse-attention kernel that could exploit it is sm_80+. No lever exists on sm_60 | An sm_60-capable sparse-attention path appearing |
+| H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1. Tuning its second-best mode cannot produce the serve command | `ik` gaining tensor split |
+| q8 KV × ubatch interaction | Noted while trimming H25. Not that test's purpose; if it matters it will surface as an anomaly in a later result | An unexplained q8 result |
+
+**What is actually left that can change the serve command:** the 100k NIAH
+quality gate (the fourth objective has *no* data at all), H19 (prompt-cache
+reuse — a flag, not a sweep), H17 (the sm_60 arithmetic bug, which confounds
+every quality comparison), and H15 (power cap, gated on the user's PSU check).
+That is a much shorter list than the hypothesis count suggests, and it is the
+list to work from.
 
 **Reuse what exists.** `/root/niah_test/` has a working harness and generated
 fixtures at 8k/32k/64k/100k (single and multi-needle). `pflash-llama.cpp` ships a
