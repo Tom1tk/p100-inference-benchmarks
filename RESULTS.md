@@ -47,6 +47,8 @@ _Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any ne
 | `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **218.9** | **221.8** | — | — | — | — | — |
 | `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 1024 | f16 | **278.8** | **276.5** | — | — | — | — | — |
 | `h14-ubatch-sweep-q4km` | rebased | Q4_K_M | tensor | 2 | 2048 | 2048 | f16 | **357.5** | **351.1** | — | — | — | — | — |
+| `h17-control-nofix` | rebased | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **222.7** | — | — | **208.4** | — | — | **20.4** |
+| `h17-patched-fp32` | rebased+h17 | Q4_K_M | tensor | 2 | 2048 | 512 | f16 | **193.0** | — | — | **182.8** | — | — | **20.4** |
 | `h25-iq3-1card-kv-q4` | rebased | IQ3_S | none | 1 | 2048 | 2048 | q4_0 | — | **202.1** | — | **184.0** | — | — | **11.2** |
 | `h25-iq3-1card-kv-q8` | rebased | IQ3_S | none | 1 | 2048 | 2048 | q8_0 | — | **202.4** | — | **184.1** | — | — | **11.2** |
 | `h25-iq3-1card` | rebased | IQ3_S | none | 1 | 2048 | 512 | f16 | — | **132.3** | — | **125.9** | — | — | **11.4** |
@@ -91,6 +93,25 @@ _Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any ne
   is the useful result — **`-sm` is a no-op when only one device is visible.**
 
 ## Table B — `llama-server` (real requests, drafters, VRAM)
+
+### H17 — the sm_60 FP16 fast-path A/B (2026-08-27)
+
+Same tree, same flags, one session; the only difference is the build. This is
+the cleanest paired comparison in the repo and it reprices the buun row above.
+
+| | control (fix off) | patched (fix on) | delta | buun (fix on) |
+|---|---|---|---|---|
+| pp2048 | 222.72 | **193.01** | **-13.3%** | 193.50 |
+| pp16384 | 208.44 | **182.76** | **-12.3%** | 182.75 |
+| tg128 | 20.357 | **20.430** | **+0.36%** | 20.67 |
+
+Std devs 0.01-0.14 t/s. Patched rebased lands within **0.3%** of buun on prefill
+at both depths — so buun's prefill "deficit" was this fix all along. Its decode
+lead survives at ~1.2% and is a genuine engine difference.
+
+**Side effect:** halving the GEMM rate cost only 12-13% of prefill, implying
+**~15% of prefill time is GEMM-rate-bound**. That is the first number anyone has
+put on H18, and it came free.
 
 | Run | Engine | Quant | `-sm` | GPUs | `-ub` | KV | Drafter | Ctx | Decode | Prefill | Accept | VRAM/card | Peak |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -161,6 +182,7 @@ _Generated: `python3 scripts/build-matrix.py`. Regenerate and paste after any ne
 |---|---|---|---|
 | Engine | mainline, rebased, buun, `ik`, PFlash | **rebased** (mainline + DFlash2, same speed as mainline) | Table A phase1 block |
 | `-sm` | `layer`, `tensor`, `graph` (`ik`), `none` (1 card) | **`tensor`** — +58% decode, +11% prefill over layer | H1/H6 |
+| **sm_60 FP16 fast path** | on (stock mainline) vs off (buun / the H17 patch) | **Leave it ON** for speed — patching it out costs **12–13% of prefill** and buys only **+0.36%** decode. But it is an arithmetic *correctness* fix, so this is a speed-vs-quality trade, **not settled** | H17 |
 | `GGML_CUDA_ALLREDUCE` | NCCL default, `internal`, `none` | **`none`** (default aborts under tensor split; internal == none) | H5 |
 | `-ub` | 128, 256, 512, 1024, 2048, 4096, 8192 | **2048** — +63% prefill; 8192 aborts; 4096 needs `-b 8192` for +1% | H14, H24 |
 | `-b` | 2048, 8192 | **2048** — only matters as a ceiling on `-ub` | H14 |
@@ -247,7 +269,7 @@ The apples-to-apples comparison. All cells on **`Qwen3.8-27B-UD-Q4_K_M`**.
 | mainline rebased | `57affa09` | layer | 180.85 | 190.80 | 192.09 | 187.15 | 12.89 | — |
 | mainline rebased | `57affa09` | tensor, `ALLREDUCE=none`, **`P2P=1`** | 221.91 | 222.77 | 214.19 | 207.63 | **20.92** | Best decode. P2P costs ~0.3% pp, buys +2.9% tg. See H10 |
 | mainline rebased | `57affa09` | tensor, `ALLREDUCE=none`, P2P off | 222.75 | 223.43 | 214.88 | 208.25 | 20.34 | Reproduces the `internal` cell above to within 0.06% |
-| **buun** | `39d97a876` | **tensor**, `ALLREDUCE=none` | 193.50 | 191.86 | 188.57 | 182.75 | 20.67 | 684s, peak 70C. Tensor works on buun — but 12–14% behind rebased on prefill |
+| **buun** | `39d97a876` | **tensor**, `ALLREDUCE=none` | 193.50 | 191.86 | 188.57 | 182.75 | 20.67 | 684s, peak 70C. Tensor works on buun. **The 12–14% prefill gap is NOT an engine difference** — see H17 below: it is the sm_60 FP16 fix, which buun carries and rebased does not. Patch rebased and it lands on 193.01 / 182.76, i.e. **on top of this row** |
 
 Earlier Q6_K_M reference cell, kept for continuity (different quant — not
 comparable to the rows above):

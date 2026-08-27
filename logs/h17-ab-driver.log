@@ -30,3 +30,8 @@ build_commit,build_number,cpu_info,gpu_info,backends,model_filename,model_type,m
 "57affa09","1183","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","2048","0","0","2026-08-27T17:30:07Z","10610958720","7395849","193.008054","0.134501"
 "57affa09","1183","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","16384","0","0","2026-08-27T17:30:39Z","89646785634","6310281","182.761712","0.012865"
 "57affa09","1183","Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz","Tesla P100-PCIE-16GB, Tesla P100-PCIE-16GB","CUDA","/root/Qwen3.8-27B-UD-Q4_K_M.gguf","qwen35 27B Q4_K - Medium","16453443584","27320697856","2048","512","8","0x0","0","50","f16","f16","99","0","tensor","0","0","1","auto","0.00","none","auto","0","0","0","0","0","0","128","0","2026-08-27T17:35:08Z","6265369508","12863965","20.429804","0.041945"
+pushed
+
+Next: update RESULTS.md, and HYPOTHESES.md if this bears on H1-H7 (see RUNBOOK.md section 4).
+
+=== A/B done -- compare results/raw/h17-control-nofix.csv vs h17-patched-fp32.csv ===
