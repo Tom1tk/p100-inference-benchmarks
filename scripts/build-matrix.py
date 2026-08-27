@@ -41,7 +41,12 @@ def main():
             quant = os.path.basename(r['model_filename']).replace('Qwen3.8-27B-UD-', '').replace('.gguf', '')
             # -dev CUDA0/CUDA1 means a single card; 'auto' or empty means both.
             gpus = '1' if (r.get('devices') or 'auto').strip() in ('CUDA0', 'CUDA1') else '2'
-            key = (os.path.basename(path)[:-4], ENGINES.get(r['build_commit'], r['build_commit']),
+            label = os.path.basename(path)[:-4]
+            engine = ENGINES.get(r['build_commit'], r['build_commit'])
+            # H17 built the same commit twice; only the label separates them.
+            if label.startswith('h17-patched'):
+                engine += '+h17'
+            key = (label, engine,
                    quant, r['split_mode'], gpus, r['n_batch'], r['n_ubatch'], r['type_k'])
             if key not in table:
                 order.append(key)

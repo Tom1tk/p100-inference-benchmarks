@@ -1322,3 +1322,95 @@ Three of the four objectives now have numbers **at the target depth, from a
 single run**. The fourth — quality — still has none, at any depth, and is now
 the only thing between this repo and its deliverable. The next question is not
 how fast this rig is; it is whether what it produces at 100k is worth reading.
+
+---
+
+## 2026-08-27 — H17: the sm_60 FP16 fix is real, and it is not free
+
+**Refuted as written.** Patching sm_60 out of the FP16 fast path costs **12-13%
+of prefill** and gains **+0.36%** of decode, against a claim of "throughput-free"
+and "+1.4% decode". The adopt-for-free path H17 assumed does not exist.
+
+| | control | patched | delta |
+|---|---|---|---|
+| pp2048 | 222.72 | 193.01 | **-13.3%** |
+| pp16384 | 208.44 | 182.76 | **-12.3%** |
+| tg128 | 20.357 | 20.430 | +0.36% |
+
+Paired A/B, same tree, same flags, one session, std devs 0.01-0.14 t/s. Peaks
+69 C and 70 C. The build itself cost no GPU time.
+
+### Why "free by hypothesis" was wrong
+
+sm_61 has the carve-out because GP104 runs FP16 at **1/64 rate**, so excluding it
+costs nothing. **GP100 runs FP16 at 2:1** — 18.7 against 9.3 TFLOPS. The patch
+therefore moves real work off a genuinely fast path that sm_61 never had. One of
+the five consumers is `ggml_cuda_mul_mat_cublas`, which flips the cuBLAS compute
+type from F16 to F32 **for quantized `src0`** — our Q4_K_M weights, on the prefill
+critical path. That was visible in the source before the run and should have been
+caught when H17 was written.
+
+### The pre-registered prediction paid off, and it corrects a banked result
+
+Written down before the run: if the fix explains buun's prefill deficit, the
+patched build converges on buun's 193.50.
+
+**Measured 193.008 at pp2048 and 182.76 at pp16384, against buun's 193.50 and
+182.75 — within 0.3% at both depths.**
+
+So **buun's 12-14% prefill "deficit" was never an engine difference.** buun
+carries the fix; rebased does not; that is the whole gap. Since Phase 3 this repo
+has been reading an arithmetic-mode difference as an engine property. RESULTS.md
+is corrected. Like for like the two engines have the same prefill, and buun's
+**decode** lead shrinks to ~1.2% and is real.
+
+The decode half of the prediction **failed** — predicted +1.6%, measured +0.36%.
+Recorded as a miss.
+
+### H18 got its number as a side effect
+
+Halving the theoretical GEMM rate cost only 12-13% of prefill. Modelling prefill
+as a GEMM-rate-bound fraction `f` plus everything else, `1/(1+f)` = the measured
+ratio gives **f = 15.4%** at 2048 and **14.1%** at 16384.
+
+**~15% of prefill time is GEMM-rate-bound; ~85% is not** — direct support for
+H18's claim that the GDN path, which has no GEMMs, is where prefill time goes.
+H18 was parked in the morning for want of a cheap probe. It got one for free.
+
+The estimate assumes cuBLAS FP32 is exactly half-rate and that nothing else
+changed; the FP32 path also converts weights to F32 rather than F16, so some of
+the 13% is bandwidth, not FLOPs. It bounds the GEMM share, it does not measure
+the GDN share.
+
+### Not adopted, not rejected
+
+At the H26 serve config, -12.3% prefill takes 100k TTFT from **~7.8 to ~9.2 min**
+per uncached turn. Against that, upstream reports KL divergence
+0.004962 -> 0.000001 and top-token agreement 95.00% -> 99.89%: **about 1 greedy
+token in 20 flips**.
+
+**We did not verify that on this rig.** The output-comparison test was planned
+and not run - the user called a halt to further testing, correctly, since the
+throughput number already forced the decision up a level. So the cost side is
+measured and the benefit side is still upstream's number.
+
+This cannot be settled on speed alone. It is a speed-versus-quality trade and it
+belongs with Phase 8, where quality finally gets measured - **which also means
+H17 must be settled before the quality sweep runs, not after, because it changes
+model numerics.** Parked for a decision.
+
+**One option recorded so nobody re-derives it:** the three patch sites are
+separable. `fast_fp16_hardware_available` alone sets the cuBLAS compute type for
+prefill GEMMs; the other two govern the decode mat-vec, flash-attention tile and
+quantized dot products. Patching only the latter two would keep FP16 prefill and
+move just the decode-side arithmetic to FP32 - recovering most of the 13% while
+still fixing the paths nearest the sampled logits. Whether that keeps the
+accuracy benefit is unknown; it would need one free build and one short run.
+
+### Artefacts
+
+`patches/h17-sm60-fp16-fastpath.patch` (three sites, copied verbatim from buun),
+`/root/dflash2-rebased/build-h17` (patched binaries; the H26-validated
+`build-cuda-p100` was left untouched), `scripts/run-h17-ab.sh`, and
+`rebased-h17` as an engine in `run-bench.sh`. The source tree itself is reverted
+to unpatched, so a rebuild of `build-h17` must re-apply the patch first.

@@ -25,8 +25,8 @@ run label so the evidence is traceable.
 | H14 | `-ub` 512→1024/2048 improves prefill ≥10% | **CONFIRMED 2026-08-25 — +63%.** Use `-ub 2048` |
 | H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
-| H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
-| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **parked by rule zero 2026-08-27.** A diagnostic, not a lever: it only sizes a prize H22 collects, and H22 crashes. H14's +63% also argues against it |
+| H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
+| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
@@ -1069,6 +1069,94 @@ zero.
 adopt — it is a correctness fix for free. If it costs 13% of prefill, it is a
 real trade against the 100k TTFT and the call is the user's, not mine.
 
+### Result — 2026-08-27. **The patch is not free. H17 as written is refuted.**
+
+Paired A/B, same tree, same flags, one session, `-sm tensor`,
+`ALLREDUCE=none`, `-b 2048 -ub 512`, `-r 2`. Peaks 69 C / 70 C.
+
+| Metric | control (no fix) | patched (FP32) | delta |
+|---|---|---|---|
+| pp2048 | 222.72 | **193.01** | **-13.3%** |
+| pp16384 | 208.44 | **182.76** | **-12.3%** |
+| tg128 | 20.357 | **20.430** | **+0.36%** |
+
+Standard deviations were 0.01-0.14 t/s, so every one of these is far outside
+noise.
+
+**Scoring the claim as written:**
+
+| H17 said | Measured | |
+|---|---|---|
+| "prefill unchanged" | **-13.3% / -12.3%** | **refuted** |
+| "gains ~1.4% decode" | **+0.36%** | **refuted** — real, but an order of magnitude short |
+| "free by hypothesis, so if throughput holds, adopt it" | throughput does not hold | **the adopt-for-free path is closed** |
+| "measurably changes model output" | not yet tested | still open |
+
+### The pre-registered prediction was right, and it reprices a banked result
+
+Predicted before the run: patched rebased converges on buun's 193.50 pp2048.
+**Measured 193.008 — a 0.25% miss.**
+
+So **the sm_60 fix accounts for essentially all of buun's 13% prefill deficit.**
+This repo has been reading an arithmetic-mode difference as an engine difference
+since Phase 3. RESULTS.md's note that buun is "12-14% behind rebased on prefill"
+is true only because buun is doing the arithmetic correctly and rebased is not.
+**Like for like, the two engines have the same prefill.**
+
+The decode half of the prediction **failed**: predicted +1.6% (buun's lead),
+measured +0.36%. buun still leads the patched build by ~1.2% on decode, so
+buun's decode advantage is a **real engine difference** — smaller than assumed,
+but not explained by this fix.
+
+### This is also the first numerical evidence for H18
+
+FP32 halves peak GEMM throughput on GP100 (18.7 -> 9.3 TFLOPS). If a fraction
+`f` of prefill time were GEMM-rate-bound, doubling GEMM time gives a speed ratio
+of `1/(1+f)`:
+
+- pp2048: `193.008/222.724 = 0.8666` -> **f = 15.4%**
+- pp16384: `182.762/208.443 = 0.8768` -> **f = 14.1%**
+
+**Roughly 15% of prefill time is GEMM-rate-bound; the other ~85% is not.** That
+is direct quantitative support for H18 — the GDN path, which has no GEMMs, is
+where prefill time actually goes. H18 was parked for want of a cheap probe;
+this is that probe, and it cost one build and ten minutes.
+
+**Caveat on the arithmetic:** this assumes cuBLAS FP32 is exactly half-rate and
+that nothing else changes. The FP32 path also converts quantized weights to F32
+rather than F16, which doubles intermediate memory traffic, so some of the 13%
+is bandwidth rather than FLOPs. Treat ~15% as an estimate with a stated model
+behind it, not a measurement.
+
+**Why decode barely moved:** decode is memory-bandwidth-bound, not
+arithmetic-bound, so the compute mode is nearly irrelevant to it. The +0.36% is
+consistent with everything else this repo has measured about the decode path.
+
+### What it costs, and what is still unknown
+
+At the H26 serve config, -12.3% prefill takes 100k TTFT from **~7.8 min to
+~9.2 min** per uncached turn.
+
+Against that: upstream's KL divergence 0.004962 -> 0.000001 and top-token
+agreement 95.00% -> 99.89%, i.e. **~1 greedy token in 20 flips**. We have **not**
+verified that on this rig — Test B was not run, so the benefit side of the trade
+is still upstream's number, not ours.
+
+**Not adopted. Not rejected. Parked for a decision**, because the throughput cost
+is real and the deliverable's fourth objective is quality, which this repo has
+never measured. It cannot be settled on speed alone.
+
+### One option worth recording before anyone re-derives it
+
+The three sites are separable. `fast_fp16_hardware_available` is the one that
+sets the **cuBLAS compute type for prefill GEMMs**; the other two govern the
+decode mat-vec, flash-attention tile and quantized dot products. A **partial
+patch** — leave `fast_fp16_hardware_available` alone, patch the other two —
+would keep FP16 prefill GEMMs and move only the decode-side arithmetic to FP32.
+That would recover most of the 13% while still fixing the paths closest to the
+sampled logits. Whether it keeps most of the accuracy benefit is unknown and
+would need one more build (free) plus a short output-comparison run.
+
 ---
 
 ## H18 — GDN layers dominate prefill
@@ -1440,6 +1528,12 @@ Two ways forward, neither attempted (user paused further chasing on this):
 pushed per this repo's own contribution rules); the 3-line patch is left in
 place, inert unless `LLAMA_GDN_FORCE_CHUNKED` is set, for whoever re-attempts
 this.
+
+**Sized 2026-08-27.** H17's A/B put a number on it without a dedicated run: see
+"This is also the first numerical evidence for H18" in H17 above. ~15% of prefill
+time is GEMM-rate-bound, so ~85% is somewhere else, and the GDN path is the
+obvious candidate. That is support, not proof — it bounds the GEMM share rather
+than measuring the GDN share directly.
 
 **Ordering — superseded 2026-08-27.** The original advice was "run H18 first;
 H18 sizes the prize, H22 collects it." That assumed H22 was a flag away. It is
