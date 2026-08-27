@@ -66,3 +66,12 @@
 2.56.279.827 I slot print_timing: id  3 | task 288 | prompt processing, n_tokens =  14183, progress = 1.00, t =  44.60 s / 317.99 tokens per second
 2.59.712.131 I slot print_timing: id  3 | task 288 | n_gen =    101, tg =  32.54 t/s, tg_3s =  32.86 t/s
 3.02.776.501 I slot print_timing: id  3 | task 288 | n_gen =    193, tg =  31.28 t/s, tg_3s =  30.02 t/s
+3.05.788.315 I slot print_timing: id  3 | task 288 | n_gen =    258, tg =  28.09 t/s, tg_3s =  21.58 t/s
+3.08.815.119 I slot print_timing: id  3 | task 288 | n_gen =    338, tg =  27.68 t/s, tg_3s =  26.43 t/s
+3.11.192.226 I slot print_timing: id  3 | task 288 | prompt eval time =   45745.97 ms / 14187 tokens (    3.22 ms per token,   310.13 tokens per second)
+3.11.192.234 I slot print_timing: id  3 | task 288 |        eval time =   14553.48 ms /   400 tokens (   36.47 ms per token,    27.42 tokens per second)
+3.11.192.235 I slot print_timing: id  3 | task 288 |       total time =   60299.45 ms / 14587 tokens
+3.11.192.237 I slot print_timing: id  3 | task 288 |    graphs reused =        394
+3.11.192.245 I slot print_timing: id  3 | task 288 | draft acceptance = 0.66416 (  265 accepted /   399 generated), mean len =  2.99
+3.11.193.146 I slot      release: id  3 | task 288 | stop processing: n_tokens = 14586, truncated = 0
+3.11.230.563 I srv    operator(): operator(): cleaning up before exit...

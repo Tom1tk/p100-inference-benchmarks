@@ -10,3 +10,13 @@ CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server
 loaded in 10s | VRAM 10973/10973 MiB
   rep1: decode 27.43 t/s | prefill 310.79 t/s | accept 265/399 = 66.4% | peak 66C
   rep2: decode 27.38 t/s | prefill 310.65 t/s | accept 265/399 = 66.4% | peak 67C
+  rep3: decode 27.42 t/s | prefill 310.13 t/s | accept 265/399 = 66.4% | peak 68C
+--- ub=2048 done (exit 0) ---
+=== H24 results ===
+label               spec_type  drafter                    placement  rep  decode_tps  prefill_tps  n_decoded  draft_n  draft_accepted  accept_pct  gpu0_mib  gpu1_mib  peak_temp  load_s  outcome
+h24-ub512-mtp-16k   draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    1    29.37       198.19       400        374      274             73.3        10235     10235     66         20      ok
+h24-ub512-mtp-16k   draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    2    29.43       198.66       400        374      274             73.3        10235     10235     66         20      ok
+h24-ub512-mtp-16k   draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    3    29.36       198.65       400        374      274             73.3        10235     10235     67         20      ok
+h24-ub2048-mtp-16k  draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    1    27.43       310.79       400        399      265             66.4        10973     10973     66         10      ok
+h24-ub2048-mtp-16k  draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    2    27.38       310.65       400        399      265             66.4        10973     10973     67         10      ok
+h24-ub2048-mtp-16k  draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    3    27.42       310.13       400        399      265             66.4        10973     10973     68         10      ok
