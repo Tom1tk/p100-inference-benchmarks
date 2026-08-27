@@ -28,7 +28,7 @@ run label so the evidence is traceable.
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **decides the plan** |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
-| H20 | A 9B on one P100 beats the 27B's TTFT by ≥2× at 64k at acceptable NIAH quality | Untested |
+| H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback: decode within 25% of the two-card Q4_K_M at acceptable NIAH quality | Untested — **reframed 2026-08-26**, was a 9B; the old ≥2× prefill claim does not carry over |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | Untested — **the last kernel-level lever** |
 
@@ -790,8 +790,12 @@ are listed in RUNBOOK's closed table rather than here.
 prefill cannot go below **144 s** however good the kernels get, and 45–55% of
 peak — a good outcome — is **260–320 s**. We measure 11.2 TFLOP/s today, 30% of
 peak. So H14–H16 are worth at most a ~1.5–2× improvement between them, and only
-H19 and H20 can produce a step change, because only those two reduce the amount
-of work done. (H21 was a third such lever; it was withdrawn on 2026-08-25.)
+**H19** can now produce a step change, because it is the only remaining lever
+that reduces the amount of work done. (H21 was a second such lever, withdrawn
+2026-08-25; **H20 was a third until it was reframed on 2026-08-26** — a 9B cut
+the FLOP count, but a 27B at IQ3 is the same 27e9 parameters and therefore the
+same prefill FLOPs. IQ3 buys bytes, not arithmetic, and prefill is
+compute-bound. See H20 for what it does and does not buy.)
 
 ---
 
@@ -1052,53 +1056,65 @@ list** for the stated use case, and it costs nothing but a flag.
 
 ---
 
-## H20 — a lower-quant 27B on a single P100
+## H20 — Qwen3.8-27B at IQ3_S on a single P100
 
-**Superseded 2026-08-26 (user call).** Originally framed around Qwen3.5-9B —
-withdrawn: a different model isn't a fallback for "serve the 27B", it's a
-different deliverable. **Replaced with a same-model fallback:** Qwen3.8-27B
-at **IQ3** quantisation, which fits on a single 16 GB card, same as the 9B did.
-This keeps the fallback on the actual target model.
+**Reframed 2026-08-26 (user call).** Originally a Qwen3.5-9B fallback —
+withdrawn. A different model, on an older architecture, is not a fallback for
+"serve the 27B"; it is a different deliverable, and its numbers do not transfer.
+**The single-GPU arm of this project is now Qwen3.8-27B-UD-IQ3_S**, and any
+single-GPU comparison in this repo is against that file. The 9B is retired from
+the plan; it survives only as July NIAH history in H13's decay reasoning.
 
-**Claim:** Qwen3.8-27B-IQ3 on one P100 delivers ≥2× the two-card `UD-Q4_K_M`'s
-prefill at 64k, at NIAH quality acceptable for the target workload.
+**Confirmed on disk:** `/root/Qwen3.8-27B-UD-IQ3_S.gguf`, 11,483 MiB (11.2 GiB).
+No quantising needed — this is a re-run, not a build.
 
-**Reasoning:** single-card removes all cross-GPU tensor-split traffic, and
-IQ3 is roughly half the weight bytes of Q4_K_M, so both the memory-bandwidth
-and PCIe-transport terms shrink. The open question is entirely quality — IQ3
-is a much more aggressive quant than anything tested here so far, and the
-existing quality tooling (NIAH harness) was validated against the 9B, not
-against a 27B this low.
+**Claim:** Qwen3.8-27B-IQ3_S on one P100 serves at a usable depth with decode
+within 25% of the two-card `UD-Q4_K_M` config, at NIAH quality acceptable for
+coding work.
 
-**Confirmed on disk (2026-08-26):** `/root/Qwen3.8-27B-UD-IQ3_S.gguf`,
-11,483 MiB (11.2 GiB). No quantising needed — this is a re-run, not a build.
+**Why the claim changed shape when the model did.** The old 9B claim was a
+**prefill** claim (≥2× TTFT), and it was plausible for a 9B because a smaller
+model cuts the FLOP count roughly 3×. **IQ3 does not.** It is the same 27e9
+parameters and therefore the same prefill arithmetic — the weights are
+dequantised to f16 before the GEMM either way. IQ3 buys **bytes, not FLOPs**:
 
-**VRAM math, and it changes the depth this fallback can actually reach.** One
-P100 is 16,269 MiB. Weights alone leave **4,786 MiB** for KV + activations +
-overhead:
+| phase | bound by | what IQ3-on-one-card does |
+|---|---|---|
+| prefill | compute | **worse.** Same FLOPs, but one card is 18.7 TFLOPS against two cards' 37.4. Expect roughly half the prefill unless tensor-split overhead is far worse than measured |
+| decode | memory bandwidth | **plausibly competitive.** ~11.2 GiB of weights against Q4_K_M's ~16 GiB spread over two cards, and no cross-GPU traffic per token at all |
+
+So **do not carry the old ≥2× prefill claim over to IQ3** — it was a property of
+the 9B, not of the quant. This hypothesis is now about whether a single card is
+*viable*, and about decode, not about winning on TTFT.
+
+**VRAM math, and it caps the depth this fallback can reach.** One P100 is
+16,269 MiB. Weights alone leave **4,786 MiB** for KV + activations + overhead:
 
 | context | f16 KV size | fits in 4,786 MiB? |
 |---|---|---|
-| 64k | 4,096 MiB | barely — ~690 MiB left for activations, likely too tight at `-ub 2048` (H14 hit VRAM limits with far more headroom on two cards) |
+| 64k | 4,096 MiB | barely — ~690 MiB left for activations, likely too tight at `-ub 2048` |
 | 100k | 6,250 MiB | **no** — 1,464 MiB over budget at f16 KV |
 
-So as specced, this fallback **cannot reach 100k on one card at f16 KV** —
-it tops out somewhere below that, or needs a smaller `-ub`, or needs KV
-quantisation. The last option reopens the TurboQuant quality question this
-repo already priced at 14.3% of decode on the two-card config — worth
-revisiting here since removing KV quant may not be optional this time, not
-just a cost/benefit choice.
+As specced this fallback **cannot reach 100k on one card at f16 KV**: it tops
+out below that, or needs a smaller `-ub`, or needs KV quantisation. The last
+option reopens the TurboQuant question this repo priced at 14.3% of decode
+(H4) — and here it may not be a cost/benefit choice but a requirement, which is
+a materially different decision than the one H4 closed.
 
-**Test:** re-run the existing NIAH harness (`/root/niah_test/run_engine.py`,
-fixtures already generated) with `CUDA_VISIBLE_DEVICES=0`. First find the
-actual achievable depth at f16 KV (start at 32k, step up, watch VRAM — don't
-assume 64k fits until measured), then prefill speed at that depth for the
-comparison, then the NIAH quality gate at the same depth.
+**Test:** `CUDA_VISIBLE_DEVICES=0`, `-sm none`, IQ3_S. Three steps in order:
+1. **Find the achievable depth at f16 KV.** Start at 32k and step up watching
+   VRAM. Do not assume 64k fits until it is measured.
+2. **Prefill and decode at that depth**, against the two-card Q4_K_M numbers at
+   the same depth — same prompt, same `N_PREDICT`, same reps.
+3. **NIAH quality gate at that depth**, `/root/niah_test/run_engine.py`,
+   fixtures already generated.
 
-**Watch:** quality is still the deeper question — IQ3 is a much more
-aggressive quant than anything tested here, and the NIAH harness was
-validated against the 9B, not a 27B this low. Use the multi-needle fixtures
-(`niah_*_multi.jsonl`) and WEB_BENCH if this looks promising.
+**Watch:** quality is the deeper question. IQ3 is a much more aggressive quant
+than anything tested on this rig, and the NIAH harness's only baseline is the
+July 9B run — so it validates the *harness*, not this model at this quant. The
+Q4_K_M 27B has no NIAH baseline either, which means **step 3 needs a two-card
+Q4_K_M control run or it measures nothing**. Use the multi-needle fixtures
+(`niah_*_multi.jsonl`) and WEB_BENCH if it looks promising.
 
 **Not started.**
 

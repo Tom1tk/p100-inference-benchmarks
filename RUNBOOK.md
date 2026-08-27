@@ -354,7 +354,7 @@ phase is aimed at the right target.
 | ~~3~~ | ~~`-ub` sweep~~ | H14 | **DONE 2026-08-25 — CONFIRMED, +63%.** `-ub 2048` is the new default; `-ub 8192` OOMs. Re-baseline everything else on it |
 | 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
 | 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
-| 6 | 9B single-GPU vs 27B, NIAH 8k→100k | H20 | Harness and fixtures already exist |
+| 6 | **27B-IQ3_S single-GPU** vs two-card 27B-Q4_K_M — depth ceiling, then speed, then NIAH | H20 | Harness and fixtures exist. **Reframed 2026-08-26: the fallback is the same model at a lower quant, never a different model.** Needs a two-card Q4_K_M NIAH control or the quality leg measures nothing |
 | 7 | **Chunked GDN path** — patch `fused_gdn_ch=false` behind an env var, rebuild, A/B at `-ub 2048` | H22 | The last kernel-level lever. ~2-line patch, not a kernel project. **Run cell 2 first** — H18 sizes the prize. Check the load log for CPU-fallback warnings before trusting any number |
 | 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
 | ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
@@ -372,11 +372,14 @@ compute — several times longer than any run this repo has done, and prefill lo
 the cards harder than decode. The 83 °C limit has never been tested under this
 profile. Monitor cell 1 actively; do not background it and walk away.
 
-**Reuse what exists.** `/root/niah_test/` has a working harness, generated
-fixtures at 8k/32k/64k/100k (single and multi-needle) and a July baseline for
-Qwen3.5-9B. `pflash-llama.cpp` ships a built `llama-niah` with fixtures to 128k —
-that binary and its fixtures are the only reason the fork is still on disk. H20 is
-mostly a re-run, not new harness work.
+**Reuse what exists.** `/root/niah_test/` has a working harness and generated
+fixtures at 8k/32k/64k/100k (single and multi-needle). `pflash-llama.cpp` ships a
+built `llama-niah` with fixtures to 128k — that binary and its fixtures are the
+only reason the fork is still on disk. H20 is mostly a re-run, not new harness
+work. Its July baseline is a **Qwen3.5-9B** run, so it validates the harness but
+is **not** a quality baseline for anything in the current plan: every model in
+Phase 7 is Qwen3.8-27B, and the single-GPU arm is `Qwen3.8-27B-UD-IQ3_S`
+(11.2 GiB, on disk). Any quality comparison needs its own 27B control.
 
 ### Deferred
 ~~Context depths beyond 16k~~ — **now Phase 7 cell 1, the top priority**.
