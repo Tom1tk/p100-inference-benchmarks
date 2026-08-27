@@ -37,6 +37,10 @@ REPS="${REPS:-3}"
 # Empty means "leave llama-server at its defaults" (-b 2048 -ub 512).
 BATCH="${BATCH:-}"
 UB="${UB:-}"
+# H26: at 100k the default n_slots=4 is a needless allocation risk, and one
+# request can run for ~8 min, well past the old fixed 900s curl timeout.
+NP="${NP:-}"
+REQ_TIMEOUT="${REQ_TIMEOUT:-900}"
 PORT=8300
 LOAD_TIMEOUT=900
 ABORT_TEMP=83
@@ -109,6 +113,7 @@ SERVER_CMD=(
 )
 [[ -n "$BATCH" ]] && SERVER_CMD+=( -b "$BATCH" )
 [[ -n "$UB"    ]] && SERVER_CMD+=( -ub "$UB" )
+[[ -n "$NP"    ]] && SERVER_CMD+=( -np "$NP" )
 if [[ "$DRAFTER" != none ]]; then
     SERVER_CMD+=( --spec-type "$SPEC_TYPE" -md "$DRAFTER" )
     [[ "$PLACEMENT" != default ]] && SERVER_CMD+=( -devd "$PLACEMENT" )
@@ -153,7 +158,7 @@ for rep in $(seq 1 "$REPS"); do
     fi
 
     # -s not -sf: on an HTTP error we want the body, which carries the reason.
-    RESP=$(curl -s -m 900 "http://127.0.0.1:${PORT}/v1/chat/completions" \
+    RESP=$(curl -s -m "$REQ_TIMEOUT" "http://127.0.0.1:${PORT}/v1/chat/completions" \
         -H 'Content-Type: application/json' \
         -d "$(python3 -c '
 import json,sys
