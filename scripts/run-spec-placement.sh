@@ -48,13 +48,16 @@ PREFLIGHT_TEMP=70
 
 # PROMPT_FILE lets a run decode at real context depth. -c alone only sizes the
 # KV allocation; depth comes from how many tokens are actually in the cache.
+# The prompt is kept as a FILE, never as a shell variable or an argv entry: at
+# 100k tokens it is ~340 KB and blows past E2BIG in both `python3 -c ... "$P"`
+# and `curl -d "$P"`. That failure is silent-ish -- curl posts an empty body and
+# the server answers 500 with a JSON parse error, which looks like a model
+# problem and is not. See RUNLOG 2026-08-27 (H26 first attempt).
 PROMPT_FILE="${PROMPT_FILE:-}"
 if [[ -n "$PROMPT_FILE" ]]; then
     [[ -f "$PROMPT_FILE" ]] || { echo "ERROR: PROMPT_FILE not found: $PROMPT_FILE" >&2; exit 2; }
-    PROMPT=$(cat "$PROMPT_FILE")
-else
-    PROMPT='Write a detailed technical explanation of how HTTP/2 multiplexing works. Cover streams, frames, flow control, and HPACK header compression, and explain how it differs from HTTP/1.1 pipelining.'
 fi
+DEFAULT_PROMPT='Write a detailed technical explanation of how HTTP/2 multiplexing works. Cover streams, frames, flow control, and HPACK header compression, and explain how it differs from HTTP/1.1 pipelining.'
 
 # --- Arguments --------------------------------------------------------------
 [[ $# -eq 4 ]] || { sed -n '2,14p' "$0" >&2; exit 2; }
@@ -65,6 +68,19 @@ LABEL="$1"; SPEC_TYPE="$2"; DRAFTER="$3"; PLACEMENT="$4"
 [[ "$DRAFTER" == none || -f "$DRAFTER" ]] || { echo "ERROR: drafter not found: $DRAFTER" >&2; exit 2; }
 
 mkdir -p logs results/h11
+if [[ -z "$PROMPT_FILE" ]]; then
+    PROMPT_FILE="logs/${LABEL}.prompt.txt"
+    printf '%s' "$DEFAULT_PROMPT" > "$PROMPT_FILE"
+fi
+PAYLOAD="logs/${LABEL}.payload.json"
+python3 - "$PROMPT_FILE" "$N_PREDICT" "$PAYLOAD" <<'PYBUILD' || { echo "ERROR: could not build request payload" >&2; exit 2; }
+import json, sys
+prompt = open(sys.argv[1], encoding='utf-8').read()
+json.dump({"messages": [{"role": "user", "content": prompt}],
+           "temperature": 0, "top_k": 1, "seed": 42,
+           "max_tokens": int(sys.argv[2]), "cache_prompt": False,
+           "timings_per_token": False}, open(sys.argv[3], 'w', encoding='utf-8'))
+PYBUILD
 SERVER_LOG="logs/${LABEL}.server.log"
 TEMPS="logs/${LABEL}.temps.log"
 RAW="results/h11/${LABEL}.jsonl"
@@ -149,6 +165,7 @@ read -r GPU0 GPU1 <<<"$(nvidia-smi --query-gpu=memory.used --format=csv,noheader
 echo "loaded in ${LOAD_S}s | VRAM ${GPU0}/${GPU1} MiB"
 
 # --- Repetitions ------------------------------------------------------------
+OK_REPS=0
 for rep in $(seq 1 "$REPS"); do
     TEMP_NOW=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | sort -n | tail -1)
     if [[ "$TEMP_NOW" -ge "$ABORT_TEMP" ]]; then
@@ -160,11 +177,7 @@ for rep in $(seq 1 "$REPS"); do
     # -s not -sf: on an HTTP error we want the body, which carries the reason.
     RESP=$(curl -s -m "$REQ_TIMEOUT" "http://127.0.0.1:${PORT}/v1/chat/completions" \
         -H 'Content-Type: application/json' \
-        -d "$(python3 -c '
-import json,sys
-print(json.dumps({"messages":[{"role":"user","content":sys.argv[1]}],
- "temperature":0,"top_k":1,"seed":42,"max_tokens":int(sys.argv[2]),"cache_prompt":False,
- "timings_per_token":False}))' "$PROMPT" "$N_PREDICT")") || {
+        -d @"$PAYLOAD") || {
         echo "ERROR: request rep $rep failed (curl)" >&2
         row "$rep" "" "" "" "" "" "" "$GPU0" "$GPU1" "" "$LOAD_S" "FAILED(request)"
         continue
@@ -192,4 +205,7 @@ PY
 )"
     echo "  rep${rep}: decode ${DEC} t/s | prefill ${PRE} t/s | accept ${DA}/${DN} = ${ACC:-n/a}% | peak ${PEAK}C"
     row "$rep" "$DEC" "$PRE" "$NDEC" "$DN" "$DA" "${ACC:-}" "$GPU0" "$GPU1" "$PEAK" "$LOAD_S" "ok"
+    OK_REPS=$(( OK_REPS + 1 ))
 done
+
+[[ "$OK_REPS" -gt 0 ]] || { echo "ERROR: $LABEL produced no successful reps" >&2; exit 1; }
