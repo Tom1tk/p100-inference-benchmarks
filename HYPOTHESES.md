@@ -26,11 +26,11 @@ run label so the evidence is traceable.
 | H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | Untested |
-| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **decides the plan** |
+| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | Untested — **parked by rule zero 2026-08-27.** A diagnostic, not a lever: it only sizes a prize H22 collects, and H22 crashes. H14's +63% also argues against it |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
-| H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | Untested — **the last kernel-level lever** |
+| H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | **Tried 2026-08-26, crashes** under `-sm tensor` (chunked ops carry no split-axis metadata). Now a kernel project, not a flag — **parked by rule zero** |
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 
@@ -993,6 +993,11 @@ tier for quality. Free by hypothesis, so if throughput holds, adopt it.
 
 ## H18 — GDN layers dominate prefill
 
+> **Status: parked by rule zero, 2026-08-27.** Still plausible, still untested,
+> but it cannot change the serve command. See "Where this stands" at the end of
+> the section — read that before acting on the test plan below, which was
+> written when H22 still looked like a flag.
+
 **Claim:** in a 16k prefill, more than half of GPU time is spent in
 `GATED_DELTA_NET`, not in `MUL_MAT`.
 
@@ -1019,7 +1024,7 @@ FP32 with the author's own TODO — but it means H18 and H23 are probably both
 true at different depths: GDN-bound short, attention-bound long. Test both
 together, at 100k, not 16k.
 
-**Why it decides the plan:** if true, H14 and the whole family of quant/GEMM
+**Why it *used to* decide the plan:** if true, H14 and the whole family of quant/GEMM
 knobs are dead ends, and the largest lever we control is writing a chunked GDN
 kernel — plausibly **1.5–2.5× on those layers, ~1.3–1.7× end-to-end** (the
 published 2–3× figures rely on Hopper TMA and warp specialisation we cannot use;
@@ -1031,6 +1036,32 @@ the chunked *algorithm* itself is architecture-neutral).
 2. `test-backend-ops perf` filtered to `GATED_DELTA_NET` — **not currently built**;
    needs a rebuild with tests enabled.
 3. `nsys`/`ncu` on a single 16k prefill for a per-kernel breakdown.
+
+### Where this stands (2026-08-27)
+
+**Parked by rule zero. It is a diagnostic, not a lever.** Three things moved
+against it, none of which refute it:
+
+1. **H14 argued the other way.** The `-ub` sweep was deliberately framed so a
+   *null* result would be positive evidence for H18 — a token-at-a-time kernel
+   should barely care about batch shape. We measured **+63%**. That is
+   GEMM-shaped behaviour, so H18 is no longer the leading explanation for the
+   30%-of-peak figure.
+2. **Its flat-curve premise broke at depth** (H13, above). The depth decay fits
+   the ~16 full-attention layers' O(n²) cost better than a kernel that is linear
+   in tokens. Best current read: GDN-bound short, attention-bound long.
+3. **The lever it feeds is gone.** A confirmed H18 has exactly one action
+   attached — write the chunked GDN path — and that is H22, which crashes under
+   `-sm tensor` because the chunked ops carry no split-axis metadata. Kernel
+   work, not a patch.
+
+So neither outcome of H18 changes the serve command today, and it does not earn
+its power. **Unpark when H22 becomes runnable** (someone wiring the split axes,
+or an `-sm none`/`layer` run being worth it on its own merits).
+
+If it is ever re-run, note that step 1 above must be taken at **`-ub 2048`**;
+every number in the original framing came from the `-ub 512` regime H14 showed
+to be a local minimum.
 
 ---
 
@@ -1330,9 +1361,12 @@ pushed per this repo's own contribution rules); the 3-line patch is left in
 place, inert unless `LLAMA_GDN_FORCE_CHUNKED` is set, for whoever re-attempts
 this.
 
-**Ordering:** run **H18 first** (`GGML_CUDA_CUBLAS_COMPUTE_TYPE`, at `-ub 2048`).
-H18 sizes the prize; H22 collects it. Running H22 blind risks spending a rebuild
-on a 5% slice.
+**Ordering — superseded 2026-08-27.** The original advice was "run H18 first;
+H18 sizes the prize, H22 collects it." That assumed H22 was a flag away. It is
+not: the crash above makes it a kernel project, so there is no prize to size and
+**both are parked**. If someone annotates the split axes (or decides an `-sm
+none`/`layer` run is worth it on its own), the original ordering applies again —
+H18 first, at `-ub 2048`.
 
 ---
 
