@@ -405,9 +405,84 @@ acceptance to translate proportionally.
 |---|---|---|
 | H2 (XL split-stall) | _pending_ | |
 | H3 (stock quant degradation) | _pending_ | |
-| H4 (TurboQuant KV penalty) | _pending_ | |
+| H4 (TurboQuant KV penalty) | `results/h25-iq3-1card.csv` | **Does not generalise.** The 14.3% figure was TurboQuant's own; stock `-ctk/-ctv q8_0` costs **1.5%** of decode and 0.2% of prefill. See Phase 7 below |
 | H5 (NCCL harmful) | `phase0-ik-graph-q6k` | **Partly confirmed** — fails outright, not merely slower. See HYPOTHESES.md |
 | H7 (dispatch bug) | _pending_ | |
 | H8 (DFlash2 usable) | `h8-loadcheck-df2q4` — runs on both GPUs, 57.0% acceptance, clean output | **Works.** Speedup not yet quantified — needs mainline's own no-drafter control |
 | H9 (Q8 vs Q4 drafter) | `h11-df2q8-*` vs `h11-df2q4-*` | **Leaning no** — Q8 accepted 44.4% vs Q4's 45.8%, no faster, +0.87 GiB. One prompt; needs more |
 | H11 (drafter placement) | `results/h11-placement.csv` | **Refuted** — ≤0.15% spread across placements. Found a `-devd CUDA0` abort with DFlash2 instead |
+
+
+---
+
+## Phase 7 — prefill, TTFT and the single-GPU question
+
+### H24 — does `-ub 2048` cost decode? (2026-08-27)
+
+Two matched llama-server arms, 16k context, MTP drafter, `-sm tensor`,
+`GGML_CUDA_ALLREDUCE=none`, `-b 2048`, 400 output tokens, 3 reps.
+Data: `results/h11-placement.csv` (`h24-ub512-mtp-16k`, `h24-ub2048-mtp-16k`).
+
+| `-ub` | decode t/s | prefill t/s | acceptance | VRAM/card |
+|---|---|---|---|---|
+| 512 | 29.39 | 198.5 | 73.3% | 10,235 MiB |
+| 2048 | 27.41 | 310.5 | 66.4% | 10,973 MiB |
+| delta | **-6.7%** | **+56.4%** | -6.9 pts | +738 MiB |
+
+**Refuted, and explained exactly.** The acceptance control moved, which normally
+voids a test — here the arithmetic closes it with no residual. 400 output tokens
+cost `400 - accepted` target forward passes: 126 vs 135 steps is +7.1% work,
+predicting -6.7% decode against -6.7% measured. **There is no intrinsic ubatch
+penalty on the decode path**; the loss is entirely the drafter accepting less at
+the larger ubatch. Generated tokens were byte-identical across arms and reps, so
+quality is untouched.
+
+**Verdict: keep `-ub 2048`.** Break-even is ~11,800 output tokens per prompt —
+far beyond any real request, and the config is for long-running harnesses where
+TTFT is what hurts.
+
+Side benefit: the 29.26 t/s headline reproduced at 29.39 under
+`ALLREDUCE=none`, closing a config-change gap in the record.
+
+### H25 — 27B-IQ3_S on one P100 (2026-08-27)
+
+Three single-card arms, `-dev CUDA0 -sm none`, `-ub 2048`, <=16k.
+Data: `results/h25-iq3-1card.csv`.
+
+**KV quantisation is nearly free** (the durable result, and it is about the
+*two-card* config):
+
+| KV | pp16384 t/s | tg128 t/s |
+|---|---|---|
+| f16 | 183.80 | 11.38 |
+| q8_0 | 184.13 | 11.21 |
+| q4_0 | 184.05 | 11.18 |
+
+Prefill within 0.2%, decode within 1.5%. `q4_0` buys nothing over `q8_0`.
+**Consequence for the deliverable:** `q8_0` should halve the two-card 100k KV
+cache from ~6,250 to ~3,125 MiB for ~1.5% of decode.
+
+**One card vs the pair, at 16k:**
+
+| | one card (IQ3_S) | pair (Q4_K_M) | ratio |
+|---|---|---|---|
+| prefill | 184.1 | 327.1 | 56% |
+| decode, no drafter | 10.4 | 19.75 | 53% |
+| decode, as actually served (MTP) | **OOM** | 27.41 | **38%** |
+
+Halving the weight bytes did not buy back the lost card: decode fell to the same
+53% as prefill. MTP does not fit — the server loaded at 16,029 of 16,269 MiB and
+died on the first request, already with `q8_0` KV, so the usual mitigation was
+spent:
+
+```
+common_fit_params: failed to fit params to free device memory:
+  n_gpu_layers already set by user to 99, abort
+CUDA error: out of memory ... in ggml_cuda_pool_vmm::alloc
+```
+
+**Verdict (user call, 2026-08-27): a single P100 is not feasible for real-world
+use, and the line of enquiry is closed.** It fails on speed and on the 100k
+context ceiling before quality is even measured. The offered follow-up (MTP at
+`-ub 512`) was declined: its best case still loses to the two-card
+drafter-free number while also surrendering prefill.

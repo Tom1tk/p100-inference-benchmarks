@@ -407,7 +407,7 @@ phase is aimed at the right target.
 | ~~3~~ | ~~`-ub` sweep~~ | H14 | **DONE 2026-08-25 — CONFIRMED, +63%.** `-ub 2048` is the new default; `-ub 8192` OOMs. Re-baseline everything else on it |
 | 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
 | 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
-| 6 | **27B-IQ3_S single-GPU** vs two-card 27B-Q4_K_M — depth ceiling, then speed, then NIAH | H20 | Harness and fixtures exist. **Reframed 2026-08-26: the fallback is the same model at a lower quant, never a different model.** Needs a two-card Q4_K_M NIAH control or the quality leg measures nothing |
+| ~~6~~ | ~~**27B-IQ3_S single-GPU** vs two-card 27B-Q4_K_M~~ | H20/H25 | **CLOSED 2026-08-27 — user call, not feasible for real-world use.** H25 measured 56% of the pair's prefill, 53% of its drafter-free decode, and MTP OOMs at 16,029/16,269 MiB, so against the config we serve it is at **38%**. It also cannot reach 100k on VRAM. The quality leg was never run and never will be — no point NIAH-testing a config that fails on speed and context first |
 | ~~7~~ | ~~**Chunked GDN path** A/B~~ | H22 | **Tried 2026-08-26, crashes.** The chunked graph's ops carry no split-axis metadata, so it aborts under `-sm tensor` before producing a number. Wiring that up is real kernel work, not a 2-line patch. **Parked by rule zero** — it is no longer a cheap test |
 | 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
 | ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
@@ -438,11 +438,18 @@ only when the stated unblock happens.
 | H23 — quadratic attention at 100k | Diagnostic. Explains the depth decay, but every sparse-attention kernel that could exploit it is sm_80+. No lever exists on sm_60 | An sm_60-capable sparse-attention path appearing |
 | H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1. Tuning its second-best mode cannot produce the serve command | `ik` gaining tensor split |
 | q8 KV × ubatch interaction | Noted while trimming H25. Not that test's purpose; if it matters it will surface as an anomaly in a later result | An unexplained q8 result |
+| MTP at `-ub 512` on one card | Offered as a follow-up to H25 and **declined**. Single-GPU is closed, so neither outcome moves the serve command: the optimistic ~15 t/s still loses to the two-card drafter-free number *and* gives up prefill | Nothing — this is closed, not parked |
+
+**Single-GPU serving is closed, not parked** (2026-08-27, user call). It failed
+on two independent counts — speed and context ceiling — before quality was ever
+measured. Do not propose single-card arms again.
 
 **What is actually left that can change the serve command:** the 100k NIAH
 quality gate (the fourth objective has *no* data at all), H19 (prompt-cache
 reuse — a flag, not a sweep), H17 (the sm_60 arithmetic bug, which confounds
-every quality comparison), and H15 (power cap, gated on the user's PSU check).
+every quality comparison), H15 (power cap, gated on the user's PSU check), and
+one newly-cheap item H25 handed us: **`q8_0` KV on the two-card 100k config**,
+which should halve the 6,250 MiB cache for ~1.5% of decode.
 That is a much shorter list than the hypothesis count suggests, and it is the
 list to work from.
 
