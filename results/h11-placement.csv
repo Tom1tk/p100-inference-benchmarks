@@ -65,3 +65,7 @@ h24-ub512-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,29.36,198.65,400
 h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,27.43,310.79,400,399,265,66.4,10973,10973,66,10,ok
 h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,27.38,310.65,400,399,265,66.4,10973,10973,67,10,ok
 h24-ub2048-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,27.42,310.13,400,399,265,66.4,10973,10973,68,10,ok
+h25-iq3-1card-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,,,,,,,16029,259,,10,FAILED(request)
+h25-iq3-1card-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,,,,,,,16029,259,,10,FAILED(request)
+h25-iq3-1card-none-16k,none,none,default,1,10.43,184.17,400,0,0,,12601,259,68,10,ok
+h25-iq3-1card-none-16k,none,none,default,2,10.41,183.34,400,0,0,,12601,259,69,10,ok

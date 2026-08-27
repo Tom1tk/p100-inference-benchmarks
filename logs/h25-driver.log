@@ -26,3 +26,23 @@ NOTE: model load takes 4-8 min with no output. This is not a hang.
   none  q4_0      2048       pp4096    202.05     0.02
   none  q4_0      2048      pp16384    184.05     0.03
   none  q4_0      2048        tg128     11.18     0.00
+pushed
+--- h25-iq3-1card-kv-q4 done (exit 0) ---
+=== h25-iq3-1card-mtp-16k === (idle 60C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-IQ3_S.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -sm none -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf 
+loaded in 10s | VRAM 16029/259 MiB
+ERROR: request rep 1 failed (curl)
+ERROR: request rep 2 failed (curl)
+--- arm3 mtp done (exit 0) ---
+=== h25-iq3-1card-none-16k === (idle 56C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/dflash2-rebased/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-IQ3_S.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -sm none -c 16384 -b 2048 -ub 2048 
+loaded in 10s | VRAM 12601/259 MiB
+  rep1: decode 10.43 t/s | prefill 184.17 t/s | accept 0/0 = n/a% | peak 68C
+  rep2: decode 10.41 t/s | prefill 183.34 t/s | accept 0/0 = n/a% | peak 69C
+--- arm3 none done (exit 0) ---
+=== H25 arm 3 ===
+label                   spec_type  drafter                    placement  rep  decode_tps  prefill_tps  n_decoded  draft_n  draft_accepted  accept_pct  gpu0_mib  gpu1_mib  peak_temp  load_s  outcome
+h25-iq3-1card-mtp-16k   draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    1                                                                             16029     259                  10      FAILED(request)
+h25-iq3-1card-mtp-16k   draft-mtp  mtp-Qwen3.8-27B-Q4_0.gguf  default    2                                                                             16029     259                  10      FAILED(request)
+h25-iq3-1card-none-16k  none       none                       default    1    10.43       184.17       400        0        0                           12601     259       68         10      ok
+h25-iq3-1card-none-16k  none       none                       default    2    10.41       183.34       400        0        0                           12601     259       69         10      ok
