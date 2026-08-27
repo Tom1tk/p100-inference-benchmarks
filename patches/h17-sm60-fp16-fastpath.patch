@@ -1,0 +1,39 @@
+H17 -- exclude sm_60 from the FP16 fast path.
+
+Upstream issue ggml-org/llama.cpp#25593: sm_61 has a carve-out from the FP16
+fast path, sm_60 does not, so FP32 math is silently truncated to FP16 on P100.
+Reported effect: median KL divergence 0.004962 -> 0.000001, same-top-token rate
+95.00% -> 99.89%.
+
+Identical to the fix buun-llama-cpp (39d97a876) already carries as its PR #80 --
+copied from there rather than reinvented, so the two engines become comparable
+on quality as well as throughput.
+
+NOTE for P100 specifically: this is NOT free the way it is on sm_61. GP104 runs
+FP16 at 1/64 rate so the carve-out costs it nothing; GP100 runs FP16 at 2:1
+(18.7 vs 9.3 TFLOPS), so this sends real work from the fast path to FP32.
+The throughput cost is the thing under test, not an assumption.
+
+--- a/ggml/src/ggml-cuda/common.cuh
++++ b/ggml/src/ggml-cuda/common.cuh
+@@ -258,9 +258,9 @@
+ #define FP16_AVAILABLE
+ #endif
+
+-#if defined(FP16_AVAILABLE) && __CUDA_ARCH__ != 610
++#if defined(FP16_AVAILABLE) && __CUDA_ARCH__ != 610 && __CUDA_ARCH__ != 600
+ #define FAST_FP16_AVAILABLE
+ #endif
+
+ static bool fast_fp16_available(const int cc) {
+     return GGML_CUDA_CC_IS_AMD(cc) ||
+-        (GGML_CUDA_CC_IS_NVIDIA(cc) && fp16_available(cc) && ggml_cuda_highest_compiled_arch(cc) != 610) ||
++        (GGML_CUDA_CC_IS_NVIDIA(cc) && fp16_available(cc) && ggml_cuda_highest_compiled_arch(cc) != 610 && ggml_cuda_highest_compiled_arch(cc) != 600) ||
+         (GGML_CUDA_CC_IS_MTHREADS(cc) && fp16_available(cc));
+ }
+
+ static bool fast_fp16_hardware_available(const int cc) {
+-    return (GGML_CUDA_CC_IS_NVIDIA(cc) && cc >= GGML_CUDA_CC_PASCAL && cc != 610) || GGML_CUDA_CC_IS_AMD(cc) ||
++    return (GGML_CUDA_CC_IS_NVIDIA(cc) && cc >= GGML_CUDA_CC_PASCAL && cc != 610 && cc != 600) || GGML_CUDA_CC_IS_AMD(cc) ||
+         (GGML_CUDA_CC_IS_MTHREADS(cc) && cc >= GGML_CUDA_CC_QY2);
+ }

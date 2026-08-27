@@ -42,6 +42,7 @@ case "$ENGINE" in
     ik-nonccl) BIN=/root/ik_llama.cpp/build-nonccl/bin/llama-bench ;;   # H5: same tree, -DGGML_NCCL=OFF
     mainline) BIN=/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-bench ;;
     mainline-rebased) BIN=/root/dflash2-rebased/build-cuda-p100/bin/llama-bench ;;   # pr-27342 rebased onto 75844307
+    rebased-h17) BIN=/root/dflash2-rebased/build-h17/bin/llama-bench ;;   # H17: same tree, sm_60 out of the FP16 fast path
     *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|ik-nonccl|mainline|mainline-rebased)" >&2; exit 2 ;;
 esac
 
