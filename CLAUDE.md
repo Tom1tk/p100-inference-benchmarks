@@ -7,7 +7,14 @@ restates the rules that must never be re-derived from context.
 ## Hard limits
 
 1. **Never let a card exceed 83 °C.** Abort the run if it does.
-2. **Every run costs the user real electricity.** Before launching a sweep:
+2. **Every run costs the user real electricity.** Rule zero, asked of every arm,
+   sweep and open hypothesis: **"do we really need to test this?"** A test earns
+   its power only if it can change what goes in the serve command. Stop at the
+   first "no": do we already know the answer / would either outcome change the
+   command / is there a cheaper way to the same confidence / is this the
+   smallest run that answers it. A hypothesis that fails rule zero is **parked
+   with the reason** (RUNBOOK "Parked by rule zero"), never silently dropped.
+   Then, before launching:
    - Prefer many short runs to few long ones.
    - Never re-measure a settled lever. Audit every arm against `results/` first
      and delete the ones that re-answer a closed question; cite the banked
