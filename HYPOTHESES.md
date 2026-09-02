@@ -31,6 +31,7 @@ run label so the evidence is traceable.
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | **Tried 2026-08-26, crashes** under `-sm tensor` (chunked ops carry no split-axis metadata). Now a kernel project, not a flag — **parked by rule zero** |
+| H23 | Quadratic attention (16/65 layers) drives the decay to 100k | **Parked by rule zero** — arithmetic only; every sparse-attention kernel is sm_80+, so there is no lever on sm_60 |
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
 | H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
@@ -375,7 +376,7 @@ Qwen3.8-27B, without breaking tool calls.
 **Status: it runs, on both cards, and the output is clean.** The earlier "no
 engine supports it" verdict was right about the three forks and wrong to stop
 there — upstream `ggml-org/llama.cpp` **PR #27342** is the engine, it builds for
-`sm_60`, and it works. Now the fourth engine `mainline` (METHODOLOGY §3).
+`sm_60`, and it works. Now the fourth engine `mainline` (METHODOLOGY §2).
 
 ### First result — `h8-loadcheck-df2q4` (2026-08-24)
 
