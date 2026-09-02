@@ -1,205 +1,168 @@
 # Runbook — operating procedure
 
-This is the procedure for executing benchmark runs on this rig. Follow it in
-order. It assumes no prior context beyond what's in this repo.
+The procedure for executing benchmark runs on this rig. Follow it in order. It
+assumes no prior context beyond what's in this repo. §7 is the work queue.
 
 ---
 
 ## 0. Non-negotiables
 
-1. **Never let a card exceed 83°C.** Abort the run if it does. Hard shutdown
-   is 87°C and these are passively cooled cards behind a custom fan shroud.
-2. **Commit and push after every test run** — pass or fail. See §6. A failed
-   run is data; losing it wastes 5–20 minutes of load time to rediscover.
-3. **Don't change two variables at once.** One engine, one quant, one split
-   mode per run. The whole point is attributable comparison.
-4. **Don't silently change fixed parameters** in [METHODOLOGY.md](METHODOLOGY.md).
-   If a run needs different parameters, record why in [RUNLOG.md](RUNLOG.md).
-5. **Every run costs the user real electricity.** Prefer many short runs to few
-   long ones, never re-measure a settled lever, and abort a sweep as soon as its
-   conclusion is clear. See §2.1 — this is a hard requirement, not a preference.
+1. **Never let a card exceed 83 °C.** Abort the run if it does. Hard shutdown
+   is 87 °C on passively cooled cards behind a custom fan shroud.
+2. **Every run costs the user real electricity.** Prefer many short runs to
+   few long ones, never re-measure a settled lever, abort a sweep as soon as
+   its conclusion is clear. §2.1 is the full rule and it is a hard requirement.
+3. **Commit and push after every run, pass or fail** (§6). A failed run is
+   data; losing it wastes 5–20 minutes of load time to rediscover.
+4. **Don't change two variables at once.** One lever per run.
+5. **Don't silently change fixed parameters** in [METHODOLOGY.md](METHODOLOGY.md).
+   If a run needs different ones, record why in [RUNLOG.md](RUNLOG.md).
 
 ---
 
 ## 1. Preflight
 
-Run before the first benchmark of any session:
-
 ```bash
 nvidia-smi -L                       # expect exactly 2× Tesla P100-PCIE-16GB
 nvidia-smi --query-gpu=index,temperature.gpu,power.limit,persistence_mode \
-           --format=csv             # expect ~45-50°C idle, 175W cap, persistence Enabled
-df -h /root                         # models are 15-22GB each; check headroom
+           --format=csv             # expect ~45–50 °C idle, 175 W cap, persistence Enabled
+df -h /root                         # models are 11–22 GB each
 ```
 
-Expected baseline: idle 45–50°C, power limit 175.00 W on both cards,
-persistence mode Enabled.
-
-If persistence or the power cap is missing (they don't survive a host reboot):
+Power cap and persistence do not survive a host reboot (the cards revert to
+250 W). Restore with:
 
 ```bash
 nvidia-smi -pm 1
 nvidia-smi -pl 175 -i 0 && nvidia-smi -pl 175 -i 1
 ```
 
-**Check for competing disk I/O.** Model loads are disk-bound. If a download or
-copy is running, loads take 2–3× longer. Either wait or note it in the run log
-— it does not affect GPU-phase numbers, only wall-clock.
+**Power cap gate (H15).** 175 W is the baseline for every result in the repo.
+Raising it is approved to **220 W, not 250 W**, but only after the user has
+measured PSU wall draw with a plug-socket meter in person — it is not readable
+from this host. When cleared, step 175 → 200 → 220, one step per run, and
+record the cap as a column. Never change it unprompted.
+
+**Check for competing disk I/O.** Model loads are disk-bound; a download or
+copy makes them 2–3× slower. Wait, or note it in RUNLOG.
+
+Never edit `scripts/*.sh` while `pgrep -f 'llama-server|llama-bench'` shows
+work in flight — bash reads scripts incrementally and the running job corrupts.
 
 ---
 
 ## 2. Running one benchmark
 
+**`llama-bench`** (Table A — engine, split, quant, ubatch, depth):
+
 ```bash
 cd /root/p100-benchmarks
-./scripts/run-bench.sh <engine> <model-path> <split-mode> <label> [extra args...]
+./scripts/run-bench.sh <engine> <model-path> <split-mode> <label> [extra llama-bench args...]
+# e.g.
+./scripts/run-bench.sh mainline /root/Qwen3.8-27B-UD-Q4_K_M.gguf tensor h99-something -ub 2048
 ```
 
-- `<engine>` — `pflash` | `buun` | `ik` | `mainline`
-- `<split-mode>` — see the support matrix in [METHODOLOGY.md](METHODOLOGY.md).
-  **They differ per engine.** `ik` has `graph` but not `row`/`tensor`;
-  `pflash`/`buun` have `row`/`tensor` but not `graph`.
-- `<label>` — used for filenames and the commit message. Use
-  `phase<N>-<engine>-<splitmode>-<quant>`, e.g. `phase1-buun-layer-q6k`.
-
-Example:
+**`llama-server`** (Table B — drafters, acceptance, VRAM, real requests):
 
 ```bash
-./scripts/run-bench.sh ik /root/Qwen3.8-27B-UD-Q6_K_M.gguf graph \
-  phase1-ik-graph-q6k -cuda graphs=0
+SPLIT=tensor GGML_CUDA_ALLREDUCE=none CTX=16384 UB=2048 BATCH=2048 REPS=3 \
+  ./scripts/run-spec-placement.sh <label> <draft-mtp|draft-dflash|none> <drafter.gguf|none> <default|CUDA0|CUDA1>
 ```
 
-The script does preflight temp checks, starts telemetry, runs the benchmark,
-stops telemetry, writes logs and CSV, then commits and pushes.
+Env knobs (`MODEL`, `BIN`, `CTK`/`CTV`, `N_PREDICT`, `PROMPT_FILE`, `NP`, …)
+are documented in the script header. `scripts/run-h26-100k-serve.sh` is the
+worked example of a ladder that stops itself.
+
+- `<engine>`: `mainline` (rebased) | `buun` | `ik`. Split modes differ per
+  engine — METHODOLOGY §2.
+- `<label>`: filenames and commit message. `h<N>-<what>-<quant>` or
+  `phase<N>-<engine>-<split>-<quant>`.
+- Both scripts do the temp preflight, telemetry, logging, CSV append, and the
+  commit/push. Launch them in the background and wait for completion; don't
+  poll with sleep loops.
 
 ### 2.1 Run economy — every run costs electricity
 
-The user pays for the power these cards draw. A two-card run is ~350 W of draw
-for its whole duration, and a 100k prefill sweep is 30+ minutes of it.
+A two-card run draws ~350 W for its whole duration; a 100k prefill sweep is
+30+ minutes of it.
 
-**Rule zero: "do we really need to test this?"** Ask it of every arm, every
-sweep, and every open hypothesis — not just of the ones that look expensive. A
-test earns its electricity only if it can **change what goes in the serve
-command**. Work through it in this order and stop at the first "no":
+**Rule zero: "do we really need to test this?"** Ask it of every arm, sweep
+and open hypothesis. A test earns its power only if it can **change what goes
+in the serve command**. Stop at the first "no":
 
-1. **Do we already know the answer?** Search `results/`, RESULTS.md and RUNLOG.md
-   before designing anything. Cite the banked number as the control.
-2. **Would either outcome change the serve command?** If the result is
-   interesting but leads to no lever we can actually pull on sm_60, it is a
-   diagnostic, not a test. Write down the reasoning instead of running it.
-3. **Is there a cheaper way to get the same confidence?** Arithmetic, a source
-   read, or a shorter proxy run at lower context often settles it for free.
+1. **Do we already know the answer?** Search RESULTS.md and `results/` first
+   and cite the banked number as the control.
+2. **Would either outcome change the serve command?** If not, it is a
+   diagnostic. Write the reasoning down instead of running it.
+3. **Is there a cheaper way to the same confidence?** Arithmetic, a source
+   read, a shorter proxy run.
 4. **Is this the smallest run that answers it?** Cut depths, reps and sweep
-   points that do not change the verdict.
+   points that don't change the verdict.
 
-A hypothesis that fails rule zero is not deleted — it is **parked with the
-reason**, so nobody re-opens it in three weeks and spends the power anyway.
+A hypothesis that fails rule zero is **parked with the reason** in §7, never
+silently dropped. Then, before launching:
 
-Then design the sweep against these three rules **before** launching it:
+- **Many short runs over few long ones.**
+- **Never re-run a settled lever.** If a control exists in `results/`, cite
+  it; don't re-take it for symmetry.
+- **Abort early**, and **build the skip condition into the driver script** so
+  an unattended run stops itself (`run-h25-iq3-single.sh` skips the `q4_0` arm
+  when `q8_0` fails; `run-h26-100k-serve.sh` is a ladder).
 
-1. **Prefer many short tests over few long ones.** Short runs fail cheaply, give
-   an answer sooner, and let the cards idle back to ~45 W between arms.
-2. **Never re-run a settled lever.** Re-measure only when a lever under test has
-   actually changed. If a control arm already exists in `results/`, cite it —
-   do not re-take it for symmetry. Audit every arm against the existing results
-   before launching, and delete the ones that re-answer a closed question.
-3. **Abort early.** If the conclusion is already clear partway through a sweep
-   (two bad cells out of three, or a failure whose cause applies to the
-   remaining arms), cancel the rest.
+Not licensed: dropping a control the repo lacks, or cutting reps below 2. When
+you trim an arm, say in RUNLOG what assumption the saving rests on.
 
-**Build the skip conditions into the driver script, not just the plan.** A run
-launched in the background must be able to stop itself — check the previous
-arm's exit status or numbers and `break`. `scripts/run-h25-iq3-single.sh` is the
-worked example: the `q4_0` arm is skipped automatically when the `q8_0` arm
-fails, because both use the same quantised-KV attention path and a second model
-load would only reconfirm the same failure.
-
-**What this does not license.** Do not drop an arm that produces a control the
-repo genuinely lacks, and do not cut reps below 2 — a number with no spread
-cannot be told apart from noise, which is how a run gets repeated. When you do
-trim an arm, say in [RUNLOG.md](RUNLOG.md) what assumption the saving rests on,
-so a surprising result later has somewhere to point.
-
----
-
-### Expected timing — read this before assuming a hang
+### 2.2 Expected timing — read before assuming a hang
 
 | Phase | Duration | What it looks like |
 |---|---|---|
-| Model load | **4–8 min** (longer under disk contention) | Process in `D` state, GPUs at 0% and idle temps, no output past the CUDA device banner |
-| Prefill sweep | 3–6 min | GPUs alternating to 100%, temps climbing to ~60°C |
-| tg128 | ~30 s | One GPU at a time under `layer` split |
+| Model load | **4–8 min** (longer under disk contention) | Process in `D` state, GPUs idle, no output past the CUDA banner |
+| Prefill sweep to 16k | 3–6 min | GPUs at 97–99% together (tensor) or alternating (layer) |
+| 100k prefill | ~8 min per request, sustained | Same, for longer. Watch the temps log |
+| tg128 | ~30 s | |
 
-**A 21.5GB model takes minutes to load and produces no output while it does.**
-This is the single most common false alarm. Confirm progress rather than
-killing it:
-
-```bash
-cat /proc/<pid>/io      # read_bytes should be climbing toward the file size
-```
-
-### Don't poll with sleep loops
-
-Launch long runs in the background and wait for completion notification rather
-than chaining sleeps. `run-bench.sh` is designed to be launched in the
-background and to be self-contained.
+Confirm progress with `cat /proc/<pid>/io` (read_bytes climbing) rather than
+killing a load.
 
 ---
 
 ## 3. Thermal safety
 
-`run-bench.sh` starts `scripts/gpu-monitor.sh`, which samples every 5s into
-`logs/<label>.temps.log` (format: `HH:MM:SS idx, tempC, watts, util%` per card).
-
-Watch a live run:
-
-```bash
-tail -f logs/<label>.temps.log
-```
-
-Thresholds:
+Both scripts start `scripts/gpu-monitor.sh`, which samples every 5 s into
+`logs/<label>.temps.log` (`HH:MM:SS idx, tempC, watts, util%`).
+`tail -f` it during any run longer than a few minutes.
 
 | Temp | Action |
 |---|---|
-| ≤ 80°C | Normal. Observed peak so far is 63°C under full load. |
-| 80–82°C | Warn, finish the current run, don't start another until cooled |
-| ≥ 83°C | **Abort immediately** (`pkill -f llama-bench`), record in RUNLOG.md |
-| 87°C | Hardware shutdown — must never be reached |
+| ≤ 80 °C | Normal. Observed peak across the whole project is 70 °C |
+| 80–82 °C | Finish the current run, don't start another until cooled |
+| ≥ 83 °C | **Abort immediately** (`pkill -f 'llama-bench|llama-server'`), record in RUNLOG |
+| 87 °C | Hardware shutdown — must never be reached |
 
-Brief power readings slightly above 175W are normal sampling overshoot; the
-cap is enforced on a rolling average. Sustained draw well above it is not
-normal and is worth investigating.
+Brief readings above 175 W are sampling overshoot; the cap is a rolling
+average.
 
 ---
 
 ## 4. Recording results
 
-After each run:
+1. **Raw data is written by the script**: `results/raw/<label>.csv` for
+   `llama-bench`, a row per rep in `results/h11-placement.csv` for
+   `llama-server`. Don't hand-edit either. (`results/all-results.csv` is a
+   stale aggregate with mixed engine schemas — never parse it by column.)
+2. **[RESULTS.md](RESULTS.md)** — Table A: run `python3 scripts/build-matrix.py`
+   and paste over the table. Table B: add a row by hand (mean of reps, peak
+   temp, anything invalid flagged in the notes). Table C: update the lever's
+   verdict if it changed.
+3. **[HYPOTHESES.md](HYPOTHESES.md)** — update the status table row and the
+   hypothesis's section with the result and run label. This is the main
+   reason the run exists; it is the easiest step to forget.
+4. **[RUNLOG.md](RUNLOG.md)** — an entry only if something notable happened:
+   a crash, a deviation, a surprise, a corrected claim.
+5. **§7 below** — move the item between open / parked / closed.
 
-1. **`results/all-results.csv`** — appended automatically by the script. This
-   is the machine-readable aggregate. Don't hand-edit it.
-
-   > **Do not parse this file by column position or by `csv.DictReader`.**
-   > Different engines emit different llama-bench schemas — pflash 43 columns,
-   > buun 46, ik 56 — and they are all appended under the single header written
-   > by whichever engine ran first. `avg_ts` therefore sits at a different index
-   > per engine, and a positional or header-keyed read silently returns the
-   > wrong column (observed: ik decode read as 0.02 t/s instead of 22.05).
-   > **Parse `results/raw/<label>.csv` instead** — each carries its own correct
-   > header. Use `all-results.csv` only for grepping which labels exist.
-2. **[RESULTS.md](RESULTS.md)** — add a curated row to the relevant phase
-   table. Include split mode, peak temp, and anything anomalous.
-3. **[RUNLOG.md](RUNLOG.md)** — add an entry only if something notable
-   happened (a crash, a parameter deviation, a surprising number). Routine
-   successful runs don't need narrative.
-4. **[HYPOTHESES.md](HYPOTHESES.md)** — if the run bears on H1–H9, update that
-   hypothesis's status. This is easy to forget and is the main reason to run
-   these benchmarks at all.
-
-For Phase 5 web-bench runs there are two extra steps: claim the index in
-[WEB_BENCH.md](WEB_BENCH.md) §5's port registry, and score the generated site
-by hand against the quality checklist in WEB_BENCH.md §4. Throughput alone does
-not decide that phase.
+Phase 5 runs additionally claim an index in [WEB_BENCH.md](WEB_BENCH.md) §5
+and are hand-scored per its §4.
 
 ---
 
@@ -207,333 +170,121 @@ not decide that phase.
 
 Do not just retry. Failures are results.
 
-1. Capture the error — `logs/<label>.log` holds full stdout+stderr including
-   any stack trace.
-2. Record it in [RUNLOG.md](RUNLOG.md) with the exact error string and the
-   command that produced it.
-3. Check whether it bears on a hypothesis — the NCCL crash resolved most of H5
-   before a single timing number was collected.
+1. `logs/<label>.log` (or `.server.log`) holds full stdout+stderr and any
+   backtrace. Capture the error.
+2. Record it in RUNLOG with the exact string and the command.
+3. Check whether it bears on a hypothesis.
 4. **Commit and push the failure** before attempting a fix.
-5. Only then diagnose. If the fix is a rebuild, record the new commit hash and
-   build flags in [METHODOLOGY.md](METHODOLOGY.md).
+5. Only then diagnose. If the fix is a rebuild, record the commit and flags in
+   METHODOLOGY §2.
 
 ### Known failure modes
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ncclAllReduce failed with status 1`, abort at `reduce.cu:169` | `ik_llama` built with NCCL (`GGML_NCCL` defaults **ON**); no NVLink on this rig | Rebuild ik_llama with `-DGGML_NCCL=OFF` |
-| `error: invalid parameter for argument: -sm` | Split mode not supported by that engine | Check the per-engine matrix in METHODOLOGY.md |
-| `ggml-cuda.cu:106: CUDA error` on mainline `-sm tensor` | NCCL AllReduce, the Linux default, is broken on this rig — same root cause as the `ik` row above. The line number is the generic abort dispatcher; get the real cause from the backtrace frame `ggml_backend_cuda_comm_allreduce_nccl` | Set `GGML_CUDA_ALLREDUCE=none`. (`internal` also works but only because it falls back to the same path — see below.) No rebuild needed |
-| `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture '<arch>'` | `-sm tensor` is arch-gated — but the gate is a **denylist** (`default: return true`), so most archs including `qwen35` are permitted. Earlier guidance here claimed the reverse and was wrong | If you see this for `qwen35`, something else changed — check `llm_arch_supports_sm_tensor()` in `src/llama-arch.cpp` |
-| Abort at `fattn.cu:348` with turbo KV types | Known dispatch bug — `(turbo*, F16)` unsupported, only the reverse. Turbo KV types exist only in `buun` and `pflash` | Use symmetric `turbo3/turbo3` or `turbo3/q8_0`. See H7 |
-| No `pp0` row in output | `-p 0` is a no-op prefill and is silently omitted | Expected, not a bug |
-| Load appears hung, GPUs idle | Normal model load, or disk contention | See §2 timing table |
-| `pi` hangs at startup, no request reaches the server | `pi` blocks on startup network operations in this environment | `PI_OFFLINE=1` — `run-web-bench.sh` sets it. Verified, not guesswork |
-| Web-bench stage exits 124 | Hit `STAGE_TIMEOUT` (default 3600s) | Legitimate result — record it. Raise the env var only if the config is known-slow |
-| Web-bench: `port N already in use` | Index reused, or a previous site is still hosted (by design) | Pick an unused index; check WEB_BENCH.md §5 |
-| Server OOMs on load in Phase 5 | `CTX=32768` leaves too little VRAM beside a 21.5 GiB model | `CTX=16384 ./scripts/run-web-bench.sh ...` and note it in RUNLOG.md |
-| Tool calls malformed / ignored in Phase 5 | `--jinja` missing, or a genuinely bad drafter | The script passes `--jinja`. If it's there, this is a **result** — see H8 |
-| DFlash2 run shows poor acceptance instead of an error | A **v1** engine (`buun`/`ik`) silently ran the v1 path — same `draft-dflash` flag, no selector | Use `mainline`. Confirm the selector loaded in `logs/<label>.server.log` before recording. See H8 |
-| `failed to load model` on `-sm none` | Target too big for one 16 GiB card | Only `UD-IQ3_S` (~11 GiB) fits a single P100 with usable KV |
-| Running script dies with a syntax error partway through (`break: only meaningful in a loop`, `<message>: command not found`) | **A script was edited while a background job was executing it.** Bash reads a script incrementally, so an edit shifts the byte offsets under the running shell and it resumes mid-token. The file is fine afterwards — `bash -n` passes — which makes this look like a phantom | Never edit `scripts/*.sh` while `pgrep -f llama-server\|llama-bench` shows work in flight. Re-run the affected cell; discard nothing else |
-| `ggml-backend-meta.cpp:543: GGML_ASSERT(src_ss[0].axis != GGML_BACKEND_SPLIT_AXIS_0)` on DFlash2 | DFlash2 borrows the target's `output.weight` via `ctx_other`; `-sm tensor` shards it on axis 0 and the split planner can't handle a per-row op over it | Not fixable by configuration. DFlash2 is layer-split-only. See H8 |
-| `internal AllReduce init failed (n_devices != 2?)` | Misleading message — the real gate is compute capability. The internal pipeline needs `__nanosleep` (sm70+); P100 is sm_60 | Expected on this rig, harmless. Use `GGML_CUDA_ALLREDUCE=none`; `internal` reaches the same butterfly path. See H10 |
+| `ncclAllReduce failed with status 1` at `reduce.cu:169` (`ik`) | Built with NCCL (`GGML_NCCL` defaults ON); no NVLink | Use `/root/ik_llama.cpp/build-nonccl/` |
+| `ggml-cuda.cu:106: CUDA error` on mainline `-sm tensor`, backtrace frame `ggml_backend_cuda_comm_allreduce_nccl` | NCCL AllReduce is the Linux default and is broken rig-wide | `GGML_CUDA_ALLREDUCE=none`. No rebuild |
+| `internal AllReduce init failed (n_devices != 2?)` | Misleading: the real gate is sm_70 (`__nanosleep`) | Harmless; `internal` falls back to the `none` path. Use `none` |
+| `error: invalid parameter for argument: -sm` | Split mode not supported by that engine | METHODOLOGY §2 support table |
+| `LLAMA_SPLIT_MODE_TENSOR not implemented for architecture` | The gate is a denylist and `qwen35` is permitted — if you see this, something else changed | Check `llm_arch_supports_sm_tensor()` in `src/llama-arch.cpp` |
+| `ggml-backend-meta.cpp:543: GGML_ASSERT(src_ss[0].axis != GGML_BACKEND_SPLIT_AXIS_0)` with DFlash2 | DFlash2 borrows the target's `output.weight` via `ctx_other`; tensor split shards it on axis 0 | Not fixable by config. DFlash2 is layer-only. H8 |
+| `dflash requires ctx_other to be set` / `pre-allocated tensor (output.weight) in a buffer (CUDA1)` with `-devd CUDA0` | Same borrowed tensor lives on CUDA1 under layer split | Use `default` or `CUDA1` placement. Upstream bug in PR #27342. H11 |
+| DFlash2 run shows poor acceptance, no error | A v1 engine (`buun`/`ik`) silently ran the v1 path | Use `mainline`; confirm the selector in the server log. H8 |
+| Abort at `fattn.cu:348` with turbo KV types | `(turbo*, F16)` dispatch unsupported | Symmetric `turbo3/turbo3`. Moot: TurboQuant is closed. H7 |
+| `-ub 8192` aborts in the cuBLAS staging allocator | Too large | `-ub 2048` (4096 needs `-b 8192` for +1%). H14 |
+| `failed to load model` on `-sm none` | Target too big for one card | Only `UD-IQ3_S` fits one P100. Single-GPU is closed anyway |
+| `CUDA error: out of memory` in `ggml_cuda_pool_vmm::alloc` after a clean load | VRAM exhausted on the first request (seen at 16,029/16,269 MiB) | Smaller quant, `q8_0` KV, or drop the drafter |
+| `FAILED(request)` rows with empty responses at 100k | Prompt passed through argv hit E2BIG; curl posted an empty body | Fixed 2026-08-27 in `run-spec-placement.sh` (prompt via file) |
+| Prefill t/s implausibly high on reps 2+ (`f_sim_best = 1.000` in log) | Slot-level prefix reuse; `cache_prompt: false` doesn't defeat it | Prefill from rep 1 only, or a fresh server per rep. Decode/acceptance unaffected |
+| Script dies with `break: only meaningful in a loop` or `<word>: command not found` mid-run | A `.sh` was edited while a background job was executing it | Re-run the affected cell; the file is fine (§1) |
+| Chunked GDN graph aborts under `-sm tensor` | Its ops carry no split-axis metadata | Kernel work, not a flag. H22 parked |
+| No `pp0` row | `-p 0` is a no-op | Expected |
+| Load appears hung, GPUs idle | Normal load, or disk contention | §2.2 |
+| `pi` hangs at startup (Phase 5) | Blocks on network in this environment | `PI_OFFLINE=1`, set by `run-web-bench.sh` |
+| Phase 5 stage exits 124 | `STAGE_TIMEOUT` (3600 s) hit | A legitimate result; record it |
+| Phase 5 `port N already in use` | Index reused, or a previous site is still hosted (by design) | Pick an unused index; WEB_BENCH §5 |
+| Phase 5 server OOMs on load | `CTX=32768` beside a large model | `CTX=16384`, note it in RUNLOG |
 
 ---
 
-## 6. Git protocol — commit and push every run
+## 6. Git protocol
 
-**This is mandatory and applies to failed runs too.**
-
-`run-bench.sh` does this automatically at the end of each run. If you run a
-benchmark by hand, or edit any document, do it manually:
+**Mandatory, failed runs included.** The scripts commit and push at the end of
+each run. For hand runs and document edits:
 
 ```bash
-cd /root/p100-benchmarks
-git add -A
-git commit -m "bench: <label> — <one-line outcome>"
-git push
+cd /root/p100-benchmarks && git add -A && git commit -m "bench: <label> — <outcome>" && git push
 ```
-
-Commit message conventions:
 
 | Prefix | Use for |
 |---|---|
-| `bench:` | A benchmark run (pass or fail) |
-| `docs:` | Documentation changes with no new data |
+| `bench:` | A run, pass or fail |
+| `docs:` | Documentation with no new data |
 | `build:` | Engine rebuilds, flag changes |
 | `fix:` | Corrections to previously recorded data or claims |
 
 Remote: `https://github.com/Tom1tk/p100-inference-benchmarks.git` (private).
-
-If a push fails, do not discard the commit — the local history is the record.
-Retry, and note the failure in RUNLOG.md if it persists.
+If a push fails, keep the commit and retry; note persistent failure in RUNLOG.
 
 ---
 
-## 7. Phases and completion criteria
+## 7. Work queue
 
-Run phases in order. A phase is done when every cell has either a number or a
-recorded reason it couldn't produce one.
+The deliverable is a serve command ([README.md](README.md)). Phases 0, 1, 2
+and 6 are done, Phase 3 folded into Phase 8, Phase 7 has two cells left, Phase
+5 has not started, Phase 8 is planned. Everything below is ranked by whether
+it can change the serve command.
 
-### Phase 1 — engine baseline
-No MTP, no TurboQuant. Establishes the apples-to-apples comparison.
+### Open
 
-- 3 engines × `UD-Q6_K_M` × {`none` (single-GPU reference), `layer`}
-- The `none` leg needs `UD-IQ3_S`, not `Q6_K_M` — 21.5 GiB does not fit one
-  card. Record it as a separate quant row, not as a `Q6_K_M` single-GPU number
-- Plus `graph` for `ik` only — **blocked until the NCCL rebuild**
-- Full prefill depth list + tg128, `-r 3`
-
-**Done when:** every engine has `none` and `layer` numbers, and the
-single-vs-dual comparison is recorded. Answers part of H6.
-
-**Status (2026-08-25): complete except the `none` leg**, which the operator
-deferred. It needs `UD-IQ3_S` — the only target that fits one 16 GiB card.
-Everything else is in RESULTS.md, on `UD-Q4_K_M` rather than `Q6_K_M`.
-Selected configuration: **`mainline-rebased` · `-sm tensor` ·
-`GGML_CUDA_ALLREDUCE=none`**.
-
-### Phase 2 — MTP on/off
-Winning engine(s) from Phase 1 × `UD-Q6_K_M` × MTP on vs off.
-
-Requires the server, not `llama-bench` — the latter doesn't drive speculative
-decoding. Per-engine flags are in METHODOLOGY.md and **differ meaningfully**
-(`buun` uses `draft-mtp`, not `mtp`). Record acceptance rate, not just t/s.
-
-**Done when:** H1 has a verdict with an acceptance rate to support it.
-
-**Status (2026-08-25): complete.** H1 has a verdict — refuted as stated, and
-the speedup is depth-dependent (1.05× at 4k, 1.48× at 16k) rather than a single
-number. Best configuration: **`-sm tensor` + MTP-Q4_0 + `f16` KV, 29.26 t/s at
-16k depth.**
-
-Two measurement rules this phase established, both learned the hard way:
-
-- **Never size a speculative-decoding run at 64 tokens.** A short generation
-  overstated the MTP speedup by 13x (90.0% acceptance vs 40.1% at 400 tokens).
-  Use `N_PREDICT=400` minimum, and quote depth alongside every acceptance rate.
-- **Acceptance rate is not comparable across engines** unless `n_max`/`p_min`
-  are pinned on both. `buun` reported 82.4% where `mainline-rebased` reported
-  73.3% on an identical drafter, prompt, and budget — different defaults, not a
-  better drafter. Compare end-to-end decode t/s instead.
-
-### Phase 3 — quant sweep
-Winning engine/split from Phases 1–2 × `IQ3_S` / `Q4_K_M` / `Q5_K_M` / `Q6_K_M`
-× tg128 + pp16384 only. Not the full depth sweep — this phase is about quant
-choice, not re-confirming depth scaling.
-
-Run `IQ3_S` **twice**: once on `-sm layer` for the quant-curve row, and once on
-`-sm none` (single card, `CUDA_VISIBLE_DEVICES=0`) for the single-GPU reference
-that H6 needs and that every other quant is too large to provide. Expect its
-prefill to trail the K-quants — IQ dequantization is compute-heavy and sm_60 has
-no dp4a — so read it as the cost of single-GPU, not as a like-for-like quant
-comparison.
-
-### Phase 4 — targeted hypothesis tests
-H2 (XL split-stall), H3 (stock quant quality), H4 (TurboQuant KV), H5 (NCCL),
-H7 (dispatch bug). Each is a small targeted run, not a matrix pass. See
-[HYPOTHESES.md](HYPOTHESES.md) for the specific test each needs.
-
-### Phase 5 — agentic web-build benchmark
-The final phase, and the only one that measures *usability* rather than
-throughput. Full procedure in **[WEB_BENCH.md](WEB_BENCH.md)** — read it before
-running, the port scheme and quality scoring are not obvious from the script.
-
-```bash
-./scripts/run-web-bench.sh <engine> <model-path> <split-mode> <label> <index> [server args...]
-```
-
-Matrix: the winning engine/split from Phases 1–3 × each **drafter arm** —
-none (control), MTP, DFlash2-Q4, DFlash2-Q8. All four are runnable as of
-2026-08-24; the DFlash2 arms require `engine = mainline` (see H8).
-
-Because `mainline` is a different engine, run its **own** no-drafter control as
-an arm. Comparing DFlash2-on-mainline against MTP-on-buun would confound drafter
-with engine, which is the one thing this repo exists to avoid.
-
-Each run claims an index and leaves its site hosted at `4000 + index`, so at
-the end every model version is browsable side by side.
-
-**Done when:** every drafter arm has a total task time, token count, and
-prefill/decode avg/min/max, plus a hand-scored quality verdict — or a recorded
-reason it couldn't produce one. Answers H9 and the practical half of H1/H8.
-
-### Phase 6 — dual-GPU transport and placement (H10–H12)
-Added 2026-08-24 after a survey found several untouched inter-GPU controls.
-These are cheap, mostly runtime-switchable, and apply to whichever config wins
-Phases 1–3. Full knob list in METHODOLOGY §3.
-
-Highest value first:
-
-1. `GGML_CUDA_P2P=1` vs unset on **`-sm tensor`**. Peer access is **off by
-   default** in mainline and these cards peer in both directions. Test it on
-   tensor split, not layer — tensor moves far more cross-GPU data. This is the
-   best remaining cheap test in the project.
-2. ~~`GGML_CUDA_ALLREDUCE` three-way~~ — **done**. `nccl` aborts; `internal`
-   and `none` are identical to within 0.2%. Correctness switch, not a
-   performance one. See H10.
-3. ~~Drafter placement~~ — **done**, refuted at 4k and 16k. See H11.
-4. `ik` graph knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) — unblocked by the
-   `build-nonccl` rebuild, but lower priority now that `-sm tensor` beats
-   `-sm graph` on prefill at every depth.
-
-Record per-GPU utilization from the temps log alongside throughput. These
-hypotheses are about transfer stalls, so utilization is the evidence.
-
-**Trap:** any `-ot` override silently disables pipeline parallelism. Compare
-`-ot` runs against a no-`-ot` control, never against the Phase 1 baseline.
-
-### Phase 7 — prefill and TTFT (H13–H22)
-
-**Two levers remain after 2026-08-25**, once TurboPrefill (H16) and PFlash (H21)
-were withdrawn: the **power cap** (H15, cell 8 — requires the user's careful manual
-involvement at every step) and the **chunked GDN path** (H22, cell 7). Everything
-else in this phase is measurement, or a work-reducing lever rather than a way to
-make the existing kernels faster.
-
-**The current priority.** Opened 2026-08-25 from
-[Research/prefill-ttft-2026-08-25.md](Research/prefill-ttft-2026-08-25.md) —
-read it before running anything here; it closes several obvious-looking knobs at
-the source level and establishes the hardware floor that bounds every result.
-
-Run in this order. The first two are gates: they decide whether the rest of the
-phase is aimed at the right target.
-
-| # | Cell | Hypothesis | Why this order |
+| # | Item | Why | Cost / gate |
 |---|---|---|---|
-| ~~1~~ | ~~`-p 16384,65536,100000 -n 0`, tensor, `-ub 2048`~~ | H13 | **DONE 2026-08-26.** 327.1 / 250.1 / 215.4 t/s; 7.7 min TTFT at 100k |
-| ~~2~~ | ~~`GGML_CUDA_CUBLAS_COMPUTE_TYPE` toggle at 16k~~ | H18 | **Parked by rule zero.** Diagnostic: it tells us *why* prefill is slow, but the only lever it feeds is cell 7, which is itself parked. Re-open if cell 7 becomes runnable |
-| ~~3~~ | ~~`-ub` sweep~~ | H14 | **DONE 2026-08-25 — CONFIRMED, +63%.** `-ub 2048` is the new default; `-ub 8192` OOMs. Re-baseline everything else on it |
-| 4 | `--cache-ram 20000 --cache-idle-slots` on WEB_BENCH multi-turn | H19 | Highest practical value for the actual use case; costs a flag |
-| 5 | sm_60 FP16 fast-path patch, rebuild, one Phase 2 cell + one NIAH tier | H17 | Free by hypothesis; also un-confounds buun-vs-rebased quality |
-| ~~6~~ | ~~**27B-IQ3_S single-GPU** vs two-card 27B-Q4_K_M~~ | H20/H25 | **CLOSED 2026-08-27 — user call, not feasible for real-world use.** H25 measured 56% of the pair's prefill, 53% of its drafter-free decode, and MTP OOMs at 16,029/16,269 MiB, so against the config we serve it is at **38%**. It also cannot reach 100k on VRAM. The quality leg was never run and never will be — no point NIAH-testing a config that fails on speed and context first |
-| ~~7~~ | ~~**Chunked GDN path** A/B~~ | H22 | **Tried 2026-08-26, crashes.** The chunked graph's ops carry no split-axis metadata, so it aborts under `-sm tensor` before producing a number. Wiring that up is real kernel work, not a 2-line patch. **Parked by rule zero** — it is no longer a cheap test |
-| 8 | Power cap 175→200→220 W | H15 | **Approved to 220 W**, but blocked on the user's in-person PSU plug-meter check. Thermally the riskiest cell — temperature log is the primary output |
-| ~~9~~ | ~~PFlash-style selection spike~~ | ~~H21~~ | **Withdrawn 2026-08-25.** PFlash is sm_80-only with no v2; hand-porting it is not worth the build cost |
-| ~~—~~ | ~~TurboPrefill build~~ | ~~H16~~ | **Withdrawn 2026-08-25** — user call. Forces `-sm layer`, costing 35% of decode to buy prefill; wrong trade against the four simultaneous targets |
+| 1 | **H19 — prompt-cache reuse** (`--cache-ram 20000 --cache-idle-slots`, multi-turn) | The actual use case re-sends a growing prefix every turn. Also cuts the Phase 8 sweep from ~14 h to ~2 h | One multi-turn run; a flag |
+| 2 | **H17 — decide the sm_60 FP16 fix** | Measured: −12–13% prefill, +0.36% decode. It is a correctness fix that changes numerics, so it must be applied or rejected **before** any quality run | Decision; needs Phase 8's first arm to see whether the output difference matters |
+| 3 | **Phase 8 — quality gate** ([QUALITY-PLAN.md](QUALITY-PLAN.md)) | The only objective with no data. Sweep D (drafter hash check, ~45 min) first — it also settles the drafter re-rank at the current config, since every MTP-vs-DFlash2 comparison was at `-ub 512`/4k/layer | ~3 h GPU with H19, ~14 h without. After 1 and 2 |
+| 4 | **H15 — power cap 175 → 200 → 220 W** | Prefill is compute-bound; the one lever that could move it without a kernel | **Blocked on the user's PSU meter check** (§1) |
+| 5 | Phase 5 — agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; run after Phase 8 fixes the config |
+| 6 | `GGML_CUDA_P2P=1` with MTP | +2.9% decode drafter-free (H10), never measured in combination. Cheap | One Table B cell against the banked `h24-ub2048-mtp-16k` control |
+| 7 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 
-**`-ub 2048` is now mandatory in every Phase 7 cell.** H14 found the old default
-`-ub 512` to be a local minimum of the throughput curve, worth 63% less than 2048.
-Any cell run at the old default measures the wrong regime and will have to be
-repeated. Use `scripts/run-ubatch-sweep.sh` (env-overridable: `LABEL`, `BATCH`,
-`UBATCHES`, `PROMPTS`, `REPS`) for further sweeps; note `-ub` is capped by `-b`,
-so raising ubatch above 2048 requires raising `-b` too.
+### Parked by rule zero
 
-**Thermal note, and it is new.** A 100k prefill is 8–16 minutes of *sustained*
-compute — several times longer than any run this repo has done, and prefill loads
-the cards harder than decode. The 83 °C limit has never been tested under this
-profile. Monitor cell 1 actively; do not background it and walk away.
+Not closed — the question may still be true — but it cannot change the serve
+command today. Re-open only on the stated unblock.
 
-### Parked by rule zero — reasoning recorded so nobody re-spends the power
-
-These are not closed (the questions may still be true); they simply cannot
-change the serve command today, so they do not earn their electricity. Re-open
-only when the stated unblock happens.
-
-| Item | Why it's parked | What would unpark it |
+| Item | Why parked | What would unpark it |
 |---|---|---|
-| H18 — GDN-bound prefill | Diagnostic. It sizes a prize that only H22 can collect, and H22 is parked | H22 becoming runnable |
-| H22 — chunked GDN | Crashes under `-sm tensor`: the chunked ops have no split-axis metadata. Now a kernel project, not a flag | Someone annotating the split axes, or a run on `-sm none`/`layer` being worth it on its own |
-| H23 — quadratic attention at 100k | Diagnostic. Explains the depth decay, but every sparse-attention kernel that could exploit it is sm_80+. No lever exists on sm_60 | An sm_60-capable sparse-attention path appearing |
-| H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1. Tuning its second-best mode cannot produce the serve command | `ik` gaining tensor split |
-| q8 KV × ubatch interaction | Noted while trimming H25. Not that test's purpose; if it matters it will surface as an anomaly in a later result | An unexplained q8 result |
-| MTP at `-ub 512` on one card | Offered as a follow-up to H25 and **declined**. Single-GPU is closed, so neither outcome moves the serve command: the optimistic ~15 t/s still loses to the two-card drafter-free number *and* gives up prefill | Nothing — this is closed, not parked |
-
-**Single-GPU serving is closed, not parked** (2026-08-27, user call). It failed
-on two independent counts — speed and context ceiling — before quality was ever
-measured. Do not propose single-card arms again.
-
-**H26 (2026-08-27) closed the largest gap:** the deliverable config now serves
-at 100k — 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card,
-70 C sustained. That also settled `q8_0` KV on two cards, decode at depth, and
-the sustained-thermal question, and it retired the `-ctk q4_0` fallback as
-unnecessary.
-
-**What is actually left that can change the serve command:** the 100k **NIAH
-quality gate — now the only objective with no data at all. Planned in full in
-[QUALITY-PLAN.md](QUALITY-PLAN.md) (Phase 8) and deliberately scheduled LAST**,
-because the levers below do not change what the model outputs but do change how
-long it takes to measure it — a ~2 h sweep with prompt-cache reuse against ~14 h
-without;
-H19 (prompt-cache reuse — a flag, not a sweep); H17 (the sm_60 arithmetic bug,
-which confounds every quality comparison); H15 (power cap, gated on the user's
-PSU check); and a **drafter re-rank at the current config** — every MTP-vs-DFlash2
-comparison was taken at `-ub 512`/4k/layer, where DFlash2 won, and H26 showed
-acceptance is not monotonic in depth.
-That is a much shorter list than the hypothesis count suggests, and it is the
-list to work from.
-
-**Reuse what exists.** `/root/niah_test/` has a working harness and generated
-fixtures at 8k/32k/64k/100k (single and multi-needle). `pflash-llama.cpp` ships a
-built `llama-niah` with fixtures to 128k — that binary and its fixtures are the
-only reason the fork is still on disk. H20 is mostly a re-run, not new harness
-work. Its July baseline is a **Qwen3.5-9B** run, so it validates the harness but
-is **not** a quality baseline for anything in the current plan: every model in
-Phase 7 is Qwen3.8-27B, and the single-GPU arm is `Qwen3.8-27B-UD-IQ3_S`
-(11.2 GiB, on disk). Any quality comparison needs its own 27B control.
-
-### Deferred
-~~Context depths beyond 16k~~ — **now Phase 7 cell 1, the top priority**.
-~~Power-limit experiment~~ — **approved 2026-08-25 to a 220 W ceiling** (not 250 W),
-now Phase 7 cell 8. Still blocked on one thing: the user must measure PSU wall draw
-with a plug-socket meter in person before the first run above 175 W. Log the cap as
-a separate column; don't change it silently mid-matrix. Remaining deferred:
-fine-grained row-vs-layer comparison; Phase 1's single-GPU (`none`) leg on `UD-IQ3_S`.
+| H18 — GDN-bound prefill | Diagnostic; sizes a prize only H22 can collect. Free evidence from H17: ~85% of prefill is not GEMM-bound | H22 becoming runnable |
+| H22 — chunked GDN path | Crashes under `-sm tensor` (no split-axis metadata). A kernel project | Someone annotating the split axes |
+| H23 — quadratic attention at 100k | Explains the depth decay, but every sparse-attention kernel is sm_80+ | An sm_60 sparse-attention path |
+| H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1 | `ik` gaining tensor split |
+| H2, H3 — XL split-stall, stock-quant degradation | Fold into Phase 8 Sweep Q arms 3 and 5, only if Q4_K_M shows a gap | A gap in Sweep Q |
+| q8 KV × ubatch interaction | Noted during H25; not worth its own run | An unexplained q8 result |
 
 ### Closed — do not spend runs here
 
-| Line of enquiry | Why it's closed |
+| Line of enquiry | Why |
 |---|---|
-| TurboQuant KV | −14.3% decode for 788 MiB. H4/H7 |
-| `buun` as an engine | Behind `mainline-rebased` on prefill (12–14%) and on decode with MTP (3.9%); its one exclusive feature is TurboQuant. H6 |
-| DFlash2 | Layer-split-only, and `tensor + MTP` beats `layer + DFlash2` by +71% decode. H8 |
-| `GGML_CUDA_ALLREDUCE` tuning | Only butterfly runs on Pascal; `internal` and `none` are the same path. Use `none`. H10 |
-| Drafter placement (`-devd`) | Moves VRAM, not throughput. H11 |
-| `ik` `-sm graph` knobs (H12) | Low value now — `-sm tensor` beats graph on prefill at every depth and is within 8% on decode, and `ik` has no path to tensor split |
-| **PFlash — product, fork and technique** | Requires **sm_80+** — the `mean_K → score → select → sparse_fwd` kernels plus BSA target Ampere, and no v2 exists, so it is architecturally unavailable. H21 briefly reopened the *technique* as a hand-port; **withdrawn 2026-08-25** — not worth the build cost with no upstream to track. Note also that the earlier "too lossy" quality verdict was formed on a **7900 XTX, not on these P100s**, so the sm_60 arithmetic bug (H17) never confounded it. `pflash-llama.cpp` stays on disk only for its built `llama-niah` binary and fixtures |
-| **vLLM / vllm-pascal / pascal-pkgs-ci** | vLLM needs cc ≥ 7.0; `vllm-pascal` is discontinued, its successor tops out at vLLM **0.10.0** and is "soft-broken due to PyTorch". 0.10 long predates `qwen35` hybrid-SSM support |
-| **SGLang, TensorRT-LLM, ExLlamaV3, ktransformers** | sm_75 / sm_80+ minimum |
-| **MLC-LLM / TVM** | No `qwen35` hybrid support; we would be writing GDN kernels in TVM with worse tooling, and MLC prefill trails llama.cpp where measured |
-| **tinygrad** | Not an inference engine — no GGUF loader, no gated-delta-net op, no hybrid-SSM support, no quantised Pascal kernels, no TP serving. Parity means rewriting the stack we already have |
-| **FlashQLA** | Hopper SM90 + TMA + warpgroup MMA only |
-| `GGML_CUDA_FORCE_MMQ` | `__dp4a` needs cc 6.1; P100 is 6.0. `mmq.cu:316` returns false unconditionally. Quantised prefill always goes dequant → cuBLAS |
-| `GGML_CUDA_F16` | Already effectively on — `ggml-cuda.cu:1626` picks `CUBLAS_COMPUTE_16F` for cc 600, and `prefer_f32_output` is set only for cc == 700 |
-| KV quant to reach 100k | Unnecessary: f16 KV at 100k is 6.25 GiB, and 100k fits VRAM. KV quant doesn't affect prefill at all |
+| Single-GPU serving (H20/H25) | 56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k. **User call, 2026-08-27** |
+| PFlash — product, fork, technique (H21) | sm_80-only, no v2, hand-port not worth it. Fork kept on disk only for `llama-niah` |
+| TurboPrefill (H16) | Forces `-sm layer`, −35% decode. User call |
+| TurboQuant KV (H4/H7) | −14.3% decode for 788 MiB |
+| `buun` as an engine | Its prefill deficit was the H17 fix; its only exclusive feature is TurboQuant |
+| DFlash2 as the drafter (H8) | Layer-only; tensor + MTP beats layer + DFlash2 by +71% decode. Still an arm in Phase 8 Sweep D |
+| Q8 drafters (H9) | Accept less, same speed, +0.87 GiB |
+| AllReduce tuning (H10) | Only the butterfly path runs on Pascal |
+| Drafter placement `-devd` (H11) | Moves VRAM, not throughput |
+| `-ub` above 2048 (H14) | +1% for double the activation VRAM; 8192 aborts |
+| KV quant as a way to *reach* 100k | Unnecessary — f16 fits. `q8_0` is used for headroom, not fit |
+| vLLM / vllm-pascal / SGLang / TensorRT-LLM / ExLlamaV3 / ktransformers / FlashQLA | sm_70+ minimum, or no `qwen35` support |
+| MLC-LLM / TVM, tinygrad | No hybrid-SSM support; would mean rewriting the stack |
+| `GGML_CUDA_FORCE_MMQ`, `GGML_CUDA_F16` | No-ops on cc 6.0 (no dp4a; F16 compute already selected) |
 
-### Unmeasured — do not quote
+### Measurement rules that constrain later phases
 
-**`tensor + MTP + GGML_CUDA_P2P=1` was never measured.** P2P (+2.9% decode) was
-measured drafter-free on `llama-bench`; MTP (29.26 t/s) on `llama-server` at
-depth. The combined cell was queued twice and ran neither time. The defensible
-best-measured number is **29.26 t/s**, without P2P.
-
----
-
-## What this project is for
-
-The deliverable is **a server launch command**, not a table. Read every phase as
-"does this change what goes in that command." Four targets must hold *at once* —
-100k context, highest decode, highest prefill, and output quality indistinguishable
-from baseline — and almost every lever trades one against another. The quality
-target is the binding constraint and has the least data behind it; a throughput win
-from a lossy technique does not count until it clears a NIAH gate.
-
-See [README.md](README.md#the-objective) for the full statement and the lever map.
-
-### Phase 8 — the quality gate
-
-**Planned, not started.** See **[QUALITY-PLAN.md](QUALITY-PLAN.md)** for the
-full design: two sweeps (quants, drafters), the baseline definition, fixture
-shape, abort rules and order of operations.
-
-Three things from it that belong here because they constrain *other* phases:
-
-1. **H17 must be settled before any quality run.** It changes model numerics, so
-   landing it afterwards invalidates the whole sweep.
-2. **H19 is worth ~10x on the sweep's cost**, not just on the agentic loop. It is
-   a prerequisite, not a nice-to-have.
-3. **The drafter sweep is an equivalence check, not a quality sweep.** Greedy
-   speculative output is a property of the target model; four drafters should
-   produce four identical hashes in ~45 min. If they do, drafters are ranked on
-   speed alone, permanently.
+- Quote every prefill figure with its length **and ubatch**; every acceptance
+  figure with its depth. Neither transfers.
+- Speculative runs: ≥400 output tokens, ≥2 reps. Never compare acceptance
+  across engines without pinning `n_max`/`p_min`.
+- Phase 8 freezes the serve command before its first arm and moves one lever
+  per run: the model file in Sweep Q, the drafter in Sweep D.
