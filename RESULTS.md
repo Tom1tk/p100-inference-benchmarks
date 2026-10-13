@@ -125,6 +125,9 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | `h25-iq3-1card-none-16k` | rebased | IQ3_S | none | **1** | 2048 | q8_0 | none | 16k | 10.42 | 183.8 | — | 12601 | 69 C |
 | `h25-iq3-1card-mtp-16k` | rebased | IQ3_S | none | **1** | 2048 | q8_0 | MTP-Q4_0 | 16k | **OOM** | — | — | 16029 at load | — |
 | `h26-100k-mtp-kvq8` | rebased | Q4_K_M | tensor | 2 | 2048 | **q8_0** | MTP-Q4_0 | **100k** | **20.02** | **207.4** | 60.3% | 12147/12147 | 70 C |
+| `saluki-iq2mix-mtp-d16k` | rebased | Saluki IQ2-mix | tensor | 2 | 2048 | f16 | MTP-Q4_0 | 16k | 27.36 | 309.1 | 64.9% | 7075/7075 | 65 C |
+| `saluki-iq2mix-abl-embmtp-d16k` | rebased | Saluki IQ2-mix abl. | tensor | 2 | 2048 | f16 | MTP, embedded | 16k | 23.65 | 310.1 | 50.8% | 6915/6915 | 65 C |
+| `saluki-iq2mix-1card-mtp-d16k` | rebased | Saluki IQ2-mix | none | **1** | 2048 | f16 | MTP-Q4_0 | 16k | 17.45 | 179.2 | 64.9% | 12815/259 | 65 C |
 **Reading notes.**
 
 - **`h26-100k-mtp-kvq8` is the deliverable config** and the only row at the

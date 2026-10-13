@@ -1425,3 +1425,8 @@ to unpatched, so a rebuild of `build-h17` must re-apply the patch first.
 - **`saluki-iq2mix-mtp-16k` and `saluki-iq2mix-abl-embmtp-16k` are INVALID as Table B rows**: launched
   without `PROMPT_FILE=prompts/h11-depth-prompt.txt`, so they decoded at ~40 tokens depth, not 16k.
   Prefill (36–55 t/s) is a 40-token prompt and meaningless. Re-run as `*-d16k` labels.
+- Depth re-runs (r=2, prefill from rep 2 shown in Table B; rep 1 ~295 t/s): base Saluki IQ2-mix + stock
+  MTP drafter matches the Q4_K_M control (27.36 vs 27.41 decode, 64.9 vs 66.4% accept) at −3.9 GiB/card.
+  The abliterated file's embedded MTP head accepts 50.8% → 23.65 t/s (−14%). Prefill unchanged (~310).
+- Single card (`-sm none`, user request): fits at 12,815 MiB, but 17.45 decode / 179 prefill = 64% / 58%
+  of the pair. Same verdict as H20/H25: single-GPU stays closed for speed. Quality untested (Phase 8).

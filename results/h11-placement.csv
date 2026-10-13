@@ -77,3 +77,9 @@ saluki-iq2mix-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,23.71,35.82,
 saluki-iq2mix-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,23.78,52.49,400,483,237,49.1,7075,7075,59,169,ok
 saluki-iq2mix-abl-embmtp-16k,draft-mtp,embedded,default,1,21.44,39.71,400,539,218,40.4,6915,6915,57,130,ok
 saluki-iq2mix-abl-embmtp-16k,draft-mtp,embedded,default,2,21.40,54.95,400,539,218,40.4,6915,6915,60,130,ok
+saluki-iq2mix-mtp-d16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,27.31,296.07,400,405,263,64.9,7075,7075,63,157,ok
+saluki-iq2mix-mtp-d16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,27.41,309.12,400,405,263,64.9,7075,7075,65,157,ok
+saluki-iq2mix-abl-embmtp-d16k,draft-mtp,embedded,default,1,23.64,294.09,400,472,240,50.8,6915,6915,63,155,ok
+saluki-iq2mix-abl-embmtp-d16k,draft-mtp,embedded,default,2,23.66,310.05,400,472,240,50.8,6915,6915,65,155,ok
+saluki-iq2mix-1card-mtp-d16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,17.44,175.78,400,405,263,64.9,12815,259,65,140,ok
+saluki-iq2mix-1card-mtp-d16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,17.45,179.21,400,405,263,64.9,12815,259,65,140,ok
