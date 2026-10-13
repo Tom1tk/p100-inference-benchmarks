@@ -73,3 +73,7 @@ h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,,,,,,,12147,1214
 h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,,,,,,,12147,12147,,190,FAILED(request)
 h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,20.00,207.71,400,426,257,60.3,12147,12147,70,20,ok
 h26-100k-mtp-kvq8,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,20.03,207.13,400,426,257,60.3,12147,12147,70,20,ok
+saluki-iq2mix-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,23.71,35.82,400,483,237,49.1,7075,7075,57,169,ok
+saluki-iq2mix-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,23.78,52.49,400,483,237,49.1,7075,7075,59,169,ok
+saluki-iq2mix-abl-embmtp-16k,draft-mtp,embedded,default,1,21.44,39.71,400,539,218,40.4,6915,6915,57,130,ok
+saluki-iq2mix-abl-embmtp-16k,draft-mtp,embedded,default,2,21.40,54.95,400,539,218,40.4,6915,6915,60,130,ok

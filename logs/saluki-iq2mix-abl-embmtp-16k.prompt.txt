@@ -1,0 +1,1 @@
+Write a detailed technical explanation of how HTTP/2 multiplexing works. Cover streams, frames, flow control, and HPACK header compression, and explain how it differs from HTTP/1.1 pipelining.

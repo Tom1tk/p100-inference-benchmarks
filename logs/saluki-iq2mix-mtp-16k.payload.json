@@ -1,0 +1,1 @@
+{"messages": [{"role": "user", "content": "Write a detailed technical explanation of how HTTP/2 multiplexing works. Cover streams, frames, flow control, and HPACK header compression, and explain how it differs from HTTP/1.1 pipelining."}], "temperature": 0, "top_k": 1, "seed": 42, "max_tokens": 400, "cache_prompt": false, "timings_per_token": false}

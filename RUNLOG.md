@@ -1414,3 +1414,14 @@ accuracy benefit is unknown; it would need one free build and one short run.
 `build-cuda-p100` was left untouched), `scripts/run-h17-ab.sh`, and
 `rebased-h17` as an engine in `run-bench.sh`. The source tree itself is reverted
 to unpatched, so a rebuild of `build-h17` must re-apply the patch first.
+
+## 2026-10-13 — Underdog-Saluki-27B-1.0 IQ2-mix smoke (two models)
+
+- Models: `Underdog-Saluki-27B-1.0-IQ2-mix.gguf` (ConwayResearch, 7.36 GiB, 64 blocks) and
+  `Underdog-Saluki-27B-1.0-IQ2-mix-MTP-abliterated.gguf` (Kujira, 7.78 GiB, 65 blocks,
+  `nextn_predict_layers = 1`). Both `qwen35`, `general.name = Qwen3.8-27B GSQ-RCO`. sha256 match HF.
+- `run-spec-placement.sh` gained drafter `embedded`: `--spec-type draft-mtp` with no `-md`, so the
+  MTP head inside the target GGUF is used.
+- **`saluki-iq2mix-mtp-16k` and `saluki-iq2mix-abl-embmtp-16k` are INVALID as Table B rows**: launched
+  without `PROMPT_FILE=prompts/h11-depth-prompt.txt`, so they decoded at ~40 tokens depth, not 16k.
+  Prefill (36–55 t/s) is a 40-token prompt and meaningless. Re-run as `*-d16k` labels.

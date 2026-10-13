@@ -3,7 +3,7 @@
 #
 # Usage: ./scripts/run-spec-placement.sh <label> <spec-type> <drafter-path|none> <placement>
 #   spec-type   draft-mtp | draft-dflash | none
-#   drafter     path to drafter GGUF, or 'none' for the no-drafter control
+#   drafter     path to drafter GGUF, or 'none' for the no-drafter control; 'embedded' = MTP head in the target GGUF
 #   placement   default | CUDA0 | CUDA1     (default = no -devd, drafter splits over both)
 #
 # Everything except the drafter and its placement is pinned, so a difference in
@@ -65,7 +65,7 @@ LABEL="$1"; SPEC_TYPE="$2"; DRAFTER="$3"; PLACEMENT="$4"
 
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }
 [[ -f "$MODEL" ]] || { echo "ERROR: model not found: $MODEL" >&2; exit 2; }
-[[ "$DRAFTER" == none || -f "$DRAFTER" ]] || { echo "ERROR: drafter not found: $DRAFTER" >&2; exit 2; }
+[[ "$DRAFTER" == none || "$DRAFTER" == embedded || -f "$DRAFTER" ]] || { echo "ERROR: drafter not found: $DRAFTER" >&2; exit 2; }
 
 mkdir -p logs results/h11
 if [[ -z "$PROMPT_FILE" ]]; then
@@ -130,7 +130,10 @@ SERVER_CMD=(
 [[ -n "$BATCH" ]] && SERVER_CMD+=( -b "$BATCH" )
 [[ -n "$UB"    ]] && SERVER_CMD+=( -ub "$UB" )
 [[ -n "$NP"    ]] && SERVER_CMD+=( -np "$NP" )
-if [[ "$DRAFTER" != none ]]; then
+if [[ "$DRAFTER" == embedded ]]; then
+    # MTP head inside the target GGUF (nextn_predict_layers=1): no -md needed.
+    SERVER_CMD+=( --spec-type "$SPEC_TYPE" )
+elif [[ "$DRAFTER" != none ]]; then
     SERVER_CMD+=( --spec-type "$SPEC_TYPE" -md "$DRAFTER" )
     [[ "$PLACEMENT" != default ]] && SERVER_CMD+=( -devd "$PLACEMENT" )
 fi
