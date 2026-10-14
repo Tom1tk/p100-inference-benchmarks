@@ -11,3 +11,4 @@ sites/*/.pi-agent/sessions/
 
 # nsys sqlite exports are regenerable from the .nsys-rep
 results/phase0/nsys/*.sqlite
+__pycache__/

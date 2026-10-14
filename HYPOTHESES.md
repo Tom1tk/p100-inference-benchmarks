@@ -39,10 +39,11 @@ run label so the evidence is traceable.
 | H28 | Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode | **CONFIRMED 2026-10-14.** +27% 2-card drafter-free, +32.6% with MTP+P2P (37.66 t/s at 16k), +7.5% 1-card. KLD gate passed. Not in the serve command until Phase 8 |
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | **Done** (2026-10-14): H17 alone 0.018 = 0.31× the quant step (0.059), and only +0.003 on top of Q4, so **H17 closed as negligible**; mmvh +1.4% (Q4) / +4.2% (IQ3) over mmvq, so **tier 2 runs the candidate** |
-| H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | Pre-registered 2026-10-14 |
+| H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | **Confirmed** (2026-10-14, in H34): prefill +6.8% (337.7 → 360.8), decode flat, KLD ≈ 0 (bit-for-bit top-1) |
 | H32 | Phase 8 tier 2: the candidate serve command answers every 100k haystack question the Q5_K_M reference answers | Pre-registered 2026-10-14 |
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
-| H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | Pre-registered 2026-10-14 |
+| H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
+| H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | Pre-registered 2026-10-14 |
 
 ---
 
@@ -2192,6 +2193,71 @@ h29-1card-mmvh-iq3 15.86 / 196.40):
 - `h34-2card-f16reduce` vs `h34-2card`: H31's prediction, prefill +6–10%, decode ±1%.
 
 **Driver.** `scripts/run-h34-fork-levers.sh` (supersedes `run-h31-f16-reduce.sh`).
+
+**Result (2026-10-14, `results/h34-kld.csv`, `results/h11-placement.csv`, commit 13d2cb5).**
+
+Correctness: all 38 `test-backend-ops MUL_MAT q6_K` cases at n ≤ 8 (the mmvh path) pass. The
+binary then aborts at `ggml-cuda.cu:1506` (`GGML_ASSERT(convert_func != nullptr)`) on a
+non-contiguous Q6_K cuBLAS case. That abort predates the change (same with `MMVH=0`) and is
+outside mmvh. The driver's `FAIL` grep does not catch a crash, so this was checked by hand.
+
+| KLD gate | mean | same-top % | gate | |
+|---|---|---|---|---|
+| `q6k-mmvh-ub8` | 0.021324 | 99.216 | ≤ 0.026, ≥ 98.9 | pass |
+| `gemm-algo-ub512` | 0.003662 | 97.549 | ≤ 0.002, ≥ 99 | **fail** |
+| `f16-reduce-ub512` | −0.000005 | 100.000 | ≤ 0.002, ≥ 99 | pass (exact) |
+
+ALGO3 failed, so every speed arm ran with `GEMM_ALGO=0` (the driver's pre-registered rule).
+
+| Arm (rep 2) | decode t/s | prefill t/s | vs control | predicted |
+|---|---|---|---|---|
+| `h34-2card` (MMVH Q6_K) | 26.62 | 337.16 | decode **+5.2%**, prefill −1.5% | decode +3–6% ✓ |
+| `h34-1card-iq3` | 15.83 | 196.72 | flat / flat | decode +0–1% ✓ |
+| `h34-2card-f16reduce` | 26.64 | 360.71 | prefill **+6.8%** vs `h34-2card`, decode flat | +6–10%, ±1% ✓ |
+
+Prefill predictions for `h34-2card` (+2–4%) and `h34-1card-iq3` (+5–10%) were ALGO3's and are
+untested. The −1.5% on `h34-2card` prefill (both reps, vs 343.9/342.3 banked) is small but
+consistent. Its cause is unknown: the new path is n ≤ 8 only, so it should be build drift. Not
+chased; `h34-2card` is the control for everything that follows.
+
+**Verdict.**
+- **Q6_K mmvh: adopt** (inside `MMVH=1`). 2-card decode 25.29 → 26.62 t/s.
+- **F16 reduce (H31): adopt.** It is numerically exact on this text: each card rounds its own
+  partial too, so after the reduce the F16 rounding is the only change, and it is below the
+  logit noise floor. Prefill 337 → 361 t/s at 16k.
+- **ALGO3: not adopted yet.** The gate compared ALGO3 against the default FP16 GEMM, i.e.
+  one FP16 accumulation order against another, so it measures *difference*, not *loss*. The
+  97.5% top-1 agreement matches H17's FP16-vs-FP32 gap (q5-fp16 97.5%). That pattern fits
+  "different rounding", not "worse". A gate that could tell those apart is H35.
+
+## H35 — does ALGO3 add loss, or only different rounding?
+
+**Basis.** H34 gated ALGO3 (H33) against the default FP16 GEMM, so it compared two FP16
+accumulation orders and measured *difference*: mean 0.0037, same-top 97.5%, a fail.
+H17's FP16-vs-FP32 gap shows the same 97.5% top-1 agreement. Two roundings of the same
+sum disagree that much without either being worse. This was not caught at
+pre-registration. The fair question is H30's: how far is each from exact arithmetic?
+
+**Run.** H30's reference (Q5_K_M on `build-h17`, sm_60 FP32), regenerated because the H30
+base file was deleted. One arm, `q4-fp16-algo3`, uses H30's `q4-fp16` config with ALGO3 on.
+Its control is the banked `q4-fp16` (mean 0.062355, same-top 95.833), not a re-run: that
+path is env-gated and unchanged in the rebuilt binary, and the reference is deterministic.
+
+**Prediction.** ALGO3 lands within ±3% of the control: mean 0.0605–0.0642, same-top
+95.3–96.4. Rounding order is noise next to the quant step.
+
+**Gate.** Mean ≤ 0.062355 × 1.05 = **0.0655** and same-top ≥ **95.33**. Fail → ALGO3 stays
+off, and P3 moves on to the dequant/convert sub-targets.
+
+**Speed arms** (only if the gate passes; one lever, ALGO3, on top of H34's adopted set):
+- `h35-2card-algo3` vs `h34-2card-f16reduce` (26.64 / 360.71): prefill **+2–4%**, decode ±1%.
+- `h35-1card-iq3-algo3` vs `h34-1card-iq3` (15.83 / 196.72): prefill **+5–10%**, decode ±1%.
+- 1-card KLD: **not run** (rule zero). It is the same cuBLAS algorithm on the same sm_60
+  hardware with bigger M. The 2-card gate covers the numerics question, and 1-card is
+  the secondary target.
+
+**Driver.** `scripts/run-h35-algo3-loss.sh`. Two short KLD runs (~5 min), then two REPS=2
+speed arms if the gate passes.
 
 ## H32 — Phase 8 tier 2: 100k haystack gate for the candidate serve command
 
