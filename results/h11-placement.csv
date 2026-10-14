@@ -93,3 +93,9 @@ h27-1card-graphs1,none,none,default,1,10.95,197.26,400,0,0,,13177,259,65,10,ok
 h27-1card-graphs1,none,none,default,2,10.94,197.14,400,0,0,,13177,259,66,10,ok
 d5-p2p-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,28.43,296.68,400,399,265,66.4,10973,10973,62,176,ok
 d5-p2p-mtp-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,28.35,307.70,400,399,265,66.4,10973,10973,65,176,ok
+h28-2card-mmvh1,none,none,default,1,25.28,343.94,400,0,0,,9073,9073,62,10,ok
+h28-2card-mmvh1,none,none,default,2,25.29,342.25,400,0,0,,9073,9073,65,10,ok
+h28-1card-mmvh1,none,none,default,1,11.82,191.54,400,0,0,,13161,259,65,240,ok
+h28-1card-mmvh1,none,none,default,2,11.82,196.44,400,0,0,,13161,259,65,240,ok
+h28-2card-mmvh1-mtp-p2p,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,37.56,308.28,400,393,268,68.2,11053,11053,61,198,ok
+h28-2card-mmvh1-mtp-p2p,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,37.75,320.25,400,393,268,68.2,11053,11053,63,198,ok

@@ -1914,3 +1914,28 @@ On the banked build (`dflash2-rebased`), with `GGML_CUDA_P2P=1`, MTP, `-ub 2048`
 
 **Conclusion: P2P helps with MTP too. Adopted into the serve command 2026-10-14 (user call).**
 
+
+## H28 — the Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode
+
+**Basis.** On sm_60 the mmvq matvec is ALU-bound (~200 GB/s, emulated dp4a). The fork's
+`mmvh` kernel (`4826395`: Q4_K, Q5_K, IQ4_XS, ncols 1–8) runs n=1 at model shapes
+×1.16–2.01 in `test-backend-ops perf` (300–380 GB/s on the big matrices). Those three types
+are 89% of the weight bytes on 2-card UD-Q4_K_M, but only 24.5% (IQ4_XS) on 1-card UD-IQ3_S.
+It accumulates 16 products in fp16 per unit, so it is lossy relative to int8 dot products.
+
+**Prediction (registered before the run).**
+- **Accuracy gate, first.** `llama-perplexity` KLD on 8×512 tokens of `prompts/h26-100k-prompt.txt`,
+  2-card `-sm layer`, `-ub 8` so the matvec path runs. The base is mmvq with mmvh off.
+  The mmvh arm's mean KLD is **≤ 2× the reference**, where the reference is the same model through
+  mmq (`-ub 512`, mmvh off), the numeric noise stock llama.cpp already accepts. Same-top-token
+  agreement is within 0.5 pp of the reference. If the gate fails, the speed arms are skipped.
+- **2-card, drafter-free, 16k:** decode **+12% or more** against `h27-2card-graphs0` (19.89 t/s,
+  same fork code with mmvh off). Prefill is unchanged (±2%; prefill uses mmq).
+- **1-card IQ3_S, drafter-free, 16k:** decode **+3–8%** against `h27-1card-graphs0` (11.00).
+  This is small because only IQ4_XS is covered so far.
+- **2-card serve config** (fork, MTP, P2P, mmvh on): decode beats the serve row's 28.39 t/s
+  (`d5-p2p-mtp-16k`, banked binary) by **8% or more**. This arm changes the binary as well as the
+  kernel; it answers whether the serve command should move to the fork, not what mmvh alone is worth.
+- Greedy output is **not** expected to be byte-identical; the KLD gate is the quality check.
+
+**Run.** `scripts/run-h28-mmvh.sh`.
