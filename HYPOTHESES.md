@@ -46,7 +46,7 @@ run label so the evidence is traceable.
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
 | H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
-| H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | Pre-registered (2026-10-14) |
+| H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
 
 ---
 
@@ -2600,3 +2600,22 @@ types: ≤ +1% expected, inside run-to-run noise at REPS=2. Re-open if LOWBIT is
 1-card and the serve command is re-benched for another reason.
 
 **Driver.** `scripts/run-h42-lowbit.sh`.
+
+**Result (2026-10-14, `results/h42-kld.csv`, bench commit 934ad95).**
+
+| vs Q5 FP32 reference, IQ3_S `-ub 8` 1-card | mean | p99 | p99.9 | same-top % |
+|---|---|---|---|---|
+| `iq3-lowbit-off` | 0.320269 | 10.21 | 25.67 | 91.251 |
+| `iq3-lowbit-on` | 0.329384 | 11.04 | 26.01 | 91.251 |
+
+Gate passed: +2.8% mean (≤ +5%), same-top unchanged. The shift is more than the ~1e-6 rounding
+reorder H41 saw, and sits well inside the ±0.044 error bar. Likely cause: IQ2 weights carry a
++64 bias into the half2 products, so their fp16 partial sums are larger and lose more low bits.
+Worth a look if LOWBIT ever goes into the 2-card command; not chased for 1-card.
+
+| Speed arm (rep 1 / rep 2) | decode t/s | prefill t/s | vs `h35-1card-iq3-algo3` (15.84 / 198.5) | predicted |
+|---|---|---|---|---|
+| `h42-1card-iq3-lowbit` | 17.89 / 17.90 | 201.44 / 200.88 | decode **+13.0%**, prefill +1.3% (noise) | +8–15% ✓ |
+
+**Verdict: adopt `GGML_PASCAL_MMVH_LOWBIT=1` for the 1-card arm.** The 2-card serve command is
+unchanged (rule-zero park stands: Q3_K only, ≤ +1%).
