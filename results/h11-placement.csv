@@ -107,3 +107,7 @@ h34-1card-iq3,none,none,default,1,15.83,187.12,400,0,0,,13161,259,65,212,ok
 h34-1card-iq3,none,none,default,2,15.83,196.72,400,0,0,,13161,259,65,212,ok
 h34-2card-f16reduce,none,none,default,1,26.55,360.88,400,0,0,,9073,9073,61,100,ok
 h34-2card-f16reduce,none,none,default,2,26.64,360.71,400,0,0,,9073,9073,64,100,ok
+h35-2card-algo3,none,none,default,1,26.61,373.88,400,0,0,,9073,9073,61,32,ok
+h35-2card-algo3,none,none,default,2,26.62,371.83,400,0,0,,9073,9073,64,32,ok
+h35-1card-iq3-algo3,none,none,default,1,15.84,195.97,400,0,0,,13161,259,65,173,ok
+h35-1card-iq3-algo3,none,none,default,2,15.84,201.09,400,0,0,,13161,259,65,173,ok

@@ -1,0 +1,2 @@
+label,mean_kld,p99_kld,p999_kld,same_top_pct
+q4-fp16-algo3,0.061941,0.301779,18.426304,95.686
