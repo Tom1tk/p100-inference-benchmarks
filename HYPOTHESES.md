@@ -1939,3 +1939,27 @@ It accumulates 16 products in fp16 per unit, so it is lossy relative to int8 dot
 - Greedy output is **not** expected to be byte-identical; the KLD gate is the quality check.
 
 **Run.** `scripts/run-h28-mmvh.sh`.
+
+### Result (2026-10-14) — CONFIRMED (speed), gate passed with a tail caveat (quality)
+
+Fork `4826395`, 16k depth, 400 tokens, 2 reps. Rows are in `results/h11-placement.csv` and `results/h28-kld.csv`.
+
+| Arm | Control | Decode t/s | Δ | Prefill (rep 2) |
+|---|---|---|---|---|
+| 2-card drafter-free | `h27-2card-graphs0` 19.89 | **25.29** | **+27%** (pred ≥ +12%) | 342.3 vs 342.2 |
+| 1-card IQ3_S drafter-free | `h27-1card-graphs0` 11.00 | **11.82** | **+7.5%** (pred +3–8%) | 196.4 vs 196.6 |
+| 2-card serve config (fork + MTP + P2P) | `d5-p2p-mtp-16k` 28.39 | **37.66** | **+32.6%** (pred ≥ +8%) | 320.3 vs 307.7 |
+
+- MTP acceptance is 68.2% (268/393) against 66.4%. VRAM is unchanged. Peak temperature was 65 °C.
+- **KLD gate PASS** (8×512 tokens, base = mmvq at `-ub 8`):
+
+| | mean KLD | median | 99% | 99.9% | max | same top-1 |
+|---|---|---|---|---|---|---|
+| ref: stock mmq | 0.0166 | 0.00053 | 0.077 | 1.16 | 14.3 | 97.35% |
+| mmvh | 0.0217 | 0.00004 | 0.020 | **4.30** | **24.6** | 99.17% |
+
+- On 99% of tokens mmvh is closer to the int8 matvec than stock mmq is. **The 0.1% tail is about 4× worse.** ln(PPL ratio) is +0.5% ± 0.65%, which is not significant.
+- Suspected cause: fp16 accumulation of IQ4_XS's +128 bias, followed by cancellation. Not yet isolated.
+- **Not adopted yet.** Two open items before the serve command can move to the fork binary:
+  - Isolate and fix the KLD tail.
+  - Run the Phase 8 quality gate.
