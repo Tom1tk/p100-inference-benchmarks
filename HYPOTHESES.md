@@ -26,7 +26,7 @@ run label so the evidence is traceable.
 | H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
-| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
+| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it. **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
@@ -35,6 +35,7 @@ run label so the evidence is traceable.
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
 | H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
+| H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **Untested 2026-10-14** — prediction below |
 
 ---
 
@@ -1820,3 +1821,27 @@ prefill was genuinely re-done, so both reps are valid measurements. The H11
 prefix-reuse trap is therefore *not* universal. Cause unconfirmed — `-np 1` with
 `kv_unified = false` is the obvious suspect, but this run did not isolate it, so
 do not rely on `cache_prompt: false` working until something does.
+
+---
+
+## H27 — CUDA graphs on sm_60 (fork D1)
+
+**Claim.** Upstream disables CUDA graphs below Volta (`ggml-cuda.cu`, a 2024 perf
+judgement). The fork's `GGML_CUDA_PASCAL_GRAPHS=1` re-enables them.
+
+**Evidence for.** Phase 0.2 (`results/phase0/README.md`): 2-card decode is idle 23% per
+token (~13.6 ms, ~10 ms excluding trace overhead) with under 1 ms of copies — launch and
+sync latency across ~2.2k kernels per token. 1-card decode is idle only 4%.
+
+**Pre-registered prediction** (fork `0cdf2be`, drafter-free, 16k depth, 400 tokens):
+- 2-card Q4_K_M `-sm tensor`: decode **+8% or more**. Prefill within ±2%.
+- 1-card IQ3_S `-sm none`: decode **+4% or less**. Prefill within ±2%.
+- Greedy output **byte-identical** to graphs off. If it differs, the lever is rejected
+  whatever the speed.
+- It may also fail outright under the meta backend (cross-device copies during capture).
+  That is a result, not a reason to patch blindly.
+
+**Run.** `scripts/run-h27-graphs.sh`: four arms, off/on × 2-card/1-card, REPS=2. Also
+RUNBOOK §7 item 6 (D5): `GGML_CUDA_P2P=1` with MTP on the banked build, one arm against
+the `h24-ub2048-mtp-16k` control (27.41 t/s, 66.4%).
+
