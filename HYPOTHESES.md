@@ -2418,3 +2418,13 @@ heads, kv 32k, nb 512) runs it at 37.4 ms, ≈5.5 TFLOPS, ~29% of fp16 peak.
 
 **Prediction.** 100k prefill +8–12% (attention ~40% of the 0→98k average × 26%). 1-card 16k prefill
 +3–5%. Decode at 100k +0–5% (MTP verify batches take the tile kernel).
+
+**Result (2026-10-14, bench "H38 ... KLD gate FAILED", fork 5657e4b).** **REFUTED on quality — speed arms not run.**
+- KLD at 4–8k depth, half2 vs fp32 Q·K accumulation: **mean 0.321**, median 0.000065, **max 29.5**,
+  same-top 94.6%. Gate was ≤ 0.001 / ≥ 99.5%.
+- The median is clean, so the damage is a tail. Upstream already scales Q by 0.25 on this path to keep
+  fp16 products from overflowing; Qwen's outlier channels make 8-term fp16 partial sums lose all
+  precision when large terms cancel. The 151 test-backend-ops cases passed only because their
+  random inputs have no outliers. Not fixable by a shorter chunk without giving the speed back.
+- Code removed from the fork. Follow-up: run the tile kernel's existing **fp32** path on P100
+  (plain fp32 FMA, more precise than today's path, not less), micro-bench first.
