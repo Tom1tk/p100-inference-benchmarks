@@ -2454,3 +2454,15 @@ all K and IQ super-block types.
 4. 2-card serve command, 16k, REPS=2. Control banked: `h36-duplex-16k`, 40.37 / 365.3.
 
 **Prediction.** 2-card 16k prefill +2.5–3.5%, 1-card +3–4.5%. Decode flat (it uses matvec, no dequant).
+
+**Result (2026-10-14, bench "H39 staged dequant (identity + 1-card 16k + 2-card 16k)", fork 1aaab8b).**
+**Identity PASS, speed marginal — code kept off by default, parked for the 220 W re-test.**
+- Identity: KLD −0.000004, same-top 100% (the bit-identical noise floor of H36/H37).
+- 1-card IQ3_S 16k: 199.43 / **205.56** prefill (control 196.72): rep 2 **+4.5%**. Decode 15.86 (flat).
+- 2-card serve 16k: 352.12 / **370.11** prefill (control rep 1/2 364.17 / 366.40): rep 2 **+1.0%**,
+  rep 1 −3.3%. Decode 40.2 (flat). Both arms' rep 1 came in low, unlike the controls (cold loads,
+  191/215 s), so the 2-card result is inside noise.
+- Power: the 1-card arm drew at the 175 W cap in 55% of busy samples (control 47%), so part of the
+  kernel gain goes to clocks. See RUNBOOK "Re-test at the higher cap".
+- Not added to the README command: the 2-card evidence does not clear noise. No re-run at 175 W.
+

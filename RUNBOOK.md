@@ -45,6 +45,18 @@ measured PSU wall draw with a plug-socket meter in person — it is not readable
 from this host. When cleared, step 175 → 200 → 220, one step per run, and
 record the cap as a column. Never change it unprompted.
 
+**Re-test at the higher cap (user call, 2026-10-14): don't discard marginal compute-side wins.** At 175 W
+the 1-card arm sits at the cap ~50% of its busy time and the 2-card arm 15–30% (gpu-monitor power column,
+util ≥ 90% samples). A lever that removes stalls makes the card draw more and the cap claws the gain back,
+so prefill levers can look marginal here and grow at 220 W. Decode is memory/latency-bound and unaffected.
+Once H15 runs, re-test each of these with one short 16k arm per lever (cite the matching new-cap control):
+| Lever | At 175 W | Why it may grow |
+|---|---|---|
+| H39 `GGML_PASCAL_DEQUANT_STAGED=1` (bit-identical, code kept, off) | 1-card +4.5%, 2-card +1.0% (rep 2; rep 1 −3.6%) | More dequant throughput = more power in a capped phase |
+| H14 `-ub 4096 -b 8192` | +1.3% prefill | Larger GEMMs, compute-bound |
+| H35 ALGO3, 1-card | +1.0% (already on) | Note was "card likely at the 175 W cap" |
+| P5 FA tile config sweep (micro-bench only) | stock fastest, next +1.2% | Ordering of compute-bound configs can shift with clocks |
+
 **Check for competing disk I/O.** Model loads are disk-bound; a download or
 copy makes them 2–3× slower. Wait, or note it in RUNLOG.
 
