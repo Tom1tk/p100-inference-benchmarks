@@ -13,3 +13,4 @@ sites/*/.pi-agent/sessions/
 results/phase0/nsys/*.sqlite
 __pycache__/
 results/p2-step0/*.sqlite
+results/p2-step0/*.qdstrm
