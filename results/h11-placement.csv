@@ -118,3 +118,7 @@ h36-duplex-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.27,366.40,400,37
 h37-internal-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.15,363.85,400,378,273,72.2,11117,11117,64,11,ok
 h37-internal-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.16,366.00,400,377,273,72.4,11117,11117,65,11,ok
 serve-fork-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,26.94,231.97,400,404,264,65.3,12227,12227,66,11,ok
+h39-1card-iq3-staged,none,none,default,1,15.87,199.43,400,0,0,,13161,259,65,191,ok
+h39-1card-iq3-staged,none,none,default,2,15.86,205.56,400,0,0,,13161,259,65,191,ok
+h39-staged-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.21,352.12,400,378,273,72.2,11053,11053,61,215,ok
+h39-staged-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.24,370.11,400,377,273,72.4,11053,11053,64,215,ok
