@@ -44,6 +44,7 @@ run label so the evidence is traceable.
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
+| H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | Pre-registered 2026-10-14 |
 
 ---
 
@@ -2325,3 +2326,26 @@ command. A miss triggers `p8-current` to tell whether the fork or the quant is a
   39.48 t/s decode, 353.0 t/s prefill, 72.3% acceptance, against the control
   `h28-2card-mmvh1-mtp-p2p` at 37.66 / 314.3 t/s. That is +4.8% decode and +12.3% prefill,
   inside the predicted +3–6% / +8–10% on decode and slightly above on prefill.
+
+## H36 — full-duplex AllReduce copies (fork P2 step 0 finding)
+
+**Why.** P2 step 0 (bench a16a6c2: pp2048 nsys with P1 + ALGO3 + mmvh) left 10.9% of prefill wall
+idle on each card, all of it inside the reduce. Each reduce copies 0→1 (21 MB, 2.06 ms), then 1→0
+(2.05 ms) starting 9 µs after the first ends, so each card idles for both copies. The cause is the
+issue order: `cpy_tensor_async` makes card 1's stream wait for the 0→1 copy *before* card 1 queues
+its own 1→0 copy. PCIe is full duplex, so the two copies can run at once. The fork flag defers that
+wait to card 1's next graph, sync or transfer. This replaces the chunked-GEMM P2 design for now:
+it targets the same idle with no GEMM split.
+
+**Claim.** With the flag, 2-card prefill rises and the numerics are unchanged.
+
+**Test** (`scripts/run-h36-duplex-reduce.sh`, one lever):
+1. Identity gate. H35's perplexity config (Q4_K_M, ub 512, 8 chunks, ALGO3, P2P): flag off saves the logits,
+   flag on is scored against them. Pass = mean KLD ≤ 1e-5 and same-top 100%.
+2. Speed. The serve command at 16k (MTP, all levers, f16 KV, REPS=2) plus the flag. Control is
+   `serve-fork-16k` banked today: 39.48 / 353.05 t/s.
+- 1-card arm skipped (rule zero): the flag only touches peer copies, and one card makes none.
+
+**Prediction.** Prefill +3–5%. The ceiling is ~5.4% at pp2048, a little less at 16k depth where
+attention takes a bigger share. Decode within ±1%: tg copies are F32 and small (~25 ms per 64 tokens).
+
