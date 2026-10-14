@@ -2428,3 +2428,5 @@ heads, kv 32k, nb 512) runs it at 37.4 ms, ≈5.5 TFLOPS, ~29% of fp16 peak.
   random inputs have no outliers. Not fixable by a shorter chunk without giving the speed back.
 - Code removed from the fork. Follow-up: run the tile kernel's existing **fp32** path on P100
   (plain fp32 FMA, more precise than today's path, not less), micro-bench first.
+- **Follow-up result (micro-bench only, no GPU serve run):** the fp32 tile path is **+14% slower**
+  (f16 KV 42.55 vs 37.29 ms; q8_0 43.17 vs 37.73). Dropped. Cheap P5 levers are closed.
