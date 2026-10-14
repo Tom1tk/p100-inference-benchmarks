@@ -6,7 +6,9 @@ restates the rules that must never be re-derived from context.
 
 ## Hard limits
 
-1. **Never let a card exceed 83 °C.** Abort the run if it does.
+1. **Abort any run at 80 °C.** At 83 °C a P100 drops off the PCIe bus and needs
+   a host reboot to come back, and the fan controller loses its reading and
+   runs the fans at 100%.
 2. **Every run costs the user real electricity.** Rule zero, asked of every arm,
    sweep and open hypothesis: **"do we really need to test this?"** A test earns
    its power only if it can change what goes in the serve command. Stop at the

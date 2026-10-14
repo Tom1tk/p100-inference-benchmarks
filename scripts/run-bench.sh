@@ -23,7 +23,7 @@ REPS="${REPS:-3}"
 PROMPT_DEPTHS="${PROMPT_DEPTHS:-0,2048,4096,8192,16384}"
 GEN_TOKENS="${GEN_TOKENS:-128}"
 
-ABORT_TEMP=83     # hard abort threshold, degrees C
+ABORT_TEMP=80     # hard abort threshold, degrees C
 PREFLIGHT_TEMP=70 # refuse to start if a card is hotter than this
 
 # --- Arguments --------------------------------------------------------------

@@ -43,7 +43,7 @@ NP="${NP:-}"
 REQ_TIMEOUT="${REQ_TIMEOUT:-900}"
 PORT=8300
 LOAD_TIMEOUT=900
-ABORT_TEMP=83
+ABORT_TEMP=80
 PREFLIGHT_TEMP=70
 
 # PROMPT_FILE lets a run decode at real context depth. -c alone only sizes the

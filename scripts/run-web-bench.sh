@@ -29,7 +29,7 @@ CTX="${CTX:-32768}"                 # agentic transcripts run long; drop to 1638
 STAGE_TIMEOUT="${STAGE_TIMEOUT:-3600}"
 LOAD_TIMEOUT="${LOAD_TIMEOUT:-900}" # model load is 4-8 min; 15 min covers disk contention
 
-ABORT_TEMP=83
+ABORT_TEMP=80
 PREFLIGHT_TEMP=70
 
 # --- Arguments --------------------------------------------------------------

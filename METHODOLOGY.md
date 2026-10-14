@@ -17,7 +17,7 @@ are in [README.md](README.md).
 | Interconnect | PCIe 3.0 PHB, **no NVLink**. The cards can peer both ways |
 | Power | **175 W/card cap**, of a 250 W default. Approved ceiling 220 W (H15), gated on the user's PSU plug-meter check — see RUNBOOK §1. Persistence mode on. Neither survives a host reboot |
 | Cooling | Passive cards, custom 3D-printed shroud + Arduino Nano PWM controller |
-| Thermal limits | Idle ≤45 °C · load 70–80 °C · throttle 83 °C · hard shutdown 87 °C |
+| Thermal limits | Idle ≤45 °C · load 70–80 °C · abort 80 °C · card drops off the bus at 83 °C (reboot needed) |
 
 **sm_60 is the dominant architectural fact.** No dp4a, no tensor cores, no
 async copy. Most modern quantised MMQ kernels assume sm_61+ and fall back to

@@ -4,7 +4,7 @@ Finding the fastest stable way to serve Qwen3.8-27B on a dual Tesla P100
 (sm_60) rig, primarily for coding work.
 
 **Agents: read [RUNBOOK.md](RUNBOOK.md) before running anything.** It has the
-hard limits (83 °C, electricity), the procedure, and the work queue.
+hard limits (80 °C abort, electricity), the procedure, and the work queue.
 
 ---
 

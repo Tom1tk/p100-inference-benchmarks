@@ -7,8 +7,10 @@ assumes no prior context beyond what's in this repo. §7 is the work queue.
 
 ## 0. Non-negotiables
 
-1. **Never let a card exceed 83 °C.** Abort the run if it does. Hard shutdown
-   is 87 °C on passively cooled cards behind a custom fan shroud.
+1. **Abort any run at 80 °C.** At 83 °C a card drops off the PCIe bus and
+   needs a host reboot to re-mount, and the fan controller, no longer able to
+   read it, runs the fans at 100%. (Passively cooled cards behind a custom fan
+   shroud.)
 2. **Every run costs the user real electricity.** Prefer many short runs to
    few long ones, never re-measure a settled lever, abort a sweep as soon as
    its conclusion is clear. §2.1 is the full rule and it is a hard requirement.
@@ -134,10 +136,10 @@ Both scripts start `scripts/gpu-monitor.sh`, which samples every 5 s into
 
 | Temp | Action |
 |---|---|
-| ≤ 80 °C | Normal. Observed peak across the whole project is 70 °C |
-| 80–82 °C | Finish the current run, don't start another until cooled |
-| ≥ 83 °C | **Abort immediately** (`pkill -f 'llama-bench|llama-server'`), record in RUNLOG |
-| 87 °C | Hardware shutdown — must never be reached |
+| ≤ 75 °C | Normal. Observed peak across the whole project is 70 °C |
+| 76–79 °C | Finish the current run, don't start another until cooled |
+| ≥ 80 °C | **Abort immediately** (`pkill -f 'llama-bench|llama-server'`), record in RUNLOG |
+| 83 °C | Card drops off the bus: host reboot needed, fans pinned at 100%. Must never be reached |
 
 Brief readings above 175 W are sampling overshoot; the cap is a rolling
 average.
