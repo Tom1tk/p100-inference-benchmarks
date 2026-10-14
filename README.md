@@ -17,8 +17,8 @@ that command."
 | Target | Status |
 |---|---|
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
-| Highest decode | **20.02 t/s at 100k**, 27.41 at 16k (H26, H24) |
-| Highest prefill / TTFT | **207.4 t/s, ~7.8 min TTFT at 100k**; 310.5 t/s at 16k |
+| Highest decode | **39.5 t/s at 16k** (fork command, `serve-fork-16k`); 20.02 at 100k on the old stock command (H26) |
+| Highest prefill / TTFT | **~222 t/s, 440 s TTFT at 98k** (H32, incl. first answer); 353 t/s at 16k |
 | Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
 Quality is the binding constraint: it is why PFlash and DFlash v1 are excluded,
@@ -44,8 +44,8 @@ AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35).
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
-| 100k | 20.02 t/s | 207.4 t/s | 60.3% | 12,147 MiB | 70 °C | `h26-100k-mtp-kvq8` (before P2P) |
-| 16k | 28.39 t/s | 307.7 t/s | 66.4% | 10,973 MiB | 65 °C | `d5-p2p-mtp-16k` (+3.6% decode from P2P vs `h24-ub2048-mtp-16k`, f16 KV) |
+| 98k | not re-measured | ~222 t/s (440 s TTFT incl. 1st answer) | — | — | 66 °C | `p8-candidate` (H32) |
+| 16k | 39.48 t/s | 353.0 t/s | 72.3% | 11,053 MiB | 65 °C | `serve-fork-16k` (f16 KV, REPS=2; +4.8% decode, +12.3% prefill vs `h28-2card-mmvh1-mtp-p2p`) |
 
 Every lever behind that line, and every number, is in
 [RESULTS.md](RESULTS.md). What is still open is in RUNBOOK §7.

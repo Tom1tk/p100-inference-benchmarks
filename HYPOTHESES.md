@@ -36,7 +36,7 @@ run label so the evidence is traceable.
 | H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 | H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **REFUTED 2026-10-14.** Graphs engage and replay, output is byte-identical, but decode moves −1.1% (2-card) and −0.5% (1-card). The 2-card idle time is sync, not launches. D1 closed; D3 is the 2-card decode lever |
-| H28 | Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode | **CONFIRMED 2026-10-14.** +27% 2-card drafter-free, +32.6% with MTP+P2P (37.66 t/s at 16k), +7.5% 1-card. KLD gate passed. Not in the serve command until Phase 8 |
+| H28 | Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode | **CONFIRMED 2026-10-14.** +27% 2-card drafter-free, +32.6% with MTP+P2P (37.66 t/s at 16k), +7.5% 1-card. KLD gate passed. In the serve command since H32 passed |
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | **Done** (2026-10-14): H17 alone 0.018 = 0.31× the quant step (0.059), and only +0.003 on top of Q4, so **H17 closed as negligible**; mmvh +1.4% (Q4) / +4.2% (IQ3) over mmvq, so **tier 2 runs the candidate** |
 | H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | **Confirmed** (2026-10-14, in H34): prefill +6.8% (337.7 → 360.8), decode flat, KLD ≈ 0 (bit-for-bit top-1) |
@@ -2321,3 +2321,7 @@ command. A miss triggers `p8-current` to tell whether the fork or the quant is a
 - **Pass: the candidate replaces the serve command.** `p8-current` isn't needed (it runs only on a
   candidate miss). `p8-1card` was skipped as pre-registered: IQ3_S doesn't hold 100k on one card.
 - Peak temperature 66 °C on both arms.
+- **16k confirmation** (`serve-fork-16k`, commit 1e285c1): the adopted command (f16 KV, REPS=2) does
+  39.48 t/s decode, 353.0 t/s prefill, 72.3% acceptance, against the control
+  `h28-2card-mmvh1-mtp-p2p` at 37.66 / 314.3 t/s. That is +4.8% decode and +12.3% prefill,
+  inside the predicted +3–6% / +8–10% on decode and slightly above on prefill.
