@@ -1983,3 +1983,20 @@ now 77% of the 1-card UD-IQ3_S weight bytes: IQ3_S 35%, IQ4_XS 24.5%, IQ3_XXS 17
 - The 2-card arm is not re-run: UD-Q4_K_M has no IQ3 tensors, so the H28 result stands.
 
 **Run.** `scripts/run-h29-mmvh-iq3.sh`.
+
+### Result (2026-10-14) — CONFIRMED, above the predicted range
+
+Fork `428fecb`, 1-card UD-IQ3_S, `-sm none`, 16k depth, 400 tokens, 2 reps.
+
+- **Decode: 15.87 / 15.86 t/s** against `h27-1card-graphs0` at 11.00. That is **+44%** (predicted +15–25%).
+  H28's IQ4_XS-only arm reached 11.82, so the IQ3 types account for most of the gain.
+- Prefill is 196.4 against 196.6, unchanged. VRAM is unchanged. Peak temperature was 65 °C.
+- **KLD gate PASS** (`results/h29-kld.csv`):
+
+| | mean KLD | median | 99.9% | max | same top-1 |
+|---|---|---|---|---|---|
+| ref: stock mmq | 0.0076 | 0.00057 | 0.151 | 4.1 | 97.65% |
+| mmvh | 0.0091 | 0.00005 | 0.164 | 16.8 | 99.31% |
+
+- Unlike H28, the 99.9% tail is level with the reference. The max is again a single token.
+- 1 card is now at 15.9 t/s decode drafter-free. Same status as 2-card: not in any serve command until Phase 8.
