@@ -39,6 +39,7 @@ run label so the evidence is traceable.
 | H28 | Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode | **CONFIRMED 2026-10-14.** +27% 2-card drafter-free, +32.6% with MTP+P2P (37.66 t/s at 16k), +7.5% 1-card. KLD gate passed. Not in the serve command until Phase 8 |
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | Pre-registered 2026-10-14 |
+| H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | Pre-registered 2026-10-14 |
 
 ---
 
@@ -2071,4 +2072,28 @@ tokens of `prompts/h26-100k-prompt.txt`, as in H28/H29. `-ub 512` = prefill nume
   because the H27 correction showed the drafter can change greedy output.
 
 Driver: `scripts/run-h30-kld-ladder.sh`. ~8 short runs, ~25 min of GPU.
+
+
+## H31 — F16 AllReduce payload for 2-card prefill (fork P1)
+
+**Basis.** Phase 0.2: 2-card prefill is idle 18% of the time (0.95 s per 2048 ubatch,
+10.6 GB copied per card), fully serialised with compute. Under `ALLREDUCE=none` the meta
+backend's butterfly copies each F32 partial to the peer and adds it.
+
+**Change** (fork `ggml-backend-meta.cpp`, env `GGML_PASCAL_F16_REDUCE=1`): partials of
+≥ 1 MiB (prefill; decode and spec-verify stay F32) are converted to F16 on the sender,
+copied, and added in F32 on arrival. Each card also rounds its *own* partial to F16
+first, so both cards hold bit-identical sums (an asymmetric version would let the
+"replicated" residual stream drift apart between cards).
+
+**Prediction** (16k depth, drafter-free, against banked `h28-2card-mmvh1`, prefill 342.25 rep 2):
+- Prefill **+6–10%**: about half the 18% comms share, minus ~1% for the three extra
+  elementwise passes per reduce.
+- Decode **±1%** (unchanged path).
+- KLD vs the same build with the env off, `-ub 512`: mean **< 0.002**, same-top **≥ 99%**.
+  Gate: fail either and the lever is rejected regardless of speed.
+- 1-card arm: **not run**. The change only exists in the multi-device reduce; one card never
+  reaches it, so a 1-card arm would re-measure a known control (rule zero).
+
+**Driver.** `scripts/run-h31-f16-reduce.sh`: KLD pair, then one REPS=2 speed arm.
 
