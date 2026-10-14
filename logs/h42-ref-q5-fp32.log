@@ -1,0 +1,27 @@
+0.00.321.895 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.109.905 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.109.917 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.109.934 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.01.109.940 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.01.109.946 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.01.109.967 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.01.109.975 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.109.981 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.109.987 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.01.109.993 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.110.000 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.01.110.007 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.01.110.013 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.110.020 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.110.038 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+5.23.091.428 I cmn          init: llama threadpool init, n_threads = 14
+5.23.860.771 I 
+5.23.861.635 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+5.23.900.447 I perplexity: saving all logits to /root/h28-kld/h42-base.kld
+5.23.900.616 I perplexity: tokenizing the input ..
+5.26.256.440 I perplexity: tokenization took 2355.82 ms
+5.26.256.514 I perplexity: calculating perplexity over 2 chunks, n_ctx=2048, batch_size=2048, n_seq=1
+5.39.043.962 I perplexity: 12.15 seconds per pass - ETA 0.40 minutes
+[1]4.9406,[2]3.0818,
+5.57.458.227 I Final estimate: PPL = 3.0818 +/- 0.20076
+

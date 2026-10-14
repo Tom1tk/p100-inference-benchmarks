@@ -126,3 +126,5 @@ h40-par-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.55,365.07,400,378,2
 h40-par-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.48,366.93,400,377,273,72.4,11053,11053,65,21,ok
 h41-wide-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,41.48,363.16,400,375,273,72.8,11053,11053,62,20,ok
 h41-wide-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,41.54,367.69,400,375,273,72.8,11053,11053,65,20,ok
+h42-1card-iq3-lowbit,none,none,default,1,17.89,201.44,400,0,0,,13161,259,65,12,ok
+h42-1card-iq3-lowbit,none,none,default,2,17.90,200.88,400,0,0,,13161,259,65,12,ok

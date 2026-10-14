@@ -1,0 +1,3 @@
+label,mean_kld,p99_kld,p999_kld,same_top_pct
+iq3-lowbit-off,0.320269,10.214579,25.673971,91.251
+iq3-lowbit-on,0.329384,11.036196,26.011206,91.251
