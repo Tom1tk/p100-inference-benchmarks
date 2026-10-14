@@ -111,3 +111,5 @@ h35-2card-algo3,none,none,default,1,26.61,373.88,400,0,0,,9073,9073,61,32,ok
 h35-2card-algo3,none,none,default,2,26.62,371.83,400,0,0,,9073,9073,64,32,ok
 h35-1card-iq3-algo3,none,none,default,1,15.84,195.97,400,0,0,,13161,259,65,173,ok
 h35-1card-iq3-algo3,none,none,default,2,15.84,201.09,400,0,0,,13161,259,65,173,ok
+serve-fork-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,39.55,352.14,400,378,273,72.2,11053,11053,61,13,ok
+serve-fork-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,39.41,353.95,400,377,273,72.4,11053,11053,65,13,ok
