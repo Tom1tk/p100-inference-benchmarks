@@ -246,7 +246,7 @@ it can change the serve command.
 | 3 | **Phase 8 — quality gate** ([QUALITY-PLAN.md](QUALITY-PLAN.md)) | The only objective with no data. Sweep D (drafter hash check, ~45 min) first — it also settles the drafter re-rank at the current config, since every MTP-vs-DFlash2 comparison was at `-ub 512`/4k/layer | ~3 h GPU with H19, ~14 h without. After 1 and 2 |
 | 4 | **H15 — power cap 175 → 200 → 220 W** | Prefill is compute-bound; the one lever that could move it without a kernel | **Blocked on the user's PSU meter check** (§1) |
 | 5 | Phase 5 — agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; run after Phase 8 fixes the config |
-| 6 | `GGML_CUDA_P2P=1` with MTP | +2.9% decode drafter-free (H10), never measured in combination. Cheap | One Table B cell against the banked `h24-ub2048-mtp-16k` control |
+| 6 | ~~`GGML_CUDA_P2P=1` with MTP~~ | **Measured 2026-10-14: +3.6% decode (28.39 vs 27.41), same 66.4% acceptance, prefill −0.9%** (H27 section, D5) | Done. Adopting it into the serve command is pending the user's call |
 | 7 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 
 ### Parked by rule zero

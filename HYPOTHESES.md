@@ -35,7 +35,7 @@ run label so the evidence is traceable.
 | H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
 | H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
-| H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **Untested 2026-10-14** — prediction below |
+| H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **REFUTED 2026-10-14.** Graphs engage and replay, output is byte-identical, but decode moves −1.1% (2-card) and −0.5% (1-card). The 2-card idle time is sync, not launches. D1 closed; D3 is the 2-card decode lever |
 
 ---
 
@@ -1844,4 +1844,34 @@ sync latency across ~2.2k kernels per token. 1-card decode is idle only 4%.
 **Run.** `scripts/run-h27-graphs.sh`: four arms, off/on × 2-card/1-card, REPS=2. Also
 RUNBOOK §7 item 6 (D5): `GGML_CUDA_P2P=1` with MTP on the banked build, one arm against
 the `h24-ub2048-mtp-16k` control (27.41 t/s, 66.4%).
+
+### Result (2026-10-14) — REFUTED
+
+Two reps each, 16k depth, 400 tokens, drafter-free, fork `0cdf2be`. Rows are in `results/h11-placement.csv`.
+
+| Arm | Decode t/s | Prefill t/s (rep 2) | VRAM/card |
+|---|---|---|---|
+| 2-card graphs off | 19.89 | 342.2 | 9,073 |
+| 2-card graphs on | 19.66 (**−1.1%**) | 342.0 | 9,113 |
+| 1-card graphs off | 11.00 | 196.6 | 13,161 |
+| 1-card graphs on | 10.95 (**−0.5%**) | 197.1 | 13,177 |
+
+- **Greedy output is byte-identical** with graphs off and on, on both configurations.
+- **Graphs really engage.** A 1-card `GGML_CUDA_GRAPH_DEBUG=1` run (`logs/h27-graph-debug.log`) completed warmup and replayed 14 of 16 tokens. No arch disable fired. So the null result is real, not a dead flag.
+- **Why there's no gain:**
+  - On 1 card, the GPU was already 96% busy (Phase 0.2). The CPU was issuing launches ahead of the GPU, so removing launch cost frees nothing.
+  - On 2 cards, the 23% idle is the sync and AllReduce round trips between ~130 subgraphs per token. Graphs can't remove those.
+- **2-card prefill rep 1 is low on the graphs-off arm** (318 vs 342) because it is the first request after load. Prefill is compared on rep 2.
+- **Decision.** D1 is closed and the flag stays off. On 2 cards the decode lever is D3: a one-shot P2P reduce, which cuts round-trip latency. On 1 card it is D2: the matvec kernel.
+
+### D5 (RUNBOOK §7 item 6) — P2P with MTP, same session
+
+On the banked build (`dflash2-rebased`), with `GGML_CUDA_P2P=1`, MTP, `-ub 2048`, 16k:
+
+- **Decode: 28.43 / 28.35 t/s**, against the `h24-ub2048-mtp-16k` control's 27.41. That is **+3.6%**.
+- **Acceptance is identical** (265/399 = 66.4%), so the gain is in the transport, not the drafter.
+- **Prefill is 307.7 on rep 2** vs 310.5, a −0.9% change. That matches H10's −0.3% within noise.
+- VRAM is unchanged (10,973 MiB per card).
+
+**Conclusion: P2P helps with MTP too.** This is a candidate for the serve command; it is the user's call.
 

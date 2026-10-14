@@ -1451,3 +1451,17 @@ to unpatched, so a rebuild of `build-h17` must re-apply the patch first.
 - 2-card decode: 23% idle per token, and it is not copy time (under 1 ms). It is launch and sync latency. This gates in D1/D3.
 - 1-card decode: 96% busy, 86% matvec. D2 is the lever; graphs are worth at most ~4%.
 - Write-up: `results/phase0/README.md` (Phase 0.2 section).
+
+## 2026-10-14 — H27: CUDA graphs on sm_60 (fork D1), and D5: P2P with MTP
+
+- `scripts/run-h27-graphs.sh`: drafter-free, 16k depth, REPS=2. Fork `0cdf2be` with `GGML_CUDA_PASCAL_GRAPHS` set to 0 or 1. Peak 66 °C.
+- **H27 is refuted.**
+  - 2-card decode: 19.89 → 19.66 t/s (−1.1%).
+  - 1-card decode: 11.00 → 10.95 t/s (−0.5%).
+  - Greedy output is byte-identical.
+  - A debug run confirms graphs engage and replay. The 2-card idle is sync between subgraphs, not launch cost.
+  - D1 is closed. D3 is the 2-card decode lever and D2 the 1-card one.
+- **D5 (RUNBOOK §7.6), on the banked build:**
+  - `GGML_CUDA_P2P=1` with MTP decodes at 28.39 t/s vs 27.41 (+3.6%).
+  - Acceptance is unchanged at 66.4%. Prefill is −0.9%.
+  - Candidate for the serve command; awaiting the user's call.
