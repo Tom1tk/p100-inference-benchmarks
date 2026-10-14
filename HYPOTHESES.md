@@ -45,6 +45,7 @@ run label so the evidence is traceable.
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
 | H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
+| H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
 
 ---
 
@@ -2564,3 +2565,13 @@ and the NMSE vs CPU is unchanged.
 `h36-duplex-16k`, 40.37 / 365.3. No 1-card arm (H41 reason).
 
 **Prediction.** Decode **+3–6%**, prefill flat. Adopt if decode ≥ +2% on both reps.
+
+**Result (2026-10-14, `results/h11-placement.csv` `h41-wide-16k`).** **CONFIRMED, adopted.**
+- Decode **41.48 / 41.54** (control 40.37, **+2.8%** both reps; adopt bar +2% met; prediction +3–6% just missed).
+- Prefill 363.16 / 367.69 (flat). Acceptance 273/375 drafted (control 273/377–378): same accepted tokens, so
+  the gain is kernel time, not drafting luck.
+- Serve output diverges from `h36-duplex-16k` at char 546 (1413 vs 1357 chars), expected from the ub-8 sensitivity
+  shown in H41.
+- **Verdict:** `GGML_PASCAL_MMVH_Q6K_WIDE=1` joins the serve command. H32's 100k haystack gate is not re-run
+  (rule zero): the change is a ~1e-6 relative fp32 reorder with unchanged NMSE vs CPU, three orders below the mmvh
+  half-precision error that H32 already passed with.
