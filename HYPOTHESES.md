@@ -46,6 +46,7 @@ run label so the evidence is traceable.
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
 | H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
+| H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | Pre-registered (2026-10-14) |
 
 ---
 
@@ -2575,3 +2576,27 @@ and the NMSE vs CPU is unchanged.
 - **Verdict:** `GGML_PASCAL_MMVH_Q6K_WIDE=1` joins the serve command. H32's 100k haystack gate is not re-run
   (rule zero): the change is a ~1e-6 relative fp32 reorder with unchanged NMSE vs CPU, three orders below the mmvh
   half-precision error that H32 already passed with.
+
+## H42 — low-bit types on mmvh (1-card decode)
+
+**Basis.** On UD-IQ3_S (1-card), Q3_K, Q2_K, IQ2_S, IQ2_XS, IQ2_XXS and IQ1_S still take the
+mmvq path at ~83–115 GB/s. They are ~15% of decode weight bytes but ~31% of matvec time.
+Fork e2f4a24 adds mmvh loaders for all but IQ1_S (0.3% of bytes, skipped), opt-in via
+`GGML_PASCAL_MMVH_LOWBIT=1`. Micro-bench at 17408×5120, n=1, vs mmvq: Q3_K 353 → 179 µs,
+Q2_K 265 → 101, IQ2_S 262 → 144, IQ2_XS 267 → 145, IQ2_XXS 253 → 132 (1.8–2.6×).
+`test-backend-ops` MUL_MAT passes for every n ≤ 8 case of each type.
+
+**Gate (H35-style, per the H41 lesson).** Reference: Q5_K_M on `build-h17` (sm_60 FP32),
+2-card, `-c 2048 --chunks 2`. Two IQ3_S arms on the fork, 1 card, `-ub 8` (so decode
+matvecs run), MMVH=1: `iq3-lowbit-off` (control) and `iq3-lowbit-on`. Pass: on-arm mean
+KLD ≤ off-arm × 1.05 and same-top ≥ off-arm − 0.5 points.
+
+**Speed arm** (if the gate passes, one lever): `h42-1card-iq3-lowbit` = H35's 1-card env
+(MMVH=1, ALGO=1) + LOWBIT=1, 16k, REPS=2. Control: banked `h35-1card-iq3-algo3`
+(15.84 / 198.5 mean). **Prediction: decode +8–15%, prefill flat** (n > 8 never uses mmvh).
+
+**2-card arm: parked by rule zero.** Q4_K_M has only Q3_K (1.7% of bytes) among these
+types: ≤ +1% expected, inside run-to-run noise at REPS=2. Re-open if LOWBIT is adopted for
+1-card and the serve command is re-benched for another reason.
+
+**Driver.** `scripts/run-h42-lowbit.sh`.
