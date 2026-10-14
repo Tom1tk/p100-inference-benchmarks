@@ -2,14 +2,23 @@
 // at the prefill GEMM shapes, on one P100? Same call as ggml: OP_T/OP_N, F16 in/out, COMPUTE_16F.
 // Build: nvcc -O2 -arch=sm_60 -o gemm-algo-sweep scripts/gemm-algo-sweep.cu -lcublas
 // Run:   CUDA_VISIBLE_DEVICES=0 ./gemm-algo-sweep   (prints CSV: shape,algo,ms,tflops)
+// Confirm mode: ./gemm-algo-sweep -1,3 6  -> only those algos (COMPUTE_16F), interleaved over 6 rounds,
+// so clock drift under the power cap hits every algorithm equally. Third arg: N (default 2048).
 #include <cstdio>
+#include <cstdlib>
+#include <vector>
 #include <cublas_v2.h>
 #include <cuda_fp16.h>
 
 #define CK(x) do { auto e = (x); if (e != 0) { printf("error %d at %s:%d\n", (int) e, __FILE__, __LINE__); return 1; } } while (0)
 
-int main() {
-    const int N = 2048;  // ubatch
+int main(int argc, char ** argv) {
+    std::vector<int> algos;
+    if (argc > 1) { for (char * p = argv[1]; *p; ) { algos.push_back(strtol(p, &p, 10)); if (*p == ',') ++p; } }
+    else { for (int a = -1; a <= 23; ++a) algos.push_back(a); }
+    const int rounds = argc > 2 ? atoi(argv[2]) : 1;
+    const int ncompute = argc > 1 ? 1 : 2;
+    const int N = argc > 3 ? atoi(argv[3]) : 2048;  // ubatch (tokens)
     // {M = ne01 (output rows), K = ne00}: per-card shapes under -sm tensor (2 cards), then full (1 card)
     const int shapes[][2] = {
         {8704, 5120}, {5120, 8704}, {6144, 5120}, {5120, 6144}, {3072, 5120}, {5120, 3072},
@@ -29,11 +38,12 @@ int main() {
     const half alpha = __float2half(1.0f), beta = __float2half(0.0f);
     const float alpha32 = 1.0f, beta32 = 0.0f;
 
-    printf("M,K,algo,compute,ms,tflops\n");
+    printf("round,M,K,algo,compute,ms,tflops\n");
+    for (int round = 0; round < rounds; ++round)
     for (auto & s : shapes) {
         const int M = s[0], K = s[1];
-        for (int compute = 0; compute < 2; ++compute) {          // 0: COMPUTE_16F (ggml), 1: COMPUTE_32F
-            for (int algo = -1; algo <= 23; ++algo) {
+        for (int compute = 0; compute < ncompute; ++compute) {          // 0: COMPUTE_16F (ggml), 1: COMPUTE_32F
+            for (int algo : algos) {
                 const cublasGemmAlgo_t a = algo < 0 ? CUBLAS_GEMM_DEFAULT_TENSOR_OP : (cublasGemmAlgo_t) algo;
                 auto run = [&]() {
                     return compute == 0
@@ -52,7 +62,7 @@ int main() {
                 cudaEventRecord(e1);
                 cudaEventSynchronize(e1);
                 float ms; cudaEventElapsedTime(&ms, e0, e1); ms /= iters;
-                printf("%d,%d,%d,%s,%.3f,%.2f\n", M, K, algo, compute ? "32F" : "16F", ms, 2.0 * M * N * K / ms / 1e9);
+                printf("%d,%d,%d,%d,%s,%.3f,%.2f\n", round, M, K, algo, compute ? "32F" : "16F", ms, 2.0 * M * N * K / ms / 1e9);
             }
         }
         fflush(stdout);

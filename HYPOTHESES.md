@@ -40,7 +40,8 @@ run label so the evidence is traceable.
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | Pre-registered 2026-10-14 |
 | H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | Pre-registered 2026-10-14 |
-| H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | Pre-registered 2026-10-14 |
+| H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
+| H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | Pre-registered 2026-10-14 |
 
 ---
 
@@ -2114,3 +2115,53 @@ heuristics are tuned for big square-ish HGEMMs like these). Decision: if some al
 wins by ≥ 5% at shapes covering ≥ half the GEMM FLOPs, add a per-shape algorithm pick to
 the fork and A/B it end to end; otherwise P3 moves to the dequant fusion sub-target.
 No 1-card/2-card serve arm: this is a kernel-level probe (the 1-card shapes are in it).
+
+**Result (2026-10-14, `results/h33/`).** Prediction wrong. Interleaved confirm (6 rounds,
+algorithms alternating so power-cap clock drift hits all equally), speed-up of ALGO3 over
+default at n=2048:
+
+| Shape (M×K) | where | ALGO3 / default |
+|---|---|---|
+| 8704×5120 | 2-card FFN gate/up | **1.108** |
+| 5120×8704 | 2-card FFN down | 1.034 |
+| 6144×5120, 5120×6144, 3072×5120, 5120×3072 | 2-card GDN/attn proj | 1.005–1.027 |
+| 5120×17408 | 1-card FFN down | **1.250** |
+| 12288×5120, 10240×5120 | 1-card proj | 1.16, 1.12 |
+| 17408×5120 | 1-card FFN gate/up | 1.002 |
+
+No shape loses at n=2048. The real surprise is smaller n (`small-n.csv`): at **n=512 the
+default pick collapses to 5–7 TFLOPS** on 7 of 10 shapes while ALGO3 holds 12–15
+(1.7–2.7×), and n=1024 is similar. That alone explains much of the old `-ub 512` vs
+`-ub 2048` gap (H24). Below n=256 ALGO3 is 2–3× *slower*. Strictly the decision rule
+(≥ 5% on ≥ half the GEMM FLOPs) is narrowly missed at n=2048 for 2-card (FFN gate/up is
+~41% of FLOPs), but no shape loses, so no per-shape table is needed: the fork change is a
+single condition, `ALGO3 when n >= 512` on sm_60 behind `GGML_CUDA_PASCAL_GEMM_ALGO=1`.
+FLOP-weighted estimate at ub 2048: ~5% of GEMM time, so **~+3% 2-card prefill, ~+8% 1-card**.
+Every prompt's last partial ubatch (n in 512–2047) gains more.
+
+## H34 — fork levers on one rebuilt binary (Q6_K mmvh, GEMM ALGO3, F16 reduce)
+
+**Changes** (all env-gated, default off):
+- `GGML_CUDA_PASCAL_MMVH=1` now also covers **Q6_K** (1.7 GB of Q4_K_M, ~11% of decode bytes,
+  including the 1 GB output head). Decode only (n ≤ 8).
+- `GGML_CUDA_PASCAL_GEMM_ALGO=1`: H33's ALGO3 for n ≥ 512. Prefill only.
+- `GGML_PASCAL_F16_REDUCE=1`: H31 unchanged.
+
+**Design.** Q6_K and ALGO3 touch disjoint paths (n ≤ 8 vs n ≥ 512), so one arm measures
+both: its decode vs the banked control is the Q6_K effect, its prefill is the ALGO3 effect.
+H31's speed arm then adds F16_REDUCE on top (one lever) and is compared with that arm, not
+with the banked control, so Q6_K can't leak into H31's decode number.
+
+**Gates.** test-backend-ops MUL_MAT q6_K (CUDA vs CPU) passes. KLD: Q6_K at the banked H28
+config (`-sm layer`, ub 8) mean ≤ 0.026 (H28 mmvh was 0.0217) and same-top ≥ 98.9%;
+ALGO3 and F16 reduce each vs their own all-off base at ub 512, `-sm tensor`: mean ≤ 0.002,
+same-top ≥ 99%. If the Q6_K gate fails, no speed arm runs (they all use MMVH=1).
+
+**Predictions** (16k, drafter-free; controls h28-2card-mmvh1 25.29 / 342.25,
+h29-1card-mmvh-iq3 15.86 / 196.40):
+- `h34-2card`: decode **+3–6%** (Q6_K was on mmvq at ~40% of bandwidth), prefill **+2–4%**.
+- `h34-1card-iq3`: decode **+0–1%** (IQ3_S has only 0.33 GB of Q6_K; output head is Q5_K,
+  already mmvh), prefill **+5–10%**.
+- `h34-2card-f16reduce` vs `h34-2card`: H31's prediction, prefill +6–10%, decode ±1%.
+
+**Driver.** `scripts/run-h34-fork-levers.sh` (supersedes `run-h31-f16-reduce.sh`).
