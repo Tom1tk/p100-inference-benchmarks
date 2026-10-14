@@ -2533,3 +2533,34 @@ pre-existing `convert_nc` abort (H34).
   so it is not a 220 W re-test candidate either.
 
 **Prediction.** 2-card 16k decode **+3–6%**. Prefill flat (n ≥ 512 never uses mmvh).
+
+**Result (2026-10-14, logs `h41-off`/`h41-wide`, `h41-floor-*`, `h41-layer-*`).** **Gate FAILED, but the gate was wrong.**
+
+| ub 8 KLD run | mean | max | p99.9 | same-top % | PPL (chunk 2) |
+|---|---|---|---|---|---|
+| wide vs off, `-sm tensor` | 0.002716 | 3.71 | 0.125 | 99.756 | 3.0372 vs 3.0478 |
+| off vs off, `-sm tensor` (floor) | 0.000000 | 0.00005 | 0.00005 | 100.000 | — |
+| wide vs off, `-sm layer` (no reduce) | 0.000711 | 0.58 | 0.138 | 99.560 | 3.0307 vs 3.0475 |
+
+- Runs are deterministic (floor exact), and the reduce is not involved (`-sm layer` differs too).
+- Kernel check (temporary `test-backend-ops` patch, fixed inputs, real shapes 8704×5120, 5120×8704,
+  5120×3072 and 124160×5120 at n = 1 and 8): wide vs off max |Δ| ≤ 2.3e-5 on outputs of rms ~24,
+  i.e. ~1e-6 relative. That is fp32 reordering only. NMSE vs CPU is identical to 4 significant figures
+  for every case (e.g. 1.598e-05 both, 124160×5120 n=1).
+- So this model at ub 8 turns a ~1e-6 rounding change into a KLD tail (median 1e-6, max up to 3.7,
+  ~10–18 top-1 flips in 4094 tokens). Like H34/H35, the gate measured *difference*, not *loss*; a
+  1e-4 bar is unreachable for anything short of bit-exact. PPL is lower, not higher, in both topologies.
+- **Lesson:** decode-path (ub 8) KLD gates need a bit-exact identity check or a reference-based loss
+  check (H35 style), never "wide vs off ≤ 1e-4" for a numerically equivalent change.
+
+## H41b — Q6_K wide mmvh speed arm (re-gated)
+
+**Gate (met, no GPU):** kernel-level equivalence to off at real shapes (above) and PPL not worse at
+ub 8 in both topologies. No reference-based KLD run (rule zero): ~1e-6 relative fp32 reordering cannot
+move the distance from exact arithmetic measurably next to mmvh's own ~4e-3 half-precision error,
+and the NMSE vs CPU is unchanged.
+
+**Run.** 2-card serve command 16k + `GGML_PASCAL_MMVH_Q6K_WIDE=1`, REPS=2. Control banked:
+`h36-duplex-16k`, 40.37 / 365.3. No 1-card arm (H41 reason).
+
+**Prediction.** Decode **+3–6%**, prefill flat. Adopt if decode ≥ +2% on both reps.
