@@ -40,6 +40,7 @@ run label so the evidence is traceable.
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | **Done** (2026-10-14): H17 alone 0.018 = 0.31× the quant step (0.059), and only +0.003 on top of Q4, so **H17 closed as negligible**; mmvh +1.4% (Q4) / +4.2% (IQ3) over mmvq, so **tier 2 runs the candidate** |
 | H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | Pre-registered 2026-10-14 |
+| H32 | Phase 8 tier 2: the candidate serve command answers every 100k haystack question the Q5_K_M reference answers | Pre-registered 2026-10-14 |
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | Pre-registered 2026-10-14 |
 
@@ -2191,3 +2192,22 @@ h29-1card-mmvh-iq3 15.86 / 196.40):
 - `h34-2card-f16reduce` vs `h34-2card`: H31's prediction, prefill +6–10%, decode ±1%.
 
 **Driver.** `scripts/run-h34-fork-levers.sh` (supersedes `run-h31-f16-reduce.sh`).
+
+## H32 — Phase 8 tier 2: 100k haystack gate for the candidate serve command
+
+**Arms** (QUALITY-PLAN §0; `scripts/run-phase8-tier2.sh`, 19 questions from
+`prompts/phase8-fixture.json` over one ~98k-token prefix, thinking off, greedy):
+- `p8-ref`: `build-h17`, Q5_K_M, no drafter, mmvh off.
+- `p8-candidate`: fork, Q4_K_M, MTP + P2P, `GGML_CUDA_PASCAL_MMVH=1`, plus whichever of
+  `GGML_CUDA_PASCAL_GEMM_ALGO=1` / `GGML_PASCAL_F16_REDUCE=1` pass and win in H34.
+- `p8-current` only if the candidate misses a question the reference hits.
+- `p8-1card` (IQ3_S, `-sm none`, mmvh, no drafter) only if it loads at 100k.
+
+**Predictions.**
+- Reference: **≥ 17/19** (needles 5/5; function-name questions are the hard layer).
+- Candidate: **the same set as the reference.** H30 puts its whole numeric loss at 0.057
+  mean KLD, mostly the quant step, which rarely flips a fact retrieved at short answer length.
+- 1-card IQ3_S (if it runs): **≥ 2 fewer hits** than the reference (KLD 2.8× the Q4 arms).
+
+**Pass rule:** the candidate hits every question the reference hits, and it then replaces the serve
+command. A miss triggers `p8-current` to tell whether the fork or the quant is at fault.

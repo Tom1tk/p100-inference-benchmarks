@@ -49,10 +49,13 @@ GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 [GGML_CUDA_PASCAL_MMVH=1] llama-server 
 | Tier-2 arm | BIN | MODEL | Drafter | mmvh |
 |---|---|---|---|---|
 | `p8-ref` | `build-h17` | Q5_K_M | none | off |
-| `p8-candidate` | fork | Q4_K_M | MTP | on |
+| `p8-candidate` | fork, + every H34 lever that passes and wins (`GEMM_ALGO`, `F16_REDUCE`) | Q4_K_M | MTP | on (incl. Q6_K) |
 | `p8-current` (only if candidate misses where ref hits) | banked | Q4_K_M | MTP | off |
-| `p8-h17` (only if H30 says H17 ≥ 1/3 of the quant step) | `build-h17` | Q4_K_M | MTP | on |
 | `p8-1card` (only if it loads at 100k) | fork | IQ3_S, `-sm none` | none | on |
+
+H30 (done): H17 closed (0.31× the quant step, +0.003 on Q4), so there is no `p8-h17` arm. mmvh was
+within noise, so tier 2 runs the candidate. Tier 2 is H32 and runs after H34, so the
+candidate carries the prefill levers too (they change prefill numerics).
 
 **Pass:** the candidate hits every question the reference hits. Then it replaces the
 serve command (user's earlier call: adopt after the gate).
