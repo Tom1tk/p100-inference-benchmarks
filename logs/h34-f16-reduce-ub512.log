@@ -1,0 +1,72 @@
+0.00.350.346 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.080.712 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.080.730 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.080.761 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.01.080.773 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.01.080.788 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.01.080.837 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.01.080.853 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.080.867 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.080.881 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.01.080.895 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.080.909 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.01.080.924 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.01.080.939 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.080.958 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.080.992 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+0.05.306.455 I cmn          init: llama threadpool init, n_threads = 14
+0.05.498.977 I 
+0.05.499.490 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.05.574.253 I kl_divergence: computing over 8 chunks, n_ctx=512, batch_size=512, n_seq=1
+0.08.009.515 I kl_divergence: 2.43 seconds per pass - ETA 0.32 minutes
+
+chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              Δp RMS            Same top p
+   1       4.1990 ±    0.8951       0.05764 ±    0.03569      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   2       2.9496 ±    0.3476       0.02882 ±    0.01787      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   3       2.5786 ±    0.2184       0.01921 ±    0.01192      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   4       2.3431 ±    0.1594       0.01441 ±    0.00894      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   5       2.1910 ±    0.1259       0.01152 ±    0.00716      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   6       2.3146 ±    0.1198       0.00960 ±    0.00596      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   7       2.3212 ±    0.1078       0.00823 ±    0.00511      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+   8       2.3569 ±    0.1022       0.00720 ±    0.00447      -0.00000 ±    0.00000     0.000 ±  0.000 %    100.000 ±  0.000 %
+
+====== Perplexity statistics ======
+Mean PPL(Q)                   :   2.356942 ±   0.102221
+Mean PPL(base)                :   2.340034 ±   0.097993
+Cor(ln(PPL(Q)), ln(PPL(base))):  99.51%
+Mean ln(PPL(Q)/PPL(base))     :   0.007200 ±   0.004473
+Mean PPL(Q)/PPL(base)         :   1.007226 ±   0.004505
+Mean PPL(Q)-PPL(base)         :   0.016908 ±   0.010767
+
+====== KL divergence statistics ======
+Mean    KLD:  -0.000005 ±   0.000000
+Maximum KLD:   0.000004
+99.9%   KLD:   0.000004
+99.0%   KLD:   0.000000
+95.0%   KLD:   0.000000
+90.0%   KLD:   0.000000
+Median  KLD:  -0.000001
+10.0%   KLD:  -0.000015
+ 5.0%   KLD:  -0.000020
+ 1.0%   KLD:  -0.000030
+ 0.1%   KLD:  -0.000035
+Minimum KLD:  -0.000038
+
+====== Token probability statistics ======
+Mean    Δp:  0.000 ± 0.000 %
+Maximum Δp:  0.000%
+99.9%   Δp:  0.000%
+99.0%   Δp:  0.000%
+95.0%   Δp:  0.000%
+90.0%   Δp:  0.000%
+75.0%   Δp:  0.000%
+Median  Δp:  0.000%
+25.0%   Δp:  0.000%
+10.0%   Δp:  0.000%
+ 5.0%   Δp:  0.000%
+ 1.0%   Δp: -0.000%
+ 0.1%   Δp: -0.000%
+Minimum Δp: -0.000%
+RMS Δp    :  0.000 ± 0.000 %
+Same top p: 100.000 ± 0.000 %
+

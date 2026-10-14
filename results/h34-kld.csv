@@ -1,0 +1,4 @@
+label,mean_kld,p99_kld,same_top_pct
+q6k-mmvh-ub8,0.021324,0.019895,99.216
+gemm-algo-ub512,0.003662,0.035506,97.549
+f16-reduce-ub512,-0.000005,0.000000,100.000

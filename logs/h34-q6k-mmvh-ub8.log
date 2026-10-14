@@ -1,0 +1,71 @@
+0.02.933.612 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.02.933.624 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.02.933.641 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.02.933.647 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.02.933.653 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.02.933.674 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.02.933.681 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.02.933.687 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.02.933.693 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.02.933.699 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.02.933.705 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.02.933.712 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.02.933.719 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.02.933.725 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.02.933.744 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+0.54.505.880 I cmn          init: llama threadpool init, n_threads = 14
+0.55.231.454 I 
+0.55.231.894 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.55.330.193 I kl_divergence: computing over 8 chunks, n_ctx=512, batch_size=512, n_seq=1
+1.09.265.461 I kl_divergence: 13.93 seconds per pass - ETA 1.85 minutes
+
+chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              Δp RMS            Same top p
+   1       4.1946 ±    0.8962       0.08745 ±    0.05752       0.16503 ±    0.10591     4.075 ±  1.367 %    98.824 ±  0.677 %
+   2       2.9266 ±    0.3453       0.04301 ±    0.02882       0.08298 ±    0.05303     3.006 ±  0.933 %    99.412 ±  0.339 %
+   3       2.5658 ±    0.2176       0.02943 ±    0.01923       0.05550 ±    0.03537     2.522 ±  0.742 %    99.346 ±  0.292 %
+   4       2.3302 ±    0.1587       0.02114 ±    0.01446       0.04181 ±    0.02653     2.212 ±  0.635 %    99.510 ±  0.219 %
+   5       2.1801 ±    0.1254       0.01587 ±    0.01159       0.03381 ±    0.02123     2.276 ±  0.539 %    99.137 ±  0.259 %
+   6       2.3018 ±    0.1192       0.01280 ±    0.00967       0.02826 ±    0.01769     2.089 ±  0.490 %    99.150 ±  0.235 %
+   7       2.3126 ±    0.1075       0.01051 ±    0.00829       0.02431 ±    0.01517     1.957 ±  0.448 %    99.104 ±  0.223 %
+   8       2.3475 ±    0.1019       0.00899 ±    0.00726       0.02132 ±    0.01327     1.847 ±  0.416 %    99.216 ±  0.195 %
+
+====== Perplexity statistics ======
+Mean PPL(Q)                   :   2.347479 ±   0.101885
+Mean PPL(base)                :   2.326475 ±   0.096380
+Cor(ln(PPL(Q)), ln(PPL(base))):  98.64%
+Mean ln(PPL(Q)/PPL(base))     :   0.008988 ±   0.007260
+Mean PPL(Q)/PPL(base)         :   1.009028 ±   0.007325
+Mean PPL(Q)-PPL(base)         :   0.021004 ±   0.017229
+
+====== KL divergence statistics ======
+Mean    KLD:   0.021324 ±   0.013272
+Maximum KLD:  24.203733
+99.9%   KLD:   3.987230
+99.0%   KLD:   0.019895
+95.0%   KLD:   0.002745
+90.0%   KLD:   0.001388
+Median  KLD:   0.000043
+10.0%   KLD:   0.000000
+ 5.0%   KLD:  -0.000000
+ 1.0%   KLD:  -0.000003
+ 0.1%   KLD:  -0.000023
+Minimum KLD:  -0.000041
+
+====== Token probability statistics ======
+Mean    Δp:  0.047 ± 0.041 %
+Maximum Δp: 35.410%
+99.9%   Δp: 16.358%
+99.0%   Δp:  3.222%
+95.0%   Δp:  1.141%
+90.0%   Δp:  0.515%
+75.0%   Δp:  0.037%
+Median  Δp:  0.000%
+25.0%   Δp: -0.031%
+10.0%   Δp: -0.357%
+ 5.0%   Δp: -0.812%
+ 1.0%   Δp: -2.409%
+ 0.1%   Δp: -13.373%
+Minimum Δp: -52.808%
+RMS Δp    :  1.847 ± 0.416 %
+Same top p: 99.216 ± 0.195 %
+
