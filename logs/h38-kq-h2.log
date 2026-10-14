@@ -1,0 +1,66 @@
+0.00.511.073 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.353.589 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.353.601 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.353.618 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.01.353.624 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.01.353.630 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.01.353.651 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.01.353.658 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.353.664 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.353.670 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.01.353.676 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.353.682 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.01.353.688 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.01.353.695 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.353.702 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.353.720 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+2.11.810.406 I cmn          init: llama threadpool init, n_threads = 14
+2.12.514.173 I 
+2.12.514.602 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+2.13.745.727 I kl_divergence: computing over 2 chunks, n_ctx=8192, batch_size=2048, n_seq=1
+2.38.155.565 I kl_divergence: 24.41 seconds per pass - ETA 0.80 minutes
+
+chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              Δp RMS            Same top p
+   1      71.2402 ±    8.1569       0.56730 ±    0.04050       0.64015 ±    0.04592    10.782 ±  0.653 %    89.768 ±  0.474 %
+   2      10.0940 ±    0.6263       0.28378 ±    0.02050       0.32073 ±    0.02323     7.672 ±  0.461 %    94.615 ±  0.249 %
+
+====== Perplexity statistics ======
+Mean PPL(Q)                   :  10.093999 ±   0.626341
+Mean PPL(base)                :   7.600095 ±   0.386012
+Cor(ln(PPL(Q)), ln(PPL(base))):  95.35%
+Mean ln(PPL(Q)/PPL(base))     :   0.283780 ±   0.020496
+Mean PPL(Q)/PPL(base)         :   1.328141 ±   0.027222
+Mean PPL(Q)-PPL(base)         :   2.493903 ±   0.283298
+
+====== KL divergence statistics ======
+Mean    KLD:   0.320729 ±   0.023230
+Maximum KLD:  29.496008
+99.9%   KLD:  25.004601
+99.0%   KLD:  12.512929
+95.0%   KLD:   0.404146
+90.0%   KLD:   0.043457
+Median  KLD:   0.000065
+10.0%   KLD:   0.000000
+ 5.0%   KLD:  -0.000000
+ 1.0%   KLD:  -0.000001
+ 0.1%   KLD:  -0.000003
+Minimum KLD:  -0.000005
+
+====== Token probability statistics ======
+Mean    Δp:  0.019 ± 0.085 %
+Maximum Δp: 99.995%
+99.9%   Δp: 95.792%
+99.0%   Δp: 11.922%
+95.0%   Δp:  2.178%
+90.0%   Δp:  0.446%
+75.0%   Δp:  0.010%
+Median  Δp:  0.000%
+25.0%   Δp: -0.008%
+10.0%   Δp: -0.389%
+ 5.0%   Δp: -1.835%
+ 1.0%   Δp: -10.640%
+ 0.1%   Δp: -99.885%
+Minimum Δp: -100.000%
+RMS Δp    :  7.672 ± 0.461 %
+Same top p: 94.615 ± 0.249 %
+
