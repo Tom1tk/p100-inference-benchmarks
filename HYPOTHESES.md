@@ -2358,3 +2358,26 @@ attention takes a bigger share. Decode within ±1%: tg copies are F32 and small 
   removes one serialised copy hop from each.
 - **Adopted** into the serve command. Output is bit-identical, so H32's quality pass still covers it.
 
+
+## H37 — one-shot small-message AllReduce (fork plan D3)
+
+**Why.** The tg64 decode trace (53.6 ms/token, drafter-free) is 37% idle. About 124 reduces per
+token each leave a ~100 µs gap between matvec and add, roughly 12 ms/token. Upstream's
+`GGML_CUDA_ALLREDUCE=internal` already has a 2-GPU chunked kernel: one launch per reduce,
+staged through pinned host memory, with in-kernel cross-GPU sync on host flags. It was gated off
+below Volta only by `__nanosleep` and a cc ≥ 700 init guard. Fork commit: sm60 busy-spin, guard
+lowered to Pascal, and `GGML_PASCAL_AR_INTERNAL_MAX_BYTES` caps which reduces go internal. Set to
+1048575 (just under upstream's 1 MB copy-engine threshold), only decode/verify reduces use the
+kernel; prefill keeps the meta butterfly (P2P + F16 + duplex).
+
+**Claim.** Decode rises with numerics unchanged; prefill flat.
+
+**Test** (`scripts/run-h37-internal-ar.sh`, one lever: `GGML_CUDA_ALLREDUCE=internal` + cap):
+1. Identity gate. Q4_K_M perplexity, 8 chunks, **-ub 16** so every reduce is ~327 KB and takes the
+   chunked kernel. BF16 wire off (`GGML_CUDA_AR_BF16_THRESHOLD=0`): f32, two-term sum. Pass = mean
+   KLD ≤ 1e-5 and same-top 100%.
+2. Speed. Serve command at 16k (REPS=2) plus internal. Control `h36-duplex-16k` (40.37 / 365.3).
+- 1-card arm skipped (rule zero): one card makes no reduces.
+
+**Prediction.** Decode +5–15% (the ceiling is the ~12 ms/token of reduce gaps, ~22%). Prefill
+within ±1%. Risk: a busy-spinning block steals an SM from the matvec on Pascal (no nanosleep).
