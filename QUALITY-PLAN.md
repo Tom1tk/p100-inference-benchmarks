@@ -49,7 +49,7 @@ GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 [GGML_CUDA_PASCAL_MMVH=1] llama-server 
 | Tier-2 arm | BIN | MODEL | Drafter | mmvh |
 |---|---|---|---|---|
 | `p8-ref` | `build-h17` | Q5_K_M | none | off |
-| `p8-candidate` | fork, + every H34 lever that passes and wins (`GEMM_ALGO`, `F16_REDUCE`) | Q4_K_M | MTP | on (incl. Q6_K) |
+| `p8-candidate` | fork, + `F16_REDUCE` (H34) + `GEMM_ALGO` (H35) | Q4_K_M | MTP | on (incl. Q6_K) |
 | `p8-current` (only if candidate misses where ref hits) | banked | Q4_K_M | MTP | off |
 | `p8-1card` (only if it loads at 100k) | fork | IQ3_S, `-sm none` | none | on |
 

@@ -43,7 +43,7 @@ run label so the evidence is traceable.
 | H32 | Phase 8 tier 2: the candidate serve command answers every 100k haystack question the Q5_K_M reference answers | Pre-registered 2026-10-14 |
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
-| H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | Pre-registered 2026-10-14 |
+| H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
 
 ---
 
@@ -2259,13 +2259,41 @@ off, and P3 moves on to the dequant/convert sub-targets.
 **Driver.** `scripts/run-h35-algo3-loss.sh`. Two short KLD runs (~5 min), then two REPS=2
 speed arms if the gate passes.
 
+**Result (2026-10-14, `results/h35-kld.csv`, commit 00e4f76).**
+
+| vs Q5 FP32 reference | mean | p99 | p99.9 | same-top % |
+|---|---|---|---|---|
+| `q4-fp16` (banked H30, default GEMM) | 0.062355 | 0.318 | 18.52 | 95.833 |
+| `q4-fp16-algo3` | **0.061941** | 0.302 | 18.43 | 95.686 |
+
+Gate passed: −0.7% mean (≤ +5% allowed), −0.15 points top-1 (≤ −0.5 allowed). Inside the
+predicted ±3% band. ALGO3 rounds differently but is no farther from exact arithmetic. H34's
+gate was the wrong question.
+
+| Speed arm (rep 1 / rep 2) | decode t/s | prefill t/s | vs control | predicted |
+|---|---|---|---|---|
+| `h35-2card-algo3` | 26.61 / 26.62 | 373.88 / 371.83 | prefill **+3.1%** (rep 2), decode flat | +2–4% ✓ |
+| `h35-1card-iq3-algo3` | 15.84 / 15.84 | 195.97 / 201.09 | prefill **+1.0%** (mean), decode flat | +5–10% ✗ |
+
+The 1-card shortfall is not a missed path: every cuBLAS GEMM goes through the patched
+`cublasGemmEx` call, and sm_60 has no dp4a, so MMQ never runs. Two likely causes:
+- The 1-card FFN gate/up shape (17408×5120, ~41% of GEMM FLOPs) gains nothing (H33: 1.002).
+- Sustained 1-card GEMM sits at the 175 W cap, where a more efficient kernel buys clocks, not
+  throughput. H33's probe was short bursts.
+
+Not chased: 1-card is the secondary target and the lever costs it nothing.
+
+**Verdict: adopt `GGML_CUDA_PASCAL_GEMM_ALGO=1`.** The 2-card drafter-free prefill at 16k
+goes 342.25 (H28) → 371.83 with F16 reduce + ALGO3, **+8.6%** in all. The H32 candidate
+carries all three levers.
+
 ## H32 — Phase 8 tier 2: 100k haystack gate for the candidate serve command
 
 **Arms** (QUALITY-PLAN §0; `scripts/run-phase8-tier2.sh`, 19 questions from
 `prompts/phase8-fixture.json` over one ~98k-token prefix, thinking off, greedy):
 - `p8-ref`: `build-h17`, Q5_K_M, no drafter, mmvh off.
-- `p8-candidate`: fork, Q4_K_M, MTP + P2P, `GGML_CUDA_PASCAL_MMVH=1`, plus whichever of
-  `GGML_CUDA_PASCAL_GEMM_ALGO=1` / `GGML_PASCAL_F16_REDUCE=1` pass and win in H34.
+- `p8-candidate`: fork, Q4_K_M, MTP + P2P, `GGML_CUDA_PASCAL_MMVH=1`, `GGML_PASCAL_F16_REDUCE=1` (H34)
+  and `GGML_CUDA_PASCAL_GEMM_ALGO=1` (H35), the full adopted set.
 - `p8-current` only if the candidate misses a question the reference hits.
 - `p8-1card` (IQ3_S, `-sm none`, mmvh, no drafter) only if it loads at 100k.
 
