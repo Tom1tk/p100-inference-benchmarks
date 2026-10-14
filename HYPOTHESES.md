@@ -1258,7 +1258,22 @@ f16 contexts, fewer with the model's host-side allocations. This is the one plac
 where KV quantisation might still earn its 14.3% decode cost (H4), by tripling
 how many contexts fit in host RAM. Worth a follow-up cell if the bound binds.
 
-**Test:** `--cache-ram 20000 --cache-idle-slots` on the WEB_BENCH agentic
+**Pre-registered 2026-10-14 (run `h19-prompt-cache-defaults`).** Reading the
+server source first changed the test. Same-slot reuse doesn't go through
+`--cache-ram` at all, and the defaults are already `-ctxcp 32`, `--cache-ram 8192`
+and idle-slot caching on. The server also checkpoints the hybrid model's state at
+the last user message and near the prompt's end, whatever the `-cms 8192` spacing.
+So the first question is whether the **defaults** already reuse on our build
+(MTP, `-sm tensor`). One load runs a 4-turn session on an ~11k-token system
+prompt, then one unrelated request, then turn 5 of the session, then turn 5
+again with `cache_prompt=false` as the cold control.
+**Prediction:** on turns 2–4, prompt_n is <10% of the prompt and prompt_ms drops
+>90% against the control. Turn 5, after the interleave, also comes back above
+90% via the idle-slot RAM cache. If both hold, no flag goes into the serve
+command. If turn 2+ re-prefills in full, the checkpoint path is broken under
+MTP or tensor split, which is S2/fork work.
+
+**Original test:** `--cache-ram 20000 --cache-idle-slots` on the WEB_BENCH agentic
 scenario, measuring per-turn TTFT across a multi-turn session against the same
 session with `--cache-ram 0`. This is the **highest-value practical change in the
 list** for the stated use case, and it costs nothing but a flag.
