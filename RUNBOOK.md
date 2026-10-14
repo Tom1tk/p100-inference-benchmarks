@@ -265,7 +265,7 @@ command today. Re-open only on the stated unblock.
 
 | Line of enquiry | Why |
 |---|---|
-| Single-GPU serving (H20/H25) | 56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k. **User call, 2026-08-27** |
+| Single-GPU serving on stock builds (H20/H25) | 56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k. **User call, 2026-08-27.** Reopened 2026-10-14 for fork builds only, see CLAUDE.md Scope |
 | PFlash — product, fork, technique (H21) | sm_80-only, no v2, hand-port not worth it. Fork kept on disk only for `llama-niah` |
 | TurboPrefill (H16) | Forces `-sm layer`, −35% decode. User call |
 | TurboQuant KV (H4/H7) | −14.3% decode for 788 MiB |

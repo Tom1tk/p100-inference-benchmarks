@@ -34,6 +34,12 @@ restates the rules that must never be re-derived from context.
   user's own in-person PSU plug-meter check. Do not raise it unprompted.
 - The single-GPU arm is **`Qwen3.8-27B-UD-IQ3_S`** — the same model at a lower
   quant, never a different model.
+- **Single card is a secondary target again (user call, 2026-10-14)** for builds of
+  the fork [Tom1tk/llama.cpp-Pascal](https://github.com/Tom1tk/llama.cpp-Pascal):
+  every fork A/B run includes a 1-card arm (`UD-IQ3_S`, `-sm none`) next to the
+  2-card arm. Single-GPU serving on stock builds stays closed.
+- **This repo is for benchmarks only.** Fork plans and design docs live in the
+  fork repo (`docs/pascal/`), never here.
 
 ## Gotchas
 
