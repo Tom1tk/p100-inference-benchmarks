@@ -36,6 +36,9 @@ run label so the evidence is traceable.
 | H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 | H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **REFUTED 2026-10-14.** Graphs engage and replay, output is byte-identical, but decode moves −1.1% (2-card) and −0.5% (1-card). The 2-card idle time is sync, not launches. D1 closed; D3 is the 2-card decode lever |
+| H28 | Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode | **CONFIRMED 2026-10-14.** +27% 2-card drafter-free, +32.6% with MTP+P2P (37.66 t/s at 16k), +7.5% 1-card. KLD gate passed. Not in the serve command until Phase 8 |
+| H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
+| H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | Pre-registered 2026-10-14 |
 
 ---
 
@@ -2027,3 +2030,45 @@ Fork `428fecb`, 1-card UD-IQ3_S, `-sm none`, 16k depth, 400 tokens, 2 reps.
 
 - Unlike H28, the 99.9% tail is level with the reference. The max is again a single token.
 - 1 card is now at 15.9 t/s decode drafter-free. Same status as 2-card: not in any serve command until Phase 8.
+
+
+## H30 — Phase 8 tier 1: where the quality loss comes from (KLD ladder)
+
+**Why now.** Phase 8 needs a referent (QUALITY-PLAN §2.1) and H17 was parked "for a decision
+that needs quality data". Before spending ~8 min per 100k prefill on NIAH and code
+questions, one cheap ladder says which levers are big enough to be worth a long-context arm.
+
+**Reference.** `UD-Q5_K_M` (the largest quant on disk) on the fork built with
+`-DGGML_CUDA_PASCAL_SM60_FP32=ON` (`build-h17`, the H17 fix as a build option, fork 50b952f).
+That is the most exact arithmetic and the finest quant this rig has.
+Everything is 2-card `-sm tensor`, `ALLREDUCE=none`, `P2P=1` (the serve split), 8×512
+tokens of `prompts/h26-100k-prompt.txt`, as in H28/H29. `-ub 512` = prefill numerics,
+`-ub 8` = decode-path numerics (matvec).
+
+| Arm | Differs from ref by | Measures |
+|---|---|---|
+| `q5-fp16` | FP16 fast path | H17 alone |
+| `q4-fp32` | Q4_K_M | quant alone |
+| `q4-fp16` | quant + FP16 | today's serve prefill |
+| `q4-fp16-ub8` | + matvec path | today's serve decode |
+| `q4-fp16-mmvh` | + mmvh | candidate serve decode |
+| `iq3-1card-ub8` / `-mmvh` | IQ3_S, 1 card | 1-card current / candidate |
+
+**Predictions.**
+- H17 alone: mean KLD **0.002–0.01**, well under the quant step (`q4-fp32`, ~0.01–0.03).
+  Upstream measured median 0.005 on another model.
+- mmvh adds **≤ 0.005** mean KLD over `q4-fp16-ub8`, consistent with H28's +0.005.
+- `iq3` arms are 2–4× the Q4 arms.
+
+**Decision rules.**
+- If H17 alone is **≥ 1/3 of the quant step**, H17 gets a tier-2 (100k) arm and goes to the
+  user with the number against its −13% prefill. Otherwise H17 is closed as negligible.
+- If `q4-fp16-mmvh` is within **+25%** of `q4-fp16-ub8` mean KLD, mmvh numerics are no
+  bigger than noise next to the quant step, and tier 2 runs the candidate serve command
+  against the Q5 reference. The current serve command gets a tier-2 arm only if the
+  candidate fails there.
+- Tier 2 (100k NIAH + code questions) gates the **exact serve command, drafter included**,
+  because the H27 correction showed the drafter can change greedy output.
+
+Driver: `scripts/run-h30-kld-ladder.sh`. ~8 short runs, ~25 min of GPU.
+
