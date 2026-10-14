@@ -1,0 +1,30 @@
+Qwen3.8-27B-UD-Q4_K_M.gguf: 64 blocks, 16 full-attn, 48 GDN; matvec/GEMM types from GGUF
+  decode, per token: 69.6 ms measured-op total (excl. lm_head, norms, elementwise, launch gaps)
+    GEMM/matvec ffn                  46.1 ms   66.2%
+    GEMM/matvec gdn_proj             17.0 ms   24.4%
+    GEMM/matvec attn_full             5.2 ms    7.4%
+    GDN scan                          1.3 ms    1.8%
+    ssm conv                          0.2 ms    0.2%
+  prefill, per 2048-token ubatch: 9172.9 ms measured-op total (excl. lm_head, norms, elementwise, launch gaps)
+    GEMM/matvec ffn                5677.3 ms   61.9%
+    GEMM/matvec gdn_proj           1778.8 ms   19.4%
+    flash attn (4k ctx)             607.4 ms    6.6%
+    GDN scan                        544.0 ms    5.9%
+    GEMM/matvec attn_full           530.1 ms    5.8%
+    ssm conv                         35.4 ms    0.4%
+  unmatched: [('ssm_conv1d', 'f32', 4, 10240)]
+Qwen3.8-27B-UD-IQ3_S.gguf: 64 blocks, 16 full-attn, 48 GDN; matvec/GEMM types from GGUF
+  decode, per token: 77.6 ms measured-op total (excl. lm_head, norms, elementwise, launch gaps)
+    GEMM/matvec ffn                  52.5 ms   67.7%
+    GEMM/matvec gdn_proj             18.4 ms   23.8%
+    GEMM/matvec attn_full             5.2 ms    6.7%
+    GDN scan                          1.3 ms    1.6%
+    ssm conv                          0.2 ms    0.2%
+  prefill, per 2048-token ubatch: 9288.4 ms measured-op total (excl. lm_head, norms, elementwise, launch gaps)
+    GEMM/matvec ffn                5770.5 ms   62.1%
+    GEMM/matvec gdn_proj           1797.0 ms   19.3%
+    flash attn (4k ctx)             608.5 ms    6.6%
+    GDN scan                        543.9 ms    5.9%
+    GEMM/matvec attn_full           532.9 ms    5.7%
+    ssm conv                         35.6 ms    0.4%
+  unmatched: [('ssm_conv1d', 'f32', 4, 10240)]

@@ -26,7 +26,7 @@ run label so the evidence is traceable.
 | H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
-| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it |
+| H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
 | H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
@@ -1128,6 +1128,12 @@ that nothing else changes. The FP32 path also converts quantized weights to F32
 rather than F16, which doubles intermediate memory traffic, so some of the 13%
 is bandwidth rather than FLOPs. Treat ~15% as an estimate with a stated model
 behind it, not a measurement.
+
+**Fix note 2026-10-14 — this inference is wrong.** Phase 0 measured every op of the
+real graph on one card (`results/phase0/`): GEMMs are **~87% of prefill op time**,
+the GDN scan ~6%, flash attention ~7% at 4k. So the 13% H17 cost cannot mean "15%
+GEMM-bound". The broken assumption is most likely "FP32 is exactly half-rate on
+this path". The real cause is unverified and does not matter for the plan.
 
 **Why decode barely moved:** decode is memory-bandwidth-bound, not
 arithmetic-bound, so the compute mode is nearly irrelevant to it. The +0.36% is

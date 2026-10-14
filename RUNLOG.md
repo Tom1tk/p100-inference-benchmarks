@@ -1430,3 +1430,13 @@ to unpatched, so a rebuild of `build-h17` must re-apply the patch first.
   The abliterated file's embedded MTP head accepts 50.8% → 23.65 t/s (−14%). Prefill unchanged (~310).
 - Single card (`-sm none`, user request): fits at 12,815 MiB, but 17.45 decode / 179 prefill = 64% / 58%
   of the pair. Same verdict as H20/H25: single-GPU stays closed for speed. Quality untested (Phase 8).
+
+## 2026-10-14 — Phase 0: op-level time budget on one card (fork build)
+
+- `test-backend-ops perf` on GPU0 over the real graph's op shapes (Q4_K_M and IQ3_S),
+  fork `Tom1tk/llama.cpp-Pascal` @ `9ccbdeb`, `build-cuda-p100`. Peak 60 °C. No server run.
+- Decode matvec runs at ~40% of achievable bandwidth (K-quants, ~200 GB/s) and ~20%
+  (IQ3_S/IQ2/q3_K, ~100 GB/s). It is ALU-bound.
+- Prefill GEMM is 12–13 TFLOPS (~67% of FP16 peak) and ~87% of prefill op time.
+  The GDN scan is ~6%. **H18 is refuted** (fix note in HYPOTHESES).
+- Write-up and tables: `results/phase0/README.md`.
