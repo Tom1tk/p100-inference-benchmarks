@@ -57,7 +57,7 @@ Raw: `budget-1card.txt`.
 
 # Phase 0.2 — nsys trace, 2-card vs 1-card (2026-10-14)
 
-`scripts/run-phase0-nsys.sh`: `llama-bench -p 2048 -n 64 -r 1` (with warmup), traced with nsys
+Repo-root `scripts/run-phase0-nsys.sh`: `llama-bench -p 2048 -n 64 -r 1` (with warmup), traced with nsys
 2022.4 (`-t cuda,nvtx`). Arms: 2-card Q4_K_M `-sm tensor` with `GGML_CUDA_ALLREDUCE=none`, and
 1-card IQ3_S `-sm none`. Peak temperatures were 57 °C and 60 °C. Analysis is `scripts/nsys_budget.py`;
 output is in `nsys/*-budget.txt`. The `.nsys-rep` files open in the Nsight Systems GUI. Regenerate the
