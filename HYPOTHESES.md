@@ -27,7 +27,7 @@ run label so the evidence is traceable.
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it. **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
-| H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | Untested |
+| H19 | Prompt-cache reuse cuts agentic turn-2+ TTFT by >90% | **CONFIRMED at defaults** (−95.5% to −97.2%), no flag needed |
 | H20 | 27B-IQ3_S on one P100 is a viable single-GPU fallback | **CLOSED 2026-08-27 — not feasible.** 56% of the pair's prefill, 38% of its real decode, MTP OOMs, and it cannot reach 100k. Do not spend runs here |
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | **Tried 2026-08-26, crashes** under `-sm tensor` (chunked ops carry no split-axis metadata). Now a kernel project, not a flag — **parked by rule zero** |
@@ -1257,6 +1257,30 @@ token (16 attention layers × 4 KV heads × 256 × 2 × 2 B), so 8 GiB holds rou
 f16 contexts, fewer with the model's host-side allocations. This is the one place
 where KV quantisation might still earn its 14.3% decode cost (H4), by tripling
 how many contexts fit in host RAM. Worth a follow-up cell if the bound binds.
+
+### Verdict — CONFIRMED 2026-10-14, at default flags (`h19-prompt-cache-defaults`)
+
+| step | prompt tokens | re-prefilled | prompt_ms | vs cold |
+|---|---|---|---|---|
+| turn 1 (cold) | 14,162 | 14,162 | 47,698 | — |
+| turn 2 | 14,316 | 27 | 1,373 | −97.3% |
+| turn 3 | 14,467 | 24 | 1,430 | −97.1% |
+| turn 4 | 14,614 | 151 | 2,240 | −95.5% |
+| unrelated request | 292 | 292 | 1,647 | — |
+| turn 5 after the interleave | 14,765 | 24 | 1,510 | −97.0% |
+| turn 5, `cache_prompt=false` (control) | 14,765 | 14,765 | 50,013 | control |
+
+**Both predictions hold, with no flag changes.** The checkpoints work under MTP
+and `-sm tensor`, and the idle-slot RAM cache brings the session back after an
+interleaved request. Turn-2+ TTFT is about 1.4–2.2 s against 50 s cold.
+
+The ~1.4 s floor for ~25 new tokens is restore and launch overhead, not prefill.
+It is worth knowing about, but not worth a run. Peak temperature was 65 °C.
+
+**The serve command is unchanged. S2 (custom GDN checkpointing) is not needed for
+the single-session agent loop.** The limit that remains is `--cache-ram 8192`
+across many concurrent long sessions; that only matters if the harness ever runs
+more than about one 100k session at a time.
 
 **Pre-registered 2026-10-14 (run `h19-prompt-cache-defaults`).** Reading the
 server source first changed the test. Same-slot reuse doesn't go through

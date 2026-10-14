@@ -1,0 +1,8 @@
+label,step,prompt_total,cache_n,prompt_n,prompt_ms,decode_tps,wall_s
+h19-prompt-cache-defaults,turn1,14162,0,14162,47697.8,27.47,52.6
+h19-prompt-cache-defaults,turn2,14316,14289,27,1373.4,25.4,6.4
+h19-prompt-cache-defaults,turn3,14467,14443,24,1429.8,31.1,5.5
+h19-prompt-cache-defaults,turn4,14614,14463,151,2240.1,25.83,7.2
+h19-prompt-cache-defaults,interleave,292,0,292,1647.0,20.67,9.0
+h19-prompt-cache-defaults,turn5-after-interleave,14765,14741,24,1510.4,24.95,2.8
+h19-prompt-cache-defaults,turn5-cold-control,14765,0,14765,50013.0,25.7,50.9

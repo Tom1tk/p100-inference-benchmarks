@@ -241,7 +241,7 @@ it can change the serve command.
 
 | # | Item | Why | Cost / gate |
 |---|---|---|---|
-| 1 | **H19 — prompt-cache reuse** (`--cache-ram 20000 --cache-idle-slots`, multi-turn) | The actual use case re-sends a growing prefix every turn. Also cuts the Phase 8 sweep from ~14 h to ~2 h | One multi-turn run; a flag |
+| 1 | **H19 — prompt-cache reuse** (`--cache-ram 20000 --cache-idle-slots`, multi-turn) | The actual use case re-sends a growing prefix every turn. Also cuts the Phase 8 sweep from ~14 h to ~2 h | **Done 2026-10-14: confirmed at defaults, −95–97% turn-2+ prompt time, no flag needed** (`h19-prompt-cache-defaults`) |
 | 2 | **H17 — decide the sm_60 FP16 fix** | Measured: −12–13% prefill, +0.36% decode. It is a correctness fix that changes numerics, so it must be applied or rejected **before** any quality run | Decision; needs Phase 8's first arm to see whether the output difference matters |
 | 3 | **Phase 8 — quality gate** ([QUALITY-PLAN.md](QUALITY-PLAN.md)) | The only objective with no data. Sweep D (drafter hash check, ~45 min) first — it also settles the drafter re-rank at the current config, since every MTP-vs-DFlash2 comparison was at `-ub 512`/4k/layer | ~3 h GPU with H19, ~14 h without. After 1 and 2 |
 | 4 | **H15 — power cap 175 → 200 → 220 W** | Prefill is compute-bound; the one lever that could move it without a kernel | **Blocked on the user's PSU meter check** (§1) |
