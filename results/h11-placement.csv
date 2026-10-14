@@ -122,3 +122,5 @@ h39-1card-iq3-staged,none,none,default,1,15.87,199.43,400,0,0,,13161,259,65,191,
 h39-1card-iq3-staged,none,none,default,2,15.86,205.56,400,0,0,,13161,259,65,191,ok
 h39-staged-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.21,352.12,400,378,273,72.2,11053,11053,61,215,ok
 h39-staged-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.24,370.11,400,377,273,72.4,11053,11053,64,215,ok
+h40-par-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.55,365.07,400,378,273,72.2,11053,11053,62,21,ok
+h40-par-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.48,366.93,400,377,273,72.4,11053,11053,65,21,ok
