@@ -2391,3 +2391,30 @@ within ±1%. Risk: a busy-spinning block steals an SM from the matvec on Pascal 
   ~100 µs matvec→add gaps are not transport time. They are most likely the meta backend's host-side
   per-subgraph dispatch (one subgraph boundary per reduce). The decode lever, if any, is in the
   meta scheduler, not the reduce kernel. Serve command unchanged.
+
+## H38 — half2 Q·K accumulation in the FA tile kernel (fork plan P5)
+
+**Why.** At 98k, prefill is 232 t/s against 365 at 16k. A linear fit to those two averages, and the
+pp2048 trace (fattn 102 ms at ~1k depth), put attention at ~50% of per-token prefill time at 64k:
+P5's 25% gate is met without a profile run. The sm60 prefill path is `fattn-tile`, D=256,
+32 cols/block, `ncols2=2` (GQA 6). A one-card micro-bench (new test-backend-ops perf case: 12 Q / 2 KV
+heads, kv 32k, nb 512) runs it at 37.4 ms, ≈5.5 TFLOPS, ~29% of fp16 peak.
+- **Config sweep, closed** (fork `build-logs/p5-fa-sweep.sh`, 8 variants of nthreads/occupancy/
+  nbatch_fa/nbatch_K): stock 256/2/64/64 is fastest. 256/2/64/32 +1.2%, 256/2/32/64 +4.7%,
+  256/1/64/128 +8.6%, 512/1/64/64 +15%; 256/1/128/64, 128/2/64/64 and 256/2/128/32 are ~2.4× slower.
+- **The lever:** the Q·K inner loop does `float += half22float2(hmul2)` (5 instructions per 4 flops),
+  while V·KQ already uses `hfma2`. `GGML_PASCAL_FA_KQ_H2` accumulates `cpy_ne` (4) half2 products with
+  `__hfma2`, then flushes to the fp32 accumulator once. Micro-bench: **37.4 → 27.8 ms (−26%)** f16 KV,
+  37.7 → 28.5 ms q8_0 KV. All 151 D=256 FLASH_ATTN_EXT tests pass against CPU.
+
+**Claim.** 100k prefill rises with quality held. Lossy: 8-product fp16 partial sums.
+
+**Test** (`scripts/run-h38-fa-kq-h2.sh`, one lever, compile-time, `build-p5` vs `build-cuda-p100`):
+1. KLD gate at depth: Q4_K_M, `-c 8192 --chunks 2` (scored tokens 4–8k deep), serve levers.
+   Pass = mean KLD ≤ 0.001 (<2% of the Q4 quant step, H30 0.057) and same-top ≥ 99.5%.
+2. 1-card IQ3_S, 16k, drafter-free, REPS=2. Control banked: `h34-1card-iq3` rep 2, 15.83 / 196.72.
+3. 2-card serve command, 100k, REPS=1. Control banked: `serve-fork-100k`, 26.94 / 231.97.
+- If adopted, the H32 100k haystack is re-run before the README command changes (lossy at depth).
+
+**Prediction.** 100k prefill +8–12% (attention ~40% of the 0→98k average × 26%). 1-card 16k prefill
++3–5%. Decode at 100k +0–5% (MTP verify batches take the tile kernel).
