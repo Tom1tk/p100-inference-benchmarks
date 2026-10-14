@@ -38,7 +38,7 @@ run label so the evidence is traceable.
 | H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **REFUTED 2026-10-14.** Graphs engage and replay, output is byte-identical, but decode moves −1.1% (2-card) and −0.5% (1-card). The 2-card idle time is sync, not launches. D1 closed; D3 is the 2-card decode lever |
 | H28 | Pascal half2 matvec (fork D2, `GGML_CUDA_PASCAL_MMVH=1`) lifts decode | **CONFIRMED 2026-10-14.** +27% 2-card drafter-free, +32.6% with MTP+P2P (37.66 t/s at 16k), +7.5% 1-card. KLD gate passed. Not in the serve command until Phase 8 |
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
-| H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | Pre-registered 2026-10-14 |
+| H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | **Done** (2026-10-14): H17 alone 0.018 = 0.31× the quant step (0.059), and only +0.003 on top of Q4, so **H17 closed as negligible**; mmvh +1.4% (Q4) / +4.2% (IQ3) over mmvq, so **tier 2 runs the candidate** |
 | H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | Pre-registered 2026-10-14 |
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | Pre-registered 2026-10-14 |
@@ -2074,6 +2074,32 @@ tokens of `prompts/h26-100k-prompt.txt`, as in H28/H29. `-ub 512` = prefill nume
   because the H27 correction showed the drafter can change greedy output.
 
 Driver: `scripts/run-h30-kld-ladder.sh`. ~8 short runs, ~25 min of GPU.
+
+**Result (2026-10-14, `results/h30-kld.csv`).** All arms rc=0, peak 65 °C.
+
+| Arm | Mean KLD | p99 | Same top |
+|---|---|---|---|
+| `q5-fp16` (H17 alone) | 0.0182 | 0.051 | 97.50% |
+| `q4-fp32` (quant alone) | 0.0592 | 0.375 | 96.62% |
+| `q4-fp16` (serve prefill) | 0.0624 | 0.318 | 95.83% |
+| `q4-fp16-ub8` (serve decode, mmvq) | 0.0560 | 0.350 | 96.23% |
+| `q4-fp16-mmvh` (candidate decode) | 0.0568 | 0.372 | 96.32% |
+| `iq3-1card-ub8` | 0.1572 | 2.58 | 92.99% |
+| `iq3-1card-mmvh` | 0.1638 | 2.92 | 92.75% |
+
+- **Predictions: the scale was wrong, the ordering held.** H17 alone is 0.018 (predicted
+  0.002–0.01) and the quant step is 0.059 (predicted 0.01–0.03). IQ3 is 2.8× Q4 (predicted 2–4×).
+- **H17: closed as negligible**, by the pre-registered rule, though it is a near miss: alone it is
+  0.31× the quant step, just under the 1/3 line. What decides it is that the errors don't
+  stack. On Q4, FP16 arithmetic adds only +0.003 (0.0592 → 0.0624, +5%), because the quant
+  error dominates. Buying that back would cost the −13% prefill. Revisit only if the serve quant
+  moves to Q5 or above.
+- **mmvh: within noise.** +1.4% over mmvq on Q4 and +4.2% on IQ3, against a +25% allowance.
+  So tier 2 runs the candidate serve command against the Q5 reference.
+- Side finding: the decode path (ub 8) sits *closer* to the reference than the prefill
+  path (ub 512, FP16 cuBLAS): 0.056 vs 0.062.
+- The p99.9 of 13–21 on every Q4/IQ3 arm (vs 0.45 for Q5) is a handful of tokens where Q4
+  flips a confident prediction. It is a property of the quant, not of any kernel lever.
 
 
 ## H31 — F16 AllReduce payload for 2-card prefill (fork P1)
