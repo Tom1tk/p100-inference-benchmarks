@@ -17,8 +17,8 @@ that command."
 | Target | Status |
 |---|---|
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
-| Highest decode | **39.5 t/s at 16k** (fork command, `serve-fork-16k`); 20.02 at 100k on the old stock command (H26) |
-| Highest prefill / TTFT | **~222 t/s, 440 s TTFT at 98k** (H32, incl. first answer); 353 t/s at 16k |
+| Highest decode | **40.4 t/s at 16k** (fork command, `h36-duplex-16k`); 20.02 at 100k on the old stock command (H26) |
+| Highest prefill / TTFT | **~222 t/s, 440 s TTFT at 98k** (H32, incl. first answer); 365 t/s at 16k |
 | Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
 Quality is the binding constraint: it is why PFlash and DFlash v1 are excluded,
@@ -33,19 +33,19 @@ value practical lever left.
 
 ```
 Tom1tk/llama.cpp-Pascal (fork, /root/llama.cpp-Pascal/build-cuda-p100)  ·  -sm tensor
-GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1
+GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_DUPLEX_REDUCE=1
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1
 ```
 
 Adopted 2026-10-14 after it passed the Phase 8 quality gate (H32: 19/19 at 100k, vs 18/19
 for the Q5_K_M FP32 reference). Fork levers: half2 matvec incl. Q6_K (H28, H34), F16
-AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35).
+AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds).
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
 | 98k | not re-measured | ~222 t/s (440 s TTFT incl. 1st answer) | — | — | 66 °C | `p8-candidate` (H32) |
-| 16k | 39.48 t/s | 353.0 t/s | 72.3% | 11,053 MiB | 65 °C | `serve-fork-16k` (f16 KV, REPS=2; +4.8% decode, +12.3% prefill vs `h28-2card-mmvh1-mtp-p2p`) |
+| 16k | 40.37 t/s | 365.3 t/s | 72.3% | 11,053 MiB | 65 °C | `h36-duplex-16k` (f16 KV, REPS=2; +2.3% / +3.5% from duplex vs `serve-fork-16k` 39.48 / 353.0) |
 
 Every lever behind that line, and every number, is in
 [RESULTS.md](RESULTS.md). What is still open is in RUNBOOK §7.

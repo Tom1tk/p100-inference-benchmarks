@@ -44,7 +44,7 @@ run label so the evidence is traceable.
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
-| H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | Pre-registered 2026-10-14 |
+| H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
 
 ---
 
@@ -2348,4 +2348,13 @@ it targets the same idle with no GEMM split.
 
 **Prediction.** Prefill +3–5%. The ceiling is ~5.4% at pp2048, a little less at 16k depth where
 attention takes a bigger share. Decode within ±1%: tg copies are F32 and small (~25 ms per 64 tokens).
+
+**Result (2026-10-14, bench de07962, fork 897d8ee).**
+- Identity: flag on vs off, mean KLD −0.000005, same-top 100%. The flag only reorders work.
+- 16k speed, REPS=2: 40.46 / 40.27 t/s decode and 364.2 / 366.4 t/s prefill, at 72.2–72.4% acceptance.
+  Against `serve-fork-16k` (39.48 / 353.05) that is **+2.3% decode** and **+3.5% prefill**. Peak 65 °C.
+- Prefill landed inside the predicted +3–5%. Decode beat the ±1% prediction, which was wrong: each
+  decode reduce is latency-bound (~100 µs from matvec to add, ~124 reduces per token). Duplex
+  removes one serialised copy hop from each.
+- **Adopted** into the serve command. Output is bit-identical, so H32's quality pass still covers it.
 
