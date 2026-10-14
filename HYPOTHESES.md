@@ -2430,3 +2430,27 @@ heads, kv 32k, nb 512) runs it at 37.4 ms, ≈5.5 TFLOPS, ~29% of fp16 peak.
   (plain fp32 FMA, more precise than today's path, not less), micro-bench first.
 - **Follow-up result (micro-bench only, no GPU serve run):** the fp32 tile path is **+14% slower**
   (f16 KV 42.55 vs 37.29 ms; q8_0 43.17 vs 37.73). Dropped. Cheap P5 levers are closed.
+
+## H39 — staged, coalesced dequant-to-F16 before the prefill GEMM (fork plan P3 leftover)
+
+**Why.** Phase 0 put the dequant pass at 5.8% of 2-card pp2048 and 7.3% of 1-card. The Phase 0 trace
+gives its bandwidth: `dequantize_block_q4_K` on a 17408×2560 slice takes 732 µs, ~155 GB/s of
+read+write; q5_K ~205, iq4_xs ~165, iq3_s ~115 GB/s. P100 streams ~500 GB/s. Two causes are visible
+in the code. The 32-thread CTAs cap occupancy at 50% (sm_60 holds 32 CTAs per SM). Each thread also
+stores 2-byte values at an 8-byte stride.
+
+**Lever** (fork, `GGML_PASCAL_DEQUANT_STAGED=1`, runtime, off by default): each 256-thread CTA
+dequantizes 256/nthreads super-blocks into shared memory with the stock device functions, then writes
+them out as coalesced 16-byte stores. Same arithmetic, so the output is **bit-identical**. It covers
+all K and IQ super-block types.
+
+**Claim.** The dequant kernels run ≥ 2× faster, and prefill rises with output unchanged.
+
+**Test** (one lever, same binary, env on/off):
+1. `test-backend-ops -o MUL_MAT` correctness with the env on; identity check: PPL on/off equal to all
+   digits (Q4_K_M, `-c 2048 --chunks 2`).
+2. Micro-bench under nsys: dequant kernel time on/off. Skip the serve arms if under 1.5× faster.
+3. 1-card IQ3_S, 16k, drafter-free, REPS=2. Control banked: `h34-1card-iq3` rep 2, 15.83 / 196.72.
+4. 2-card serve command, 16k, REPS=2. Control banked: `h36-duplex-16k`, 40.37 / 365.3.
+
+**Prediction.** 2-card 16k prefill +2.5–3.5%, 1-card +3–4.5%. Decode flat (it uses matvec, no dequant).
