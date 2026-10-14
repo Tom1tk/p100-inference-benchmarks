@@ -245,22 +245,27 @@ If a push fails, keep the commit and retry; note persistent failure in RUNLOG.
 
 ## 7. Work queue
 
-The deliverable is a serve command ([README.md](README.md)). Phases 0, 1, 2
-and 6 are done, Phase 3 folded into Phase 8, Phase 7 has two cells left, Phase
-5 has not started, Phase 8 is planned. Everything below is ranked by whether
-it can change the serve command.
+The deliverable is a serve command ([README.md](README.md)). Phases 0, 1, 2, 6
+and 8 are done: the command passed the Phase 8 gate (H32) on 2026-10-14 and now
+only changes by fork levers, each one gated (KLD vs the FP32 Q5 reference, H35
+style) and measured against the banked control. Fork design notes live in the
+fork repo, `docs/pascal/fork-plan-2026-10-14.md`. Ranked by whether an item can
+change the serve command. Refreshed 2026-10-14.
 
 ### Open
 
 | # | Item | Why | Cost / gate |
 |---|---|---|---|
-| 1 | **H19 — prompt-cache reuse** (`--cache-ram 20000 --cache-idle-slots`, multi-turn) | The actual use case re-sends a growing prefix every turn. Also cuts the Phase 8 sweep from ~14 h to ~2 h | **Done 2026-10-14: confirmed at defaults, −95–97% turn-2+ prompt time, no flag needed** (`h19-prompt-cache-defaults`) |
-| 2 | **H17 — decide the sm_60 FP16 fix** | Measured: −12–13% prefill, +0.36% decode. It is a correctness fix that changes numerics, so it must be applied or rejected **before** any quality run | Decision; needs Phase 8's first arm to see whether the output difference matters |
-| 3 | **Phase 8 — quality gate** ([QUALITY-PLAN.md](QUALITY-PLAN.md)) | The only objective with no data. Sweep D (drafter hash check, ~45 min) first — it also settles the drafter re-rank at the current config, since every MTP-vs-DFlash2 comparison was at `-ub 512`/4k/layer | ~3 h GPU with H19, ~14 h without. After 1 and 2 |
-| 4 | **H15 — power cap 175 → 200 → 220 W** | Prefill is compute-bound; the one lever that could move it without a kernel | **Blocked on the user's PSU meter check** (§1) |
-| 5 | Phase 5 — agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; run after Phase 8 fixes the config |
-| 6 | ~~`GGML_CUDA_P2P=1` with MTP~~ | **Measured 2026-10-14: +3.6% decode (28.39 vs 27.41), same 66.4% acceptance, prefill −0.9%** (H27 section, D5) | Done. **Adopted into the serve command 2026-10-14 (user call)** |
-| 7 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
+| 1 | **H15: power cap 175 → 200 → 220 W**, then the "Re-test at the higher cap" list (§1) | Prefill is compute-bound and capped; parked marginal levers may grow | **Blocked on the user's PSU meter check** (§1) |
+| 2 | Prefill: fork plan P2 (chunked GEMM) / P3 (dequant + converts) | GEMMs are ~87% of prefill (Phase 0) | Profile first; P2 only if prefill idle > 5% |
+| 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Micro-bench first; wider loads were slower (H42 notes), needs fewer smem lookups per weight |
+| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; after the prefill levers settle |
+| 5 | TurboQuant | Kept last by user call | After everything above |
+| 6 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
+
+Done on 2026-10-14 and folded into the command or the 1-card arm: H19 prompt cache (defaults), H17 (closed as
+negligible by H30), Phase 8 (H32), P2P with MTP (H27), the fork levers H28/H31/H34/H35/H36/H41b, and for
+1-card only H42 (`GGML_PASCAL_MMVH_LOWBIT=1`, +13.0% decode).
 
 ### Parked by rule zero
 
@@ -269,7 +274,7 @@ command today. Re-open only on the stated unblock.
 
 | Item | Why parked | What would unpark it |
 |---|---|---|
-| H18 — GDN-bound prefill | Diagnostic; sizes a prize only H22 can collect. Free evidence from H17: ~85% of prefill is not GEMM-bound | H22 becoming runnable |
+| H18 — GDN-bound prefill | **Refuted 2026-10-14** (Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6%). Row kept for history | — |
 | H22 — chunked GDN path | Crashes under `-sm tensor` (no split-axis metadata). A kernel project | Someone annotating the split axes |
 | H23 — quadratic attention at 100k | Explains the depth decay, but every sparse-attention kernel is sm_80+ | An sm_60 sparse-attention path |
 | H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1 | `ik` gaining tensor split |
