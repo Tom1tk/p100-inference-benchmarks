@@ -280,6 +280,8 @@ command today. Re-open only on the stated unblock.
 | H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1 | `ik` gaining tensor split |
 | H2, H3 — XL split-stall, stock-quant degradation | Fold into Phase 8 Sweep Q arms 3 and 5, only if Q4_K_M shows a gap | A gap in Sweep Q |
 | q8 KV × ubatch interaction | Noted during H25; not worth its own run | An unexplained q8 result |
+| H42 LOWBIT on the 2-card command | Only Q3_K (1.7% of Q4_K_M bytes) is affected: ≤ +1% decode, inside REPS=2 noise | A 2-card re-bench for another reason |
+| IQ4_NL and IQ1_S on mmvh | 2.1% of 2-card bytes / 0.3% of 1-card bytes: ≤ 1% decode each | Nothing bigger left on the matvec list |
 
 ### Closed — do not spend runs here
 
