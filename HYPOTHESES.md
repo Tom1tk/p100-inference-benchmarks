@@ -1873,5 +1873,5 @@ On the banked build (`dflash2-rebased`), with `GGML_CUDA_P2P=1`, MTP, `-ub 2048`
 - **Prefill is 307.7 on rep 2** vs 310.5, a −0.9% change. That matches H10's −0.3% within noise.
 - VRAM is unchanged (10,973 MiB per card).
 
-**Conclusion: P2P helps with MTP too.** This is a candidate for the serve command; it is the user's call.
+**Conclusion: P2P helps with MTP too. Adopted into the serve command 2026-10-14 (user call).**
 

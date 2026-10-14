@@ -32,15 +32,15 @@ value practical lever left.
 ## The current answer
 
 ```
-mainline-rebased (57affa09)  ·  -sm tensor  ·  GGML_CUDA_ALLREDUCE=none
+mainline-rebased (57affa09)  ·  -sm tensor  ·  GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1
 ```
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
-| 100k | 20.02 t/s | 207.4 t/s | 60.3% | 12,147 MiB | 70 °C | `h26-100k-mtp-kvq8` |
-| 16k | 27.41 t/s | 310.5 t/s | 66.4% | 10,973 MiB | 68 °C | `h24-ub2048-mtp-16k` |
+| 100k | 20.02 t/s | 207.4 t/s | 60.3% | 12,147 MiB | 70 °C | `h26-100k-mtp-kvq8` (before P2P) |
+| 16k | 28.39 t/s | 307.7 t/s | 66.4% | 10,973 MiB | 65 °C | `d5-p2p-mtp-16k` (+3.6% decode from P2P vs `h24-ub2048-mtp-16k`, f16 KV) |
 
 Every lever behind that line, and every number, is in
 [RESULTS.md](RESULTS.md). What is still open is in RUNBOOK §7.
@@ -80,7 +80,7 @@ cd /root/p100-benchmarks
 # llama-bench cell
 ./scripts/run-bench.sh mainline /root/Qwen3.8-27B-UD-Q4_K_M.gguf tensor <label>
 # llama-server cell (drafter, acceptance, VRAM) — env knobs in the script header
-SPLIT=tensor GGML_CUDA_ALLREDUCE=none CTX=16384 UB=2048 BATCH=2048 \
+SPLIT=tensor GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 CTX=16384 UB=2048 BATCH=2048 \
   ./scripts/run-spec-placement.sh <label> draft-mtp /root/mtp-Qwen3.8-27B-Q4_0.gguf default
 ```
 

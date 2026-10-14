@@ -67,7 +67,7 @@ cd /root/p100-benchmarks
 **`llama-server`** (Table B — drafters, acceptance, VRAM, real requests):
 
 ```bash
-SPLIT=tensor GGML_CUDA_ALLREDUCE=none CTX=16384 UB=2048 BATCH=2048 REPS=3 \
+SPLIT=tensor GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 CTX=16384 UB=2048 BATCH=2048 REPS=3 \
   ./scripts/run-spec-placement.sh <label> <draft-mtp|draft-dflash|none> <drafter.gguf|none> <default|CUDA0|CUDA1>
 ```
 
@@ -246,7 +246,7 @@ it can change the serve command.
 | 3 | **Phase 8 — quality gate** ([QUALITY-PLAN.md](QUALITY-PLAN.md)) | The only objective with no data. Sweep D (drafter hash check, ~45 min) first — it also settles the drafter re-rank at the current config, since every MTP-vs-DFlash2 comparison was at `-ub 512`/4k/layer | ~3 h GPU with H19, ~14 h without. After 1 and 2 |
 | 4 | **H15 — power cap 175 → 200 → 220 W** | Prefill is compute-bound; the one lever that could move it without a kernel | **Blocked on the user's PSU meter check** (§1) |
 | 5 | Phase 5 — agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; run after Phase 8 fixes the config |
-| 6 | ~~`GGML_CUDA_P2P=1` with MTP~~ | **Measured 2026-10-14: +3.6% decode (28.39 vs 27.41), same 66.4% acceptance, prefill −0.9%** (H27 section, D5) | Done. Adopting it into the serve command is pending the user's call |
+| 6 | ~~`GGML_CUDA_P2P=1` with MTP~~ | **Measured 2026-10-14: +3.6% decode (28.39 vs 27.41), same 66.4% acceptance, prefill −0.9%** (H27 section, D5) | Done. **Adopted into the serve command 2026-10-14 (user call)** |
 | 7 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 
 ### Parked by rule zero
