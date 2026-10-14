@@ -2381,3 +2381,13 @@ kernel; prefill keeps the meta butterfly (P2P + F16 + duplex).
 
 **Prediction.** Decode +5–15% (the ceiling is the ~12 ms/token of reduce gaps, ~22%). Prefill
 within ±1%. Risk: a busy-spinning block steals an SM from the matvec on Pascal (no nanosleep).
+
+**Result (2026-10-14, bench "H37 ... identity + 16k speed", fork dfcaa7f).** **REFUTED — not adopted.**
+- Identity: internal vs none at -ub 16, mean KLD −0.000005, same-top 100% (13.75 vs 13.82 s/pass).
+  No init-fallback warning in either log, so the internal pipeline came up.
+- 16k speed, REPS=2: 40.15 / 40.16 t/s decode, 363.85 / 366.00 t/s prefill, 72.2–72.4% acceptance.
+  Against `h36-duplex-16k` (40.37 / 365.3): **−0.5% decode, flat prefill**, inside noise. Peak 65 °C.
+- Reading: replacing the reduce's copy+add with a single kernel did not move decode, so the
+  ~100 µs matvec→add gaps are not transport time. They are most likely the meta backend's host-side
+  per-subgraph dispatch (one subgraph boundary per reduce). The decode lever, if any, is in the
+  meta scheduler, not the reduce kernel. Serve command unchanged.
