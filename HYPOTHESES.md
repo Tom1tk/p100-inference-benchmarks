@@ -2505,3 +2505,31 @@ before the reduce, which stays serial. Same kernels, same order per stream, so o
   Decode levers left are kernel-side: matvec speed and fusion. At 220 W the kernels shrink and the host
   share grows, so H40 is on the RUNBOOK re-test list.
 
+
+## H41 — Q6_K mmvh with 4 lanes per superblock (decode, fork plan D2 follow-up)
+
+**Why.** At the real per-card decode shapes (new perf cases, fork `test-backend-ops`, mmvh on,
+card 0), the mmvh matvec runs at ~350 GB/s for Q4_K / Q5_K / IQ4_XS. Q6_K runs at ~190 GB/s:
+8704×5120 takes 184 µs vs 70 µs for Q4_K. Q6_K is 11.5% of Q4_K_M decode bytes, including the 1 GB
+output head, so it takes ~18% of matvec time. Cause: 210-byte blocks are 2-byte aligned. The 8-lane
+split makes each lane do 32 two-byte loads for 32 weights, and every qh byte is fetched by 4 lanes,
+every ql byte by 2.
+
+**Lever** (fork, `GGML_PASCAL_MMVH_Q6K_WIDE=1`, runtime, off by default, needs `MMVH=1`): Q6_K uses
+4 lanes per superblock. Each lane owns 16 positions of one 128-half (48 bytes, no overlap) and
+produces 4 units of 16 weights. Loads are 5 aligned 4-byte words plus funnel shifts per 16 bytes.
+Per-unit half2 math is unchanged; only the fp32 order of the per-lane sums changes.
+
+**Micro (done, ~1 min GPU).** 8704×5120 184 → 110 µs, 5120×8704 193 → 106 µs, 5120×3072 71 → 46 µs
+(−40%, ~330 GB/s). `test-backend-ops MUL_MAT q6_K`: all 38 n ≤ 8 cases pass, then the known
+pre-existing `convert_nc` abort (H34).
+
+**Test** (one lever, same binary, env on/off):
+1. Decode-path KLD: Q4_K_M 2-card, `-c 2048 --chunks 2 -ub 8` (n ≤ 8, so mmvh runs), wide vs off.
+   Pass = |mean KLD| ≤ 1e-4 and same-top ≥ 99.9% (fp32 reorder only).
+2. 2-card serve command 16k, REPS=2. Control banked: `h36-duplex-16k`, 40.37 / 365.3.
+- No 1-card arm (rule zero): UD-IQ3_S has 0.33 GB of Q6_K (~3% of bytes; its output head is Q5_K).
+  Expected gain is ≤ 1%, below run noise, and H34 measured exactly that path as flat. Memory-bound,
+  so it is not a 220 W re-test candidate either.
+
+**Prediction.** 2-card 16k decode **+3–6%**. Prefill flat (n ≥ 512 never uses mmvh).
