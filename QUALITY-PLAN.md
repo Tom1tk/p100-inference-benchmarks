@@ -11,6 +11,54 @@ this document exists before the runs do.
 
 ---
 
+## 0. Revised plan (2026-10-14) — supersedes §3 and the order in §4
+
+Three things changed since this plan was written:
+
+- **Sweep D's premise is false.** The H27 correction (HYPOTHESES.md) found the drafter
+  *can* change greedy output (`-sm layer` on the banked build, and the fork with mmvh), and
+  H24's "byte-identical" was a vacuous check. So the gate tests **the exact serve command,
+  drafter included**, and Sweep D is dropped. The drafter re-rank stays a speed question.
+- **There is a speed candidate to gate:** the fork with mmvh (H28, +32.6% decode with MTP).
+- **H17 is now a build option** in the fork (`-DGGML_CUDA_PASCAL_SM60_FP32=ON`, `build-h17`),
+  so it can be measured as one lever instead of settled blind.
+
+**Tier 1 — H30, KLD ladder (~25 min GPU).** Reference = `UD-Q5_K_M` on `build-h17`
+(finest quant on disk, exact arithmetic). Arms isolate H17, the quant step, the
+matvec path, mmvh, and the 1-card IQ3_S config. Its decision rules (HYPOTHESES.md H30)
+pick which tier-2 arms run. `UD-Q6_K_M`/`Q4_K_XL` are not on disk, so the step-0 ladder
+in §2.2 collapses to Q5_K_M.
+
+**Tier 2 — 100k haystack, 19 questions per arm (~12 min/arm).**
+`scripts/gen-phase8-fixtures.py` → `prompts/phase8-fixture.json`: the H26 code corpus
+(~98k tokens) as the system message, 5 numeric needles as code comments at 10/25/50/75/90%
+(layer 1), and 14 "which function contains this exact line" questions at 5–96% depth
+(layer 2). Every answer is checked by substring. Questions go as the user message after a
+fixed system prefix, so H19's checkpoints should reuse the prefix; `phase8-ask.py` aborts
+if question 2 re-prefills. Thinking is off and `max_tokens` is 48, so answers are short.
+
+**Frozen serve command for tier 2** (`scripts/run-phase8-tier2.sh`; only BIN, MODEL, SPEC,
+SPLIT and the `GGML_CUDA_*` env move between arms):
+
+```
+GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 [GGML_CUDA_PASCAL_MMVH=1] llama-server \
+  -m <MODEL> [--spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0.gguf] \
+  -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1 -sm tensor
+```
+
+| Tier-2 arm | BIN | MODEL | Drafter | mmvh |
+|---|---|---|---|---|
+| `p8-ref` | `build-h17` | Q5_K_M | none | off |
+| `p8-candidate` | fork | Q4_K_M | MTP | on |
+| `p8-current` (only if candidate misses where ref hits) | banked | Q4_K_M | MTP | off |
+| `p8-h17` (only if H30 says H17 ≥ 1/3 of the quant step) | `build-h17` | Q4_K_M | MTP | on |
+| `p8-1card` (only if it loads at 100k) | fork | IQ3_S, `-sm none` | none | on |
+
+**Pass:** the candidate hits every question the reference hits. Then it replaces the
+serve command (user's earlier call: adopt after the gate).
+
+---
+
 ## 1. What the sweep actually costs, and which levers move it
 
 At the H26 serve config a 100k prefill takes **482 s (8.0 min)** at 207.4 t/s.
