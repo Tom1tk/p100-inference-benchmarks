@@ -124,3 +124,5 @@ h39-staged-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.21,352.12,400,37
 h39-staged-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.24,370.11,400,377,273,72.4,11053,11053,64,215,ok
 h40-par-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,40.55,365.07,400,378,273,72.2,11053,11053,62,21,ok
 h40-par-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,40.48,366.93,400,377,273,72.4,11053,11053,65,21,ok
+h41-wide-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,41.48,363.16,400,375,273,72.8,11053,11053,62,20,ok
+h41-wide-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,41.54,367.69,400,375,273,72.8,11053,11053,65,20,ok
