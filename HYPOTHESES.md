@@ -40,6 +40,7 @@ run label so the evidence is traceable.
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | Pre-registered 2026-10-14 |
 | H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | Pre-registered 2026-10-14 |
+| H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | Pre-registered 2026-10-14 |
 
 ---
 
@@ -2097,3 +2098,19 @@ first, so both cards hold bit-identical sums (an asymmetric version would let th
 
 **Driver.** `scripts/run-h31-f16-reduce.sh`: KLD pair, then one REPS=2 speed arm.
 
+
+## H33 — cuBLAS algorithm choice at the prefill GEMM shapes (fork P3 probe)
+
+**Basis.** Phase 0.1/0.2: prefill GEMM is 64% of 2-card time and runs at 12–13 TFLOPS
+(~67% of FP16 peak). ggml calls `cublasGemmEx(OP_T, OP_N, F16, COMPUTE_16F,
+CUBLAS_GEMM_DEFAULT_TENSOR_OP)`; on sm_60 that is cuBLAS's heuristic pick.
+
+**Probe** (`scripts/gemm-algo-sweep.cu`, one card, no model, seconds of GPU): the same
+call at N=2048 for the per-card `-sm tensor` shapes and the full 1-card shapes, every
+`CUBLAS_GEMM_ALGO0..23` plus default, COMPUTE_16F and COMPUTE_32F.
+
+**Prediction.** Default is within 3% of the best algorithm at every shape (cuBLAS's
+heuristics are tuned for big square-ish HGEMMs like these). Decision: if some algorithm
+wins by ≥ 5% at shapes covering ≥ half the GEMM FLOPs, add a per-shape algorithm pick to
+the fork and A/B it end to end; otherwise P3 moves to the dequant fusion sub-target.
+No 1-card/2-card serve arm: this is a kernel-level probe (the 1-card shapes are in it).
