@@ -19,7 +19,7 @@ that command."
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
 | Highest decode | **20.02 t/s at 100k**, 27.41 at 16k (H26, H24) |
 | Highest prefill / TTFT | **207.4 t/s, ~7.8 min TTFT at 100k**; 310.5 t/s at 16k |
-| Output quality indistinguishable from baseline | **No data.** Phase 8, [QUALITY-PLAN.md](QUALITY-PLAN.md), scheduled last on purpose |
+| Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
 Quality is the binding constraint: it is why PFlash and DFlash v1 are excluded,
 why TurboQuant's 14.3% decode cost was refused, and why any lossy speed win
@@ -32,10 +32,15 @@ value practical lever left.
 ## The current answer
 
 ```
-mainline-rebased (57affa09)  ·  -sm tensor  ·  GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1
+Tom1tk/llama.cpp-Pascal (fork, /root/llama.cpp-Pascal/build-cuda-p100)  ·  -sm tensor
+GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1
 ```
+
+Adopted 2026-10-14 after it passed the Phase 8 quality gate (H32: 19/19 at 100k, vs 18/19
+for the Q5_K_M FP32 reference). Fork levers: half2 matvec incl. Q6_K (H28, H34), F16
+AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35).
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
@@ -54,7 +59,7 @@ Every lever behind that line, and every number, is in
 | 4 hypothesis tests | Ongoing — status table in [HYPOTHESES.md](HYPOTHESES.md) |
 | 5 agentic web build | Not started, tooling ready ([WEB_BENCH.md](WEB_BENCH.md)) |
 | 7 prefill / TTFT / 100k | Measured end to end (H13, H14, H24, H26). H15 (power cap) and H19 (cache reuse) remain |
-| 8 quality gate | Planned, nothing run ([QUALITY-PLAN.md](QUALITY-PLAN.md)) |
+| 8 quality gate | Tier 1 (H30 KLD) and tier 2 (H32 100k haystack) passed ([QUALITY-PLAN.md](QUALITY-PLAN.md)) |
 
 ## Documents
 

@@ -40,7 +40,7 @@ run label so the evidence is traceable.
 | H29 | mmvh IQ3_S/IQ3_XXS lifts 1-card decode | **CONFIRMED 2026-10-14.** 15.86 vs 11.00 t/s (+44%), KLD gate passed |
 | H30 | Phase 8 tier 1: KLD ladder vs a Q5_K_M FP32 reference splits quality loss into quant, arithmetic (H17) and kernel (mmvh) | **Done** (2026-10-14): H17 alone 0.018 = 0.31× the quant step (0.059), and only +0.003 on top of Q4, so **H17 closed as negligible**; mmvh +1.4% (Q4) / +4.2% (IQ3) over mmvq, so **tier 2 runs the candidate** |
 | H31 | F16 AllReduce payload (fork P1, `GGML_PASCAL_F16_REDUCE=1`) lifts 2-card prefill | **Confirmed** (2026-10-14, in H34): prefill +6.8% (337.7 → 360.8), decode flat, KLD ≈ 0 (bit-for-bit top-1) |
-| H32 | Phase 8 tier 2: the candidate serve command answers every 100k haystack question the Q5_K_M reference answers | Pre-registered 2026-10-14 |
+| H32 | Phase 8 tier 2: the candidate serve command answers every 100k haystack question the Q5_K_M reference answers | **PASSED** (2026-10-14): reference 18/19, candidate 19/19, a superset. The fork command replaces the serve command |
 | H33 | A non-default cublasGemmEx algorithm beats ggml's `DEFAULT_TENSOR_OP` at the prefill GEMM shapes (fork P3 probe) | **Prediction wrong, lever found** (2026-10-14): ALGO3 +3–11% (2-card shapes) / up to +25% (1-card) at n=2048, and 1.7–2.7× at n=512–1024; loses below n=256. End-to-end in H34 |
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
@@ -2305,3 +2305,19 @@ carries all three levers.
 
 **Pass rule:** the candidate hits every question the reference hits, and it then replaces the serve
 command. A miss triggers `p8-current` to tell whether the fork or the quant is at fault.
+
+**Result (2026-10-14, `results/phase8-tier2.csv`, `results/phase8/*.jsonl`, commits 74812a4, cc2e345).**
+
+| Arm | needles (L1) | function names (L2) | total | 98k prefill + 1st answer |
+|---|---|---|---|---|
+| `p8-ref` (Q5_K_M, FP32, no drafter) | 5/5 | 13/14 | **18/19** | 608 s |
+| `p8-candidate` (fork Q4_K_M + MTP + P2P + MMVH + F16 reduce + ALGO3) | 5/5 | 14/14 | **19/19** | 440 s |
+
+- Predictions held. Reference ≥ 17 ✓. Candidate hits the same set ✓ (a superset).
+- The reference's only miss is a near-miss. At depth 87 it answered
+  `llama_get_sampled_logits_ith` for `llama_get_logits_ith`; the candidate got it right. One
+  question can't rank the two arms. It only shows the gate isn't saturated by the
+  reference's own errors.
+- **Pass: the candidate replaces the serve command.** `p8-current` isn't needed (it runs only on a
+  candidate miss). `p8-1card` was skipped as pre-registered: IQ3_S doesn't hold 100k on one card.
+- Peak temperature 66 °C on both arms.
