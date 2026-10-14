@@ -2492,3 +2492,16 @@ before the reduce, which stays serial. Same kernels, same order per stream, so o
   inactive, so a 1-card arm would re-measure the control.
 
 **Prediction.** 2-card 16k decode +8–15% with MTP (verify batches are launch-heavy too). Prefill ±1%.
+
+**Result (2026-10-14, bench "H40 parallel dispatch (identity + 2-card 16k)", fork f24e1ff).** **REFUTED — code kept, off.**
+- Identity: KLD −0.000004, same-top 100%; serve output identical to `h36-duplex-16k` (1413 chars).
+- 2-card serve 16k: decode **40.55 / 40.48** (control 40.37, **+0.3%**), prefill 365.1 / 366.9 (flat).
+- Follow-up trace (`results/h40-trace`, llama-bench tg32, dispatch on, ~1 min GPU): both cards are
+  kernel-busy **89%** of the decode window. Launch cost is unchanged at ~6 µs per call on both threads,
+  so the driver does not serialise them. The host-bound reading of the P2 step-0 trace was mostly CUPTI
+  overhead (~2–3 µs added per launch). Untraced, one host thread already keeps up, and 2-card decode is
+  GPU-bound. The remaining ~11% idle is reduce latency.
+- **Decode host-dispatch work is closed** (graphs H27, one-shot reduce H37, parallel dispatch H40).
+  Decode levers left are kernel-side: matvec speed and fusion. At 220 W the kernels shrink and the host
+  share grows, so H40 is on the RUNBOOK re-test list.
+

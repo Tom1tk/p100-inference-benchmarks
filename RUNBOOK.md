@@ -55,6 +55,7 @@ Once H15 runs, re-test each of these with one short 16k arm per lever (cite the 
 | H39 `GGML_PASCAL_DEQUANT_STAGED=1` (bit-identical, code kept, off) | 1-card +4.5%, 2-card +1.0% (rep 2; rep 1 −3.6%) | More dequant throughput = more power in a capped phase |
 | H14 `-ub 4096 -b 8192` | +1.3% prefill | Larger GEMMs, compute-bound |
 | H35 ALGO3, 1-card | +1.0% (already on) | Note was "card likely at the 175 W cap" |
+| H40 `GGML_PASCAL_PAR_DISPATCH=1` (bit-identical, code kept, off) | 2-card decode +0.3% | Faster kernels make host dispatch a larger share of each token |
 | P5 FA tile config sweep (micro-bench only) | stock fastest, next +1.2% | Ordering of compute-bound configs can shift with clocks |
 
 **Check for competing disk I/O.** Model loads are disk-bound; a download or
