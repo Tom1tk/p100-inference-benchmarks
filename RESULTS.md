@@ -176,7 +176,7 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | Engine | mainline, rebased, buun, `ik`, PFlash | **rebased** (mainline PR #27342 on current master) | Table A phase1 block, H6 |
 | `-sm` | `layer`, `tensor`, `graph` (`ik`), `none` (1 card) | **`tensor`** — +58% decode, +11% prefill over layer | H1/H6 |
 | `GGML_CUDA_ALLREDUCE` | nccl (default), `internal`, `none` | **`none`**. nccl aborts rig-wide; `internal` needs sm70 and falls back to the same path | H5, H10 |
-| P2P | on, off | +2.9% decode drafter-free, untested with MTP. Not adopted | H10 |
+| P2P | on, off | +2.9% decode drafter-free; +3.6% with MTP (`d5-p2p-mtp-16k`). **Adopted 2026-10-14** | H10 |
 | `-ub` | 128 … 8192 | **2048** — +63% prefill at ≤16k, +56% at 16k on the server; 8192 aborts | H14, H24 |
 | `-b` | 2048, 8192 | **2048** — only matters as a ceiling on `-ub` | H14 |
 | KV `-ctk`/`-ctv` | f16, q8_0, q4_0, turbo3 | **`q8_0`** — 1.5% of decode, half the cache; q4_0 adds nothing; turbo3 costs 14.3% | H25, H4 |
