@@ -76,7 +76,7 @@ fi
 nvidia-smi --query-gpu=index,power.limit,persistence_mode --format=csv,noheader
 
 # --- Telemetry --------------------------------------------------------------
-INTERVAL=5 ./scripts/gpu-monitor.sh > "$TEMPS" 2>/dev/null &
+ABORT_TEMP=$ABORT_TEMP INTERVAL=5 ./scripts/gpu-monitor.sh > "$TEMPS" 2>/dev/null &
 MONITOR_PID=$!
 # shellcheck disable=SC2064
 trap "kill $MONITOR_PID 2>/dev/null" EXIT

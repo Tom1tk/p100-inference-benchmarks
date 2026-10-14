@@ -138,7 +138,7 @@ Both scripts start `scripts/gpu-monitor.sh`, which samples every 5 s into
 |---|---|
 | ≤ 75 °C | Normal. Observed peak across the whole project is 70 °C |
 | 76–79 °C | Finish the current run, don't start another until cooled |
-| ≥ 80 °C | **Abort immediately** (`pkill -f 'llama-bench|llama-server'`), record in RUNLOG |
+| ≥ 80 °C | **Abort immediately** (`pkill -f 'llama-bench|llama-server'`), record in RUNLOG. The four driver scripts do this themselves: `gpu-monitor.sh` with `ABORT_TEMP` set kills the driver's `llama-*` children within one 5 s sample |
 | 83 °C | Card drops off the bus: host reboot needed, fans pinned at 100%. Must never be reached |
 
 Brief readings above 175 W are sampling overshoot; the cap is a rolling

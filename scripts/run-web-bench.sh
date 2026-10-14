@@ -112,7 +112,7 @@ cleanup() {
 trap cleanup EXIT
 
 # --- Telemetry --------------------------------------------------------------
-INTERVAL=5 ./scripts/gpu-monitor.sh > "$TEMPS" 2>/dev/null &
+ABORT_TEMP=$ABORT_TEMP INTERVAL=5 ./scripts/gpu-monitor.sh > "$TEMPS" 2>/dev/null &
 MONITOR_PID=$!
 
 # --- llama-server -----------------------------------------------------------
