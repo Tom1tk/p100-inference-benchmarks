@@ -2466,3 +2466,29 @@ all K and IQ super-block types.
   kernel gain goes to clocks. See RUNBOOK "Re-test at the higher cap".
 - Not added to the README command: the 2-card evidence does not clear noise. No re-run at 175 W.
 
+
+## H40 — parallel host dispatch per card in the meta backend (decode, fork plan D-new)
+
+**Why.** H37 showed the ~100 µs matvec→add gaps are not transport. The P2 step-0 trace (P1 + ALGO3 +
+mmvh, `results/p2-step0`, CUDA API timeline, no new run) shows 2-card decode is **host-bound**. Over
+64 tg tokens one host thread makes ~4,530 `cudaLaunchKernel` calls per token for both cards: ~25.6 ms
+in the launch API plus ~15.8 ms of CPU between launches, against a ~54 ms traced token. That is
+~9 µs of host per launch against ~20 µs of GPU per kernel. `ggml_backend_meta_graph_compute` issues
+subgraph *i* for card 0 and then for card 1 from the same thread, so card 1 always starts a subgraph
+late and card 0 idles at every reduce (~124 reduces per token).
+
+**Lever** (fork, `GGML_PASCAL_PAR_DISPATCH=1`, runtime, off by default): one persistent worker thread
+per extra card. The worker issues its card's subgraph while the main thread issues card 0's. They join
+before the reduce, which stays serial. Same kernels, same order per stream, so output is
+**bit-identical**.
+
+**Claim.** 2-card decode rises because the host critical path per subgraph halves. Prefill is flat
+(GPU-bound: launches are a small share at n=2048).
+
+**Test** (one lever, same binary, env on/off):
+1. Identity: Q4_K_M 2-card, `-c 2048 --chunks 2`, KLD on vs off. Pass = |KLD| ≤ 1e-5, same-top 100%.
+2. 2-card serve command, 16k, REPS=2. Control banked: `h36-duplex-16k`, 40.37 / 365.3.
+- No 1-card arm (rule zero): with one backend the meta path has no extra card and the code is
+  inactive, so a 1-card arm would re-measure the control.
+
+**Prediction.** 2-card 16k decode +8–15% with MTP (verify batches are launch-heavy too). Prefill ±1%.
