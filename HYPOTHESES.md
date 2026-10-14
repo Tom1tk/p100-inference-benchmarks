@@ -32,7 +32,7 @@ run label so the evidence is traceable.
 | H21 | ~~PFlash-style token selection ports to sm_60~~ | **Withdrawn 2026-08-25** — see below |
 | H22 | The existing chunked GDN graph path beats the fused sequential kernel on prefill | **Tried 2026-08-26, crashes** under `-sm tensor` (chunked ops carry no split-axis metadata). Now a kernel project, not a flag — **parked by rule zero** |
 | H23 | Quadratic attention (16/65 layers) drives the decay to 100k | **Parked by rule zero** — arithmetic only; every sparse-attention kernel is sm_80+, so there is no lever on sm_60 |
-| H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Output byte-identical. Keep `-ub 2048`** |
+| H24 | `-ub 2048` costs decode <5% at 16k | **REFUTED 2026-08-27 — costs 6.7%, but entirely via a 6.9 pp drafter-acceptance drop, not the decode path. Keep `-ub 2048`** (the "output byte-identical" claim was vacuous — see H27 correction) |
 | H26 | The deliverable config serves at 100k with `q8_0` KV and MTP | **CONFIRMED in substance, narrowly refuted on the letter, 2026-08-27.** It serves: 20.02 t/s decode, 207.4 prefill, 60.3% acceptance, 12,147 MiB/card, 70 C. Decode is 26.9% below 16k, just outside the 25% claimed |
 | H25 | IQ3_S on one P100 vs the pair at <=16k | **CLOSED 2026-08-27 — single GPU not feasible.** 56% prefill / 38% real decode / MTP OOMs. The lasting result is for **two cards**: `q8_0` KV costs 1.5% of decode, not H4's 14.3% |
 | H27 | CUDA graphs on sm_60 (fork D1, `GGML_CUDA_PASCAL_GRAPHS=1`) cut decode launch gaps | **REFUTED 2026-10-14.** Graphs engage and replay, output is byte-identical, but decode moves −1.1% (2-card) and −0.5% (1-card). The 2-card idle time is sync, not launches. D1 closed; D3 is the 2-card decode lever |
@@ -1896,6 +1896,33 @@ Two reps each, 16k depth, 400 tokens, drafter-free, fork `0cdf2be`. Rows are in 
 | 1-card graphs on | 10.95 (**−0.5%**) | 197.1 | 13,177 |
 
 - **Greedy output is byte-identical** with graphs off and on, on both configurations.
+
+### Correction (2026-10-14) — output identity was compared on the wrong field
+
+The original comparison read only `message.content`. Within 400 tokens the model is still
+thinking, so `content` is empty in every arm and the check was vacuous. Re-compared on
+`reasoning_content + content` with `scripts/compare-outputs.py` (rep 1 of each arm):
+
+| Pair | One lever? | Result |
+|---|---|---|
+| H27 graphs off vs on, 2-card and 1-card | yes | **identical** — the H27 conclusion stands |
+| `h24-ub2048-mtp-16k` vs `d5-p2p-mtp-16k` (P2P) | yes | **identical** |
+| `p2-tensor-none-16k` vs `p2-tensor-mtp-16k` (drafter, banked, `-sm tensor`) | yes | **identical** |
+| `p2-layer-none-16k` vs `p2-layer-mtp-16k` (drafter, banked, `-sm layer`) | yes | **differ at char 183** |
+| `h24-ub512-mtp-16k` vs `h24-ub2048-mtp-16k` (ubatch) | yes | **differ at char 183** |
+| `h28-2card-mmvh1` vs `h28-2card-mmvh1-mtp-p2p` (drafter + P2P; P2P shown inert above) | ~yes | **differ at char 369** |
+| H28/H29 mmvh off vs on | yes | differ (expected; lossy, KLD-gated) |
+
+Consequences:
+- **H24's "byte-identical, the target corrects to the same output" is wrong.** `-ub` changes
+  the target's own prefill chunking, so the KV cache and the greedy path differ slightly.
+  That is a numerics change, not a quality regression, and `-ub 2048` stays; but part of
+  the 6.9 pp acceptance drop may be the target taking a different path, not only the drafter.
+- **The drafter can change greedy output.** It held on the banked `-sm tensor` build and
+  failed on `-sm layer` and on the fork with mmvh. Batched verify runs the target with
+  ncols>1, which can take different kernels and reduction orders than single-token decode.
+  QUALITY-PLAN Sweep D's premise ("output is a property of the target") does not hold in
+  general, so **Phase 8 gates the exact serve command, drafter included.**
 - **Graphs really engage.** A 1-card `GGML_CUDA_GRAPH_DEBUG=1` run (`logs/h27-graph-debug.log`) completed warmup and replayed 14 of 16 tokens. No arch disable fired. So the null result is real, not a dead flag.
 - **Why there's no gain:**
   - On 1 card, the GPU was already 96% busy (Phase 0.2). The CPU was issuing launches ahead of the GPU, so removing launch cost frees nothing.
