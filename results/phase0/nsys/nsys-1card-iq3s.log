@@ -1,0 +1,13 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 16269 MiB):
+  Device 0: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+| model                          |       size |     params | backend    | ngl | threads | n_ubatch |     sm |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | ------: | -------: | -----: | --: | --------------: | -------------------: |
+| qwen35 27B IQ3_S - 3.4375 bpw  |  11.20 GiB |    27.32 B | CUDA       |  99 |       8 |     2048 |   none |   1 |          pp2048 |        215.49 ± 0.00 |
+| qwen35 27B IQ3_S - 3.4375 bpw  |  11.20 GiB |    27.32 B | CUDA       |  99 |       8 |     2048 |   none |   1 |            tg64 |         11.15 ± 0.00 |
+
+build: d9f0af6 (2)
+Importer error status: The importer binary and its dependencies were not found.
+Unable to retrieve the importer version: skipping importation of the QDSTRM file.
+Generating '/tmp/nsys-report-4ad2.qdstrm'
+Generated:
+    /root/p100-benchmarks/results/phase0/nsys/nsys-1card-iq3s.qdstrm

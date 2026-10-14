@@ -1,0 +1,51 @@
+nsys-2card-q4km.sqlite: devices [0, 1], 493 GEMM calls per pp ubatch
+
+  pp2048: wall 5275.1 ms
+    dev0: 3352 kernels, kernel busy 4326.7 ms (82% of wall), idle 948.4 ms | memcpy 252 ops 919.2 ms 10570 MB
+      gemm                3397.4 ms  64.4%
+      dequant/convert      304.8 ms   5.8%
+      gdn                  246.7 ms   4.7%
+      other                174.7 ms   3.3%
+      fattn                102.4 ms   1.9%
+      allreduce add         81.7 ms   1.5%
+      ssm_conv              18.9 ms   0.4%
+    dev1: 3354 kernels, kernel busy 4288.9 ms (81% of wall), idle 986.2 ms | memcpy 252 ops 919.2 ms 10570 MB
+      gemm                3372.0 ms  63.9%
+      dequant/convert      303.2 ms   5.7%
+      gdn                  242.2 ms   4.6%
+      other                172.0 ms   3.3%
+      fattn                100.7 ms   1.9%
+      allreduce add         80.2 ms   1.5%
+      ssm_conv              18.7 ms   0.4%
+
+  tg64 (+tg1 warmup): wall 3815.7 ms (58.7 ms/token)
+    dev0: 145095 kernels, kernel busy 2929.5 ms (77% of wall), idle 886.3 ms | memcpy 17359 ops 56.6 ms 461 MB
+      matvec              2421.5 ms  63.5%
+      other                243.1 ms   6.4%
+      dequant/convert      122.9 ms   3.2%
+      allreduce add         73.9 ms   1.9%
+      gdn                   35.6 ms   0.9%
+      fattn                 21.2 ms   0.6%
+      ssm_conv              11.2 ms   0.3%
+    dev1: 145094 kernels, kernel busy 2928.7 ms (77% of wall), idle 887.1 ms | memcpy 17360 ops 57.4 ms 462 MB
+      matvec              2421.3 ms  63.5%
+      other                243.2 ms   6.4%
+      dequant/convert      122.8 ms   3.2%
+      allreduce add         73.3 ms   1.9%
+      gdn                   35.6 ms   0.9%
+      fattn                 21.3 ms   0.6%
+      ssm_conv              11.2 ms   0.3%
+
+  top tg kernels dev0:
+       710.4 ms   8516x [matvec] void mul_mat_vec_q<(ggml_type)13, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+       692.9 ms   7605x [matvec] void mul_mat_vec_q<(ggml_type)23, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+       565.8 ms   6695x [matvec] void mul_mat_vec_q<(ggml_type)12, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+       246.9 ms   1563x [matvec] void mul_mat_vec_q<(ggml_type)14, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+       101.6 ms  32309x [dequant/convert] quantize_q8_1(const float *, void *, long, long, long, long, long, unsigned int, uint3)
+        80.2 ms    455x [matvec] void mul_mat_vec_q<(ggml_type)11, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+        73.9 ms  19764x [allreduce add] void k_bin_bcast<&op_add, float, float, float, const float *>(const T2 *, const T3 *, T4 *, unsigned int, unsi
+        73.5 ms   8387x [other] void rms_norm_f32<(int)1024, (bool)1, (bool)0, (bool)0>(const float *, float *, int, int, int, long, long, lon
+        44.8 ms    455x [matvec] void mul_mat_vec_q<(ggml_type)20, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+        41.9 ms    260x [matvec] void mul_mat_vec_q<(ggml_type)21, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, 
+        38.4 ms   6760x [matvec] void mul_mat_vec_q<(ggml_type)8, (int)1, (bool)0, (bool)0, (bool)0>(const void *, const void *, const int *, g
+        35.6 ms   3120x [gdn] void gated_delta_net_cuda<(int)128, (bool)0, (bool)0, (int)4>(const float *, const float *, const float *, con

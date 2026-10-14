@@ -1440,3 +1440,14 @@ to unpatched, so a rebuild of `build-h17` must re-apply the patch first.
 - Prefill GEMM is 12–13 TFLOPS (~67% of FP16 peak) and ~87% of prefill op time.
   The GDN scan is ~6%. **H18 is refuted** (fix note in HYPOTHESES).
 - Write-up and tables: `results/phase0/README.md`.
+
+## 2026-10-14 — Phase 0.2: nsys trace, 2-card Q4_K_M vs 1-card IQ3_S
+
+- `scripts/run-phase0-nsys.sh`: llama-bench pp2048 + tg64, r=1, under nsys. Fork `9ccbdeb` build. Peak 57/60 °C.
+- Results under nsys:
+  - 2-card: 381 / 18.3 t/s.
+  - 1-card: 215 / 11.2 t/s.
+- 2-card prefill: GPUs idle 18% of the ubatch while 10.6 GB per card is copied for AllReduce. The copies are serialised with compute. This gates in P1/P2.
+- 2-card decode: 23% idle per token, and it is not copy time (under 1 ms). It is launch and sync latency. This gates in D1/D3.
+- 1-card decode: 96% busy, 86% matvec. D2 is the lever; graphs are worth at most ~4%.
+- Write-up: `results/phase0/README.md` (Phase 0.2 section).
