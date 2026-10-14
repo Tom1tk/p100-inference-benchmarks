@@ -1959,7 +1959,12 @@ Fork `4826395`, 16k depth, 400 tokens, 2 reps. Rows are in `results/h11-placemen
 | mmvh | 0.0217 | 0.00004 | 0.020 | **4.30** | **24.6** | 99.17% |
 
 - On 99% of tokens mmvh is closer to the int8 matvec than stock mmq is. **The 0.1% tail is about 4× worse.** ln(PPL ratio) is +0.5% ± 0.65%, which is not significant.
-- Suspected cause: fp16 accumulation of IQ4_XS's +128 bias, followed by cancellation. Not yet isolated.
+- **The suspected cause, IQ4_XS's +128 bias cancellation, is refuted** (`results/h28-kld-split.csv`, a temporary per-type switch):
+  - Without IQ4_XS the tail is unchanged (99.9% 4.30, max 24.5).
+  - IQ4_XS alone gives 99.9% 0.51, max 5.7.
+  - So the tail comes from the Q4_K/Q5_K paths, or from 1–2 knife-edge tokens: 99.9% of 2048 tokens is ~2 tokens, and stock mmq also reaches a max of 14.3.
+  - At n=2048 the mean difference (0.0217 vs 0.0166, ±0.013) is not significant.
+  - More KLD tokens would not decide adoption; the Phase 8 task-level gate does.
 - **Not adopted yet.** Two open items before the serve command can move to the fork binary:
   - Isolate and fix the KLD tail.
   - Run the Phase 8 quality gate.
