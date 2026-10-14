@@ -99,3 +99,5 @@ h28-1card-mmvh1,none,none,default,1,11.82,191.54,400,0,0,,13161,259,65,240,ok
 h28-1card-mmvh1,none,none,default,2,11.82,196.44,400,0,0,,13161,259,65,240,ok
 h28-2card-mmvh1-mtp-p2p,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,37.56,308.28,400,393,268,68.2,11053,11053,61,198,ok
 h28-2card-mmvh1-mtp-p2p,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,37.75,320.25,400,393,268,68.2,11053,11053,63,198,ok
+h29-1card-mmvh-iq3,none,none,default,1,15.87,196.98,400,0,0,,13161,259,65,11,ok
+h29-1card-mmvh-iq3,none,none,default,2,15.86,196.40,400,0,0,,13161,259,65,11,ok

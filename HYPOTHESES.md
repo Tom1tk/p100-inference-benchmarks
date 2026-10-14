@@ -1968,3 +1968,18 @@ Fork `4826395`, 16k depth, 400 tokens, 2 reps. Rows are in `results/h11-placemen
 - **Not adopted yet.** Two open items before the serve command can move to the fork binary:
   - Isolate and fix the KLD tail.
   - Run the Phase 8 quality gate.
+
+## H29 — mmvh with IQ3_S and IQ3_XXS lifts 1-card decode further
+
+**Basis.** The fork's `428fecb` adds IQ3_S and IQ3_XXS to mmvh, with the grids in shared
+memory. At model shapes they run n=1 at ×1.7–1.9 (~210 GB/s against ~115). Covered types are
+now 77% of the 1-card UD-IQ3_S weight bytes: IQ3_S 35%, IQ4_XS 24.5%, IQ3_XXS 17.6%.
+
+**Prediction (registered before the run).**
+- **KLD gate:** same method as H28, on the 1-card IQ3_S model (`-sm none`). Mean KLD ≤ 2× the
+  stock mmq reference, and same-top-1 within 0.5 pp of it. If the gate fails, the speed arm is skipped.
+- **1-card IQ3_S drafter-free, 16k:** decode **+15–25%** against `h27-1card-graphs0` (11.00 t/s).
+  H28's IQ4_XS-only arm reached 11.82. Prefill is unchanged.
+- The 2-card arm is not re-run: UD-Q4_K_M has no IQ3 tensors, so the H28 result stands.
+
+**Run.** `scripts/run-h29-mmvh-iq3.sh`.
