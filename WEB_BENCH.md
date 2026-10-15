@@ -18,9 +18,15 @@ For each model version, `scripts/run-web-bench.sh`:
 1. Starts `llama-server` on that engine/model/split with `--jinja` (required —
    the agent drives the model through tool calls).
 2. Starts a recording proxy between the agent and the server.
-3. Runs `pi` through the three prompts in [prompts/web-bench.md](prompts/web-bench.md),
-   one continuous session, in `sites/<label>/`.
-4. Tears down, summarizes, commits, and pushes.
+3. Runs opencode v2 (`opencode run --standalone --auto`, stages 2–3 with `--continue`)
+   through the three prompts in [prompts/web-bench.md](prompts/web-bench.md), one
+   continuous session, in `/srv/webbench-oc/<label>/site/`.
+4. Tears down, copies the site source (no `node_modules`) to `sites/<label>/`,
+   summarizes, commits, and pushes.
+
+The harness was pi until 2026-10-15; the user switched it to opencode, the harness
+they use for real. The proxy also records the server's `cache_n` per request, and
+the summary JSON reports `cached_tokens` and `cache_hit_rate` (H51).
 
 The prompts build an Express site about the model itself: a working page and
 systemd service (stage 1), an elaborate restyle with a JS interactive element
@@ -158,20 +164,27 @@ Update this table when a run claims an index. Never reuse one.
 
 | Index | Site port | Label | Engine / model / split | Status |
 |---|---|---|---|---|
+| 1 | 4001 | p5-fork-opencode | fork / Q4_K_M + MTP head96k / tensor, README serve command, **opencode v2** harness | Reserved, not run (waiting on the user's go) |
 | 0 | 4000 | p5-fork-serve | fork (Tom1tk/llama.cpp-Pascal) / Q4_K_M + MTP head96k / tensor, README serve command (q8_0 KV, 100k ctx) | **Aborted 2026-10-15** after stage 1 (387 s, site OK): pi loaded the repo's CLAUDE.md and committed + pushed the site to this repo (36b6850). Contaminated; fixed with `--no-context-files`. Site left up |
 
 ---
 
 ## 6. Prerequisites
 
-- `pi` on PATH (`/usr/bin/pi`, v0.78.0 at time of writing).
-- **`PI_OFFLINE=1` is required** — the script sets it. Without it `pi` blocks on
-  startup network operations in this environment and the stage hangs until its
-  timeout. This was verified, not assumed.
+- opencode v2 at `/root/.opencode/bin/opencode` (v2.0.13 at time of writing; override with `OPENCODE=`).
+- Verified against a mock server on 2026-10-15, so these are facts, not guesses:
+  - **stdin must be closed** (`</dev/null`). `opencode run` reads a piped stdin and hangs on an open one.
+  - **The agent's cwd must be outside `/root`.** opencode walks up from cwd and adds
+    `/root/.claude/skills` to the system prompt. From `/srv` it lists only its two built-in skills.
+  - Provider schema (v2): `providers.<id>.{package: "@ai-sdk/openai-compatible", settings: {baseURL, apiKey}}`.
+    A model `capabilities` block, and `false` for `headerTimeout`/`chunkTimeout`, are rejected and
+    silently drop the whole provider ("Model unavailable").
+  - The first turn makes an extra title-generation request (about 2k tokens, no tools) on the same
+    model. Later `--continue` turns don't; their system prompt is byte-identical, with history appended.
 - Node.js and `npm` available to the agent, plus sudo (the prompt supplies the
   password) for `systemctl`.
-- The agent's `pi` config is written per-run into `sites/<label>/.pi-agent/`.
-  The operator's `~/.pi/agent` is never touched.
+- The agent's opencode config, sessions and caches live in an isolated HOME/XDG tree
+  at `/srv/webbench-oc/<label>/home/`. The operator's `~/.config/opencode` is never touched.
 
 ### Tunables
 

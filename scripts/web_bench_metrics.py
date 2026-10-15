@@ -40,6 +40,7 @@ TIMING_FIELDS = (
     "predicted_n",
     "predicted_ms",
     "predicted_per_second",
+    "cache_n",  # prompt tokens reused from the slot's KV (fork/mainline; H51 cache hit rate)
 )
 
 
@@ -211,10 +212,14 @@ def _stats(values):
 
 
 def _reduce(rows):
+    cached = sum(r.get("cache_n") or 0 for r in rows)
+    prompt = sum(r.get("prompt_n") or 0 for r in rows)
     return {
         "requests": len(rows),
-        "prompt_tokens": sum(r.get("prompt_n") or 0 for r in rows),
+        "prompt_tokens": prompt,
         "generated_tokens": sum(r.get("predicted_n") or 0 for r in rows),
+        "cached_tokens": cached,
+        "cache_hit_rate": round(cached / (cached + prompt), 4) if cached + prompt else None,
         "prefill_tps": _stats([r.get("prompt_per_second") for r in rows]),
         "decode_tps": _stats([r.get("predicted_per_second") for r in rows]),
     }

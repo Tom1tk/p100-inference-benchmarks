@@ -8,7 +8,7 @@
 #   index       0,1,2,... unique per model version. Every port derives from it, so
 #               each site stays hosted after its run instead of fighting for :4000.
 #
-# Drives `pi` through the three prompts in prompts/web-bench.md against a
+# Drives opencode v2 (`opencode run`) through the three prompts in prompts/web-bench.md against a
 # llama-server hosting this model version, recording per-request prefill/decode
 # throughput via scripts/web_bench_metrics.py.
 #
@@ -56,7 +56,8 @@ esac
 
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }
 [[ -f "$MODEL" ]] || { echo "ERROR: model not found: $MODEL" >&2; exit 2; }
-command -v pi >/dev/null || { echo "ERROR: pi not on PATH" >&2; exit 2; }
+OPENCODE="${OPENCODE:-/root/.opencode/bin/opencode}"
+[[ -x "$OPENCODE" ]] || { echo "ERROR: opencode not found: $OPENCODE" >&2; exit 2; }
 
 # --- Ports: one block per index, so every site stays up ---------------------
 SITE_PORT=$((4000 + IDX))
@@ -80,11 +81,17 @@ METRICS="results/web/${LABEL}.jsonl"
 STAGE_TIMES="results/web/${LABEL}.stages.json"
 SUMMARY="results/web/${LABEL}.json"
 AGGREGATE="results/web-bench.csv"
-SITE_DIR="sites/${LABEL}"
-PI_DIR="${SITE_DIR}/.pi-agent"
+SITE_COPY="sites/${LABEL}"   # committed copy of the site source, taken after the run
+# The agent works outside /root: opencode walks up from its cwd and loads /root/.claude/skills
+# into the system prompt (verified 2026-10-15 against a mock server), so a site under this
+# repo would get the operator's skills. Isolated HOME/XDG keeps ~/.config/opencode untouched.
+OC_ROOT="/srv/webbench-oc/${LABEL}"
+OC_HOME="${OC_ROOT}/home"
+SITE_DIR="${OC_ROOT}/site"
 
 rm -f "$METRICS" "${METRICS}.stage"
-mkdir -p "$SITE_DIR" "$PI_DIR"
+rm -rf "$OC_HOME"
+mkdir -p "$SITE_DIR" "$OC_HOME/.config/opencode"
 
 # --- Preflight --------------------------------------------------------------
 echo "=== preflight ==="
@@ -117,7 +124,7 @@ ABORT_TEMP=$ABORT_TEMP INTERVAL=5 ./scripts/gpu-monitor.sh > "$TEMPS" 2>/dev/nul
 MONITOR_PID=$!
 
 # --- llama-server -----------------------------------------------------------
-# --jinja is required: pi drives the model through tool calls, and without the
+# --jinja is required: the agent drives the model through tool calls, and without the
 # Jinja chat template the server won't parse or emit them.
 SERVER_CMD=(
     "$BIN" -m "$MODEL"
@@ -166,15 +173,18 @@ if [[ -z "${OUTCOME:-}" ]]; then
     PROXY_PID=$!
     sleep 2
 
-    # Isolated pi config: never touch the operator's ~/.pi/agent settings.
-    cat > "${PI_DIR}/models.json" <<EOF
+    # Isolated opencode config. v2 schema: providers.<id>.settings.baseURL; header/chunk
+    # timeouts reject `false`, so give them an hour (a 98k prefill can outlast the 300 s default).
+    cat > "${OC_HOME}/.config/opencode/opencode.json" <<EOF
 {
+  "share": "disabled",
   "providers": {
     "webbench": {
-      "baseUrl": "http://127.0.0.1:${PROXY_PORT}/v1",
-      "api": "openai-completions",
-      "apiKey": "none",
-      "models": [ { "id": "${LABEL}", "name": "${LABEL}" } ]
+      "name": "webbench",
+      "package": "@ai-sdk/openai-compatible",
+      "settings": { "baseURL": "http://127.0.0.1:${PROXY_PORT}/v1", "apiKey": "none",
+                    "timeout": $(( STAGE_TIMEOUT * 1000 )), "headerTimeout": $(( STAGE_TIMEOUT * 1000 )), "chunkTimeout": $(( STAGE_TIMEOUT * 1000 )) },
+      "models": { "${LABEL}": { "limit": { "context": ${CTX}, "output": 16384 } } }
     }
   }
 }
@@ -195,13 +205,15 @@ EOF
         echo "=== stage ${STAGE} ==="
         S0=$(date +%s)
         # --continue keeps stages 2 and 3 in the same session, so the agent sees
-        # the site it already built rather than rediscovering it.
-        # -nc: without it pi loads this repo's CLAUDE.md/AGENTS.md (p5-fork-serve, 2026-10-15: the agent committed and pushed here)
-        PI_ARGS=(--provider webbench --model "$LABEL" --session-dir "${PI_DIR}/sessions" --no-context-files --no-skills --no-prompt-templates -p)
-        [[ "$STAGE" -gt 1 ]] && PI_ARGS=(--continue "${PI_ARGS[@]}")
+        # the site it already built rather than rediscovering it (and the prompt prefix stays cacheable).
+        # </dev/null: `opencode run` reads a piped stdin and hangs on an open one.
+        OC_ARGS=(run --standalone --auto -m "webbench/${LABEL}")
+        [[ "$STAGE" -gt 1 ]] && OC_ARGS+=(--continue)
 
-        ( cd "$SITE_DIR" && PI_OFFLINE=1 PI_CODING_AGENT_DIR="${REPO}/${PI_DIR}" \
-            timeout "$STAGE_TIMEOUT" pi "${PI_ARGS[@]}" "$PROMPT" ) \
+        ( cd "$SITE_DIR" && HOME="$OC_HOME" XDG_CONFIG_HOME="$OC_HOME/.config" XDG_DATA_HOME="$OC_HOME/.local/share" \
+            XDG_CACHE_HOME="$OC_HOME/.cache" XDG_STATE_HOME="$OC_HOME/.local/state" \
+            OPENCODE_DISABLE_AUTOUPDATE=1 OPENCODE_DISABLE_MODELS_FETCH=1 \
+            timeout "$STAGE_TIMEOUT" "$OPENCODE" "${OC_ARGS[@]}" "$PROMPT" < /dev/null ) \
             >> "$AGENT_LOG" 2>&1
         STATUS=$?
         STAGE_SECONDS[$STAGE]=$(( $(date +%s) - S0 ))
@@ -216,6 +228,8 @@ EOF
     done
     ELAPSED=$(( $(date +%s) - START ))
 fi
+
+mkdir -p "$SITE_COPY" && rsync -a --exclude node_modules "${SITE_DIR}/" "${SITE_COPY}/"
 
 kill "$PROXY_PID" 2>/dev/null; PROXY_PID=""
 kill "$SERVER_PID" 2>/dev/null; SERVER_PID=""
