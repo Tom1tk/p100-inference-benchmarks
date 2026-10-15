@@ -192,3 +192,6 @@ h49-n2-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,30.39,4.69,400,
 h39r-1card-ctrl,none,none,default,1,18.33,207.38,400,0,0,,13161,259,66,183,ok
 h39r-1card-ctrl,none,none,default,2,18.37,214.46,400,0,0,,13161,259,69,183,ok
 h39r-1card-ctrl,none,none,default,3,18.37,214.11,400,0,0,,13161,259,70,183,ok
+h39r-1card-staged,none,none,default,1,18.40,220.76,400,0,0,,13161,259,68,20,ok
+h39r-1card-staged,none,none,default,2,18.39,220.22,400,0,0,,13161,259,69,20,ok
+h39r-1card-staged,none,none,default,3,18.39,220.03,400,0,0,,13161,259,70,20,ok
