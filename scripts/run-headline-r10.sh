@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Headline re-measure at REPS=10 (user request 2026-10-15: 10-run averages for reported deltas).
+# Headline re-measure at REPS=10, for the FINAL report only (user, 2026-10-15). Stopped early on first use;
+# r10-stock-16k (10 reps) is banked, r10-fork-16k partial. Re-run the fork arms once the levers are done.
 # Measurement only, no lever. Arms: stock baseline 16k (as d5-p2p-mtp-16k), current serve command
 # 16k (as h44-lowbit-16k), current serve command 98k (as serve-fork-100k). Commit after each arm.
 set -uo pipefail
