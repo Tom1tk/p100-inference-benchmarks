@@ -2936,7 +2936,7 @@ Served step (f16 KV, 200 W): 68.4 ms at 16k (`p15-200w-16k`, 3.25 tok/step) → 
 | Q4_K_M | 0.0593 | 0.369 | 18.6 | 96.62% |
 | IQ4_XS | 0.0719 | 0.761 | 15.7 | 95.25% |
 
-Mean KLD is 21% worse and the p99 tail is 2× worse, beyond the pre-set +0.005 margin. Same-top is 1.4 pt lower against a −0.5 pt limit. Q4_K_M re-measured here (0.0593) agrees with H30 (0.0568–0.0592), so the reference is sound. The 16k speed arm and the haystack were cancelled by the driver; no decode number exists for IQ4_XS, and none is needed. The GGUF stays on disk (14 GB, 36 GB free); delete it if space is needed.
+Mean KLD is 21% worse and the p99 tail is 2× worse, beyond the pre-set +0.005 margin. Same-top is 1.4 pt lower against a −0.5 pt limit. Q4_K_M re-measured here (0.0593) agrees with H30 (0.0568–0.0592), so the reference is sound. The 16k speed arm and the haystack were cancelled by the driver; no decode number exists for IQ4_XS, and none is needed. The GGUF stays on disk (14 GB, 48 GB free); delete it if space is needed.
 
 ## H39r — staged dequant re-test, 1 card, 200 W
 
