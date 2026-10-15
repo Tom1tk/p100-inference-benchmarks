@@ -23,7 +23,7 @@ run label so the evidence is traceable.
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 | H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
 | H14 | `-ub` 512→1024/2048 improves prefill ≥10% | **CONFIRMED 2026-08-25 — +63%.** Use `-ub 2048` |
-| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | **Partly refuted at 16k** (2026-10-15): prefill +4.5% at 200 W, +6.4% at 220 W, +6.5% at 250 W (saturated); decode +0.3%. 98k pending |
+| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | **Partly refuted at 16k** (2026-10-15): prefill +4.5% at 200 W, +6.4% at 220 W, +6.5% at 250 W (saturated); decode +0.3%. 98k: +4.4% at 200 W; 220 W pending |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it. **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
@@ -2824,3 +2824,12 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 | 250 W | 47.61 | 400.8 | +6.5% | 69 °C | 216 / 211 W |
 
 - **Flat above 220 W at 16k** (+0.1%, inside rep noise). Peak draw at 250 W never exceeds 216 W: the 16k serve load does not use the headroom. The 16k curve saturates at ~210-220 W.
+
+**Step 4 — 98k at 200 W (user-set cap, REPS=2 by user call, `scripts/run-h15-200w-98k.sh`):** `p15-200w-98k` decode 28.44 (28.40 / 28.47), prefill **287.8** (287.82 / 287.83), peak 70 °C, peak power 213 / 209 W. Output identical to `h46-fagemm-100k` (1862 chars).
+
+| 98k | decode | prefill | vs 175 W | peak temp |
+|---|---|---|---|---|
+| 175 W `h46-fagemm-100k` (REPS=3) | 28.38 | 275.75 | — | 67 °C |
+| 200 W `p15-200w-98k` | 28.44 | 287.8 | **+4.4%** | 70 °C |
+
+- 98k gains the same as 16k at 200 W (+4.4% vs +4.5%): the long prompt is not more cap-bound than the short one. 220 W at 98k not yet run (user's call).
