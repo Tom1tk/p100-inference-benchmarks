@@ -51,7 +51,7 @@ record the cap as a column. Never change it unprompted.
 the 1-card arm sits at the cap ~50% of its busy time and the 2-card arm 15–30% (gpu-monitor power column,
 util ≥ 90% samples). A lever that removes stalls makes the card draw more and the cap claws the gain back,
 so prefill levers can look marginal here and grow at 220 W. Decode is memory/latency-bound and unaffected.
-Re-test each of these with one short 16k arm per lever at the running cap (200 W; control `p15-200w-16k`). **Still open.** Expect little: at 200 W the 2-card arm only gained 4.5%, so the cap was not holding much back:
+Re-test each of these with one short 16k arm per lever at the running cap (200 W; control `p15-200w-16k`). **2-card rows parked 2026-10-15 by H52:** the clock-event counters show 0 s power-capped at 200 W on every 2-card arm (16k and 98k), so the premise does not hold there. Only the 1-card H39 re-test ran (H39r). Expect little: at 200 W the 2-card arm only gained 4.5%, so the cap was not holding much back:
 | Lever | At 175 W | Why it may grow |
 |---|---|---|
 | H39 `GGML_PASCAL_DEQUANT_STAGED=1` (bit-identical, code kept, off) | 1-card +4.5%, 2-card +1.0% (rep 2; rep 1 −3.6%) | More dequant throughput = more power in a capped phase |
@@ -258,7 +258,7 @@ change the serve command. Refreshed 2026-10-15.
 
 | # | Item | Why | Cost / gate |
 |---|---|---|---|
-| 1 | "Re-test at the higher cap" list (§1), at 200 W | H15 done 2026-10-15 (200 W chosen, +4.4% prefill at 98k); parked marginal levers may have grown | One 16k arm per lever, REPS=3; 1-card arms matter most (it was capped ~50% of busy time) |
+| 1 | "Re-test at the higher cap" list (§1), at 200 W | **Closed 2026-10-15:** 2-card rows parked by H52 (0 s capped at 200 W); 1-card H39 re-tested as H39r | — |
 | 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
 | 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) on **opencode v2** (replaces pi, user call 2026-10-15) | The deployment target itself; carries H51 | **Pause for the user before the GPU run** (heavy) |
 | 2 | **Round 3 (H48–H53, HYPOTHESES):** f16 KV at 98k, draft length, 98k decode profile, power-cap counter, UD-IQ4_XS | User call 2026-10-15, each REPS ≥ 3 | H51 runs inside Phase 5 |
