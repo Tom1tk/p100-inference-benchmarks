@@ -17,7 +17,7 @@ that command."
 | Target | Status |
 |---|---|
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
-| Highest decode | **41.5 t/s at 16k** (fork command, `h41-wide-16k`); **26.9 t/s at 98k** (`serve-fork-100k`, +35% vs 20.02 on the old stock command, H26) |
+| Highest decode | **42.4 t/s at 16k** (fork command, `h43-k4scale-16k`); **26.9 t/s at 98k** (`serve-fork-100k`, +35% vs 20.02 on the old stock command, H26) |
 | Highest prefill / TTFT | **232 t/s, ~421 s TTFT at 98k** (`serve-fork-100k`; +12% vs 207 stock, H26); 365 t/s at 16k |
 | Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
