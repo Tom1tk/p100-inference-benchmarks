@@ -17,7 +17,7 @@ that command."
 | Target | Status |
 |---|---|
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
-| Highest decode | **47.5 t/s at 16k** (fork command incl. H46, `p15-175w-16k`); **28.4 t/s at 98k** (`h46-fagemm-100k`, +42% vs 20.02 on the old stock command, H26) |
+| Highest decode | **47.5 t/s at 16k** (fork command incl. H46, `p15-175w-16k`); **32.8 t/s at 98k** (`h48-f16kv-98k`, f16 KV at 200 W, H48b; 28.4 with q8_0 KV, +42% vs 20.02 on the old stock command, H26) |
 | Highest prefill / TTFT | **276 t/s, ~355 s TTFT at 98k** at 175 W (`h46-fagemm-100k`; +33% vs 207 stock, H26); **288 t/s, ~340 s at 200 W** (`p15-200w-98k`, H15); 376 t/s at 16k (394 at 200 W) |
 | Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
@@ -35,18 +35,19 @@ value practical lever left.
 Tom1tk/llama.cpp-Pascal (fork, /root/llama.cpp-Pascal/build-cuda-p100)  ·  -sm tensor
 GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_DUPLEX_REDUCE=1 GGML_PASCAL_MMVH_Q6K_WIDE=1 GGML_PASCAL_MMVH_LOWBIT=1 GGML_PASCAL_FA_GEMM=1
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0-head96k.gguf
--ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1
+-ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -b 2048 -ub 2048 -c 100000 -np 1
 Power cap: 200 W per card (user-set 2026-10-15; `nvidia-smi -pl 200`, does not survive a host reboot)
 ```
 
 Adopted 2026-10-14 after it passed the Phase 8 quality gate (H32: 19/19 at 100k, vs 18/19
 for the Q5_K_M FP32 reference). Fork levers: half2 matvec incl. Q6_K (H28, H34), F16
-AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run), branch-free Q4_K/Q5_K scale unpack (H43, output identical, no flag), Q3_K + IQ4_NL on mmvh (H44, `LOWBIT`, output identical, KLD gate passed), drafter LM head trimmed to the first 98,304 vocab rows (H45; lossless by construction since the target verifies every draft, output identical, acceptance unchanged), prefill flash attention through cuBLAS GEMMs at depth (H46, `FA_GEMM`: +19.2% prefill at 98k; lossy, so the H32 haystack was re-run: 19/19). The table is at 175 W. H15 (2026-10-15): 200 W adds +4.4% prefill at 98k and +4.5% at 16k, decode flat; 220 W adds +6.4% at 16k, 250 W nothing more (HYPOTHESES H15 steps 1–4).
+AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run), branch-free Q4_K/Q5_K scale unpack (H43, output identical, no flag), Q3_K + IQ4_NL on mmvh (H44, `LOWBIT`, output identical, KLD gate passed), drafter LM head trimmed to the first 98,304 vocab rows (H45; lossless by construction since the target verifies every draft, output identical, acceptance unchanged), prefill flash attention through cuBLAS GEMMs at depth (H46, `FA_GEMM`: +19.2% prefill at 98k; lossy, so the H32 haystack was re-run: 19/19). The table is at 175 W. H15 (2026-10-15): 200 W adds +4.4% prefill at 98k and +4.5% at 16k, decode flat; 220 W adds +6.4% at 16k, 250 W nothing more (HYPOTHESES H15 steps 1–4). f16 KV instead of q8_0 (H48b, 2026-10-15, 200 W): 98k decode step 88.7 vs 98.4 ms (−9.9%, REPS=3 each), decode 32.8 vs 28.4 t/s, prefill unchanged, 13,573 MiB/card; f16 is the reference KV precision, the haystack is re-checked in the final report.
 
 The trimmed drafter is generated, not downloaded: `python3 /root/llama.cpp-Pascal/scripts/pascal-trim-mtp-head.py /root/mtp-Qwen3.8-27B-Q4_0.gguf /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 98304` (needs fork cfea757+fd90268; stock builds reject the shorter head).
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
+| 98k (200 W, f16 KV) | 32.83 t/s | 288.1 t/s (~340 s TTFT) | 64.7% | 13,573 MiB | 70 °C | `h48-f16kv-98k` + `-r23` (REPS=3; q8_0 control `p15-200w-98k` + `-r3` 28.42 / 287.9 / 60.5%, 12,331 MiB) |
 | 98k | 28.38 t/s | 275.75 t/s (~355 s TTFT) | 60.5% | 12,331 MiB | 67 °C | `h46-fagemm-100k` (q8_0 KV, REPS=3; control `h46-ctrl-100k` 29.65 / 231.36 / 65.3%; decode dip is the changed greedy text drafting worse, not the kernel, which only runs for n_q ≥ 512) |
 | 16k | 47.47 t/s | 376.4 t/s | 75.9% | 11,157 MiB | 65 °C | `p15-175w-16k` (f16 KV, REPS=2, incl. H46; pre-H46 `h45-head96k-16k` 46.35 / 365.8 / 72.8%, REPS=3) |
 

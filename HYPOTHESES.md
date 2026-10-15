@@ -57,7 +57,7 @@ run label so the evidence is traceable.
 | H46 | `GGML_PASCAL_FA_GEMM=1`: prefill flash attention via cuBLAS GEMMs (Q·K fp32-accumulate, P·V HGEMM, online softmax per 4096-token KV chunk) instead of the tile kernel lifts prefill at depth | **Confirmed, adopted** (2026-10-15): prefill at 98k **+19.2%** (231.36 → 275.75), 1-card 16k ~+3%; KLD no worse than tile vs a non-FA reference (0.555 vs 0.581); H32 haystack 19/19. Decode −4.3% is changed greedy text drafting worse, not the kernel |
 | H47 | `GGML_PASCAL_FA_GEMM_QK16=1`: H46's Q·K GEMM in fp16 compute (Q pre-scaled) lifts prefill at depth within H46's quality | **Refuted** (2026-10-15): FA −29% in micro-bench, but KLD vs the non-FA reference 0.618 > tile's 0.581 and same-top 92.30% < 92.63%. Code reverted (fork d3c1c12) |
 | H48 | f16 KV instead of q8_0 at 98k lifts prefill ≥3% (FA_GEMM skips the per-call q8_0→f16 convert of all of K and V) and fits in VRAM | **Refuted (prefill)** 2026-10-15: rep 1 prefill 287.96 vs control 287.87 (3 reps); skip rule fired. Fits (13,573 MiB/card). Decode moved instead → H48b |
-| H48b | f16 KV cuts 98k decode step time ≥5% vs q8_0 (unexpected in H48 rep 1: 88.7 vs 98.4 ms/step, decode 32.91 vs 28.42) | **Pre-registered** 2026-10-15 |
+| H48b | f16 KV cuts 98k decode step time ≥5% vs q8_0 (unexpected in H48 rep 1: 88.7 vs 98.4 ms/step, decode 32.91 vs 28.42) | **Confirmed** 2026-10-15: 88.7 vs 98.4 ms/step (−9.9%, REPS=3 each), decode 32.83 vs 28.42 t/s; adopted (`-ctk f16 -ctv f16`) |
 | H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **Pre-registered** 2026-10-15 |
 | H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Pre-registered** 2026-10-15 (diagnostic) |
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
@@ -2868,6 +2868,8 @@ All arms REPS ≥ 3 (user: "at least 3 runs of each"). Running cap 200 W; contro
 **Reasoning:** decode attention (n_q 1–4, not the FA_GEMM path: `h46-ctrl-100k` with FA_GEMM off has the same 99 ms/step) reads the whole 98k cache every step. With q8_0 the kernel dequantizes it per step; with f16 it reads twice the bytes but does no dequant work. A 10% step-time cut means attention is a large share of the 98k step (feeds H50).
 
 **Test:** `scripts/run-h48b-f16kv-decode.sh`: 2 more reps of the f16 arm (`h48-f16kv-98k-r23`, `CACHE_PROMPT=1`: one prefill, decode on both), giving 3 reps. Control: the 3 q8_0 reps above. **Pass:** mean ms/step over the 3 f16 reps ≥5% below the q8_0 mean. If it passes, the README serve command moves to `-ctk f16 -ctv f16`. Quality needs no gate (f16 is the reference precision); 100k haystack is re-checked in the final report.
+
+**Result (2026-10-15, 200 W): confirmed, adopted.** f16 reps: 88.7 / 89.0 / 88.5 ms/step (32.91 / 32.82 / 32.77 t/s, accept 64.9 / 64.9 / 64.2%); q8_0: 98.5 / 98.3 / 98.5. **−9.9%.** Reps 2–3 ran with `CACHE_PROMPT=1` (rep 2 prefill reported 4.46 t/s, i.e. the prompt KV was reused) and their output is identical to rep 1. Zero seconds power-capped. README serve command, `run-p5-fork.sh` and `run-headline-r10.sh` moved to f16 KV. It also says attention is a large share of the 98k step, which H50 now sizes.
 
 ## H49 — MTP draft length
 

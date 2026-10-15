@@ -26,7 +26,7 @@ cool
 ( export $SERVE_ENV; CTX=16384 PROMPT_FILE=prompts/h11-depth-prompt.txt BIN=$FORK \
   ./scripts/run-spec-placement.sh r10-fork-16k draft-mtp $MTP_FORK default ); echo "--- r10-fork-16k exit $? ---"; commit r10-fork-16k
 cool
-( export $SERVE_ENV; CTX=100000 CTK=q8_0 CTV=q8_0 NP=1 REQ_TIMEOUT=1800 PROMPT_FILE=prompts/h26-100k-prompt.txt BIN=$FORK \
+( export $SERVE_ENV; CTX=100000 CTK=f16 CTV=f16 NP=1 REQ_TIMEOUT=1800 PROMPT_FILE=prompts/h26-100k-prompt.txt BIN=$FORK \
   ./scripts/run-spec-placement.sh r10-fork-100k draft-mtp $MTP_FORK default ); echo "--- r10-fork-100k exit $? ---"; commit r10-fork-100k
 python3 - <<'PY'
 import csv, statistics as st
