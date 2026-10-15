@@ -1,0 +1,122 @@
+0.00.419.226 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.180.367 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.180.379 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.180.395 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.01.180.402 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.01.180.408 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.01.180.429 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.01.180.435 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.180.441 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.180.447 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.01.180.453 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.180.459 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.01.180.466 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.01.180.472 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.180.479 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.180.502 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+4.07.235.631 I cmn          init: llama threadpool init, n_threads = 14
+4.08.949.652 I 
+4.08.953.090 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+4.08.953.532 I perplexity: tokenizing the input ..
+4.11.590.581 I perplexity: tokenization took 2637.04 ms
+4.11.590.677 I perplexity: calculating perplexity over 1 chunks, n_ctx=8192, batch_size=2048, n_seq=1
+FACHECK dev0 node_238 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0416532 at 4859605 (d=213 h=10 j=1581) maxref=3.87756 nmse=0.000107162
+FACHECK dev1 node_238 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0921161 at 6272012 (d=12 h=8 j=2041) maxref=3.23698 nmse=0.000319963
+FACHECK dev0 node_490 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0541742 at 1897244 (d=28 h=7 j=617) maxref=3.58282 nmse=2.3761e-05
+FACHECK dev1 node_490 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0946457 at 2817383 (d=103 h=1 j=917) maxref=2.34529 nmse=0.000102728
+FACHECK dev0 node_742 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0422551 at 2590267 (d=59 h=2 j=843) maxref=2.80582 nmse=3.99625e-05
+FACHECK dev1 node_742 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0628647 at 2830091 (d=11 h=3 j=921) maxref=3.22544 nmse=6.60149e-05
+FACHECK dev0 node_994 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0371069 at 4393029 (d=69 h=0 j=1430) maxref=3.38629 nmse=1.79471e-05
+FACHECK dev1 node_994 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0329259 at 6267335 (d=199 h=1 j=2040) maxref=4.24643 nmse=2.23386e-05
+FACHECK dev0 node_1246 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0348531 at 1181990 (d=38 h=9 j=384) maxref=3.29093 nmse=1.44558e-05
+FACHECK dev1 node_1246 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0587294 at 1221681 (d=49 h=8 j=397) maxref=4.32693 nmse=2.19772e-05
+FACHECK dev0 node_1498 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0312008 at 4117228 (d=236 h=2 j=1340) maxref=4.53368 nmse=6.83242e-06
+FACHECK dev1 node_1498 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0731533 at 3565126 (d=70 h=6 j=1160) maxref=6.28888 nmse=2.74918e-05
+FACHECK dev0 node_1750 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.106013 at 3370555 (d=59 h=2 j=1097) maxref=5.20852 nmse=2.73238e-05
+FACHECK dev1 node_1750 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.179025 at 2863371 (d=11 h=1 j=932) maxref=5.8865 nmse=7.19034e-05
+FACHECK dev0 node_2002 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0630634 at 6159883 (d=11 h=2 j=2005) maxref=4.35813 nmse=1.9948e-05
+FACHECK dev1 node_2002 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.149448 at 4613728 (d=96 h=10 j=1501) maxref=4.99788 nmse=4.78238e-05
+FACHECK dev0 node_2254 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0739803 at 1375749 (d=5 h=10 j=447) maxref=4.2622 nmse=2.22421e-05
+FACHECK dev1 node_2254 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.093853 at 2869046 (d=54 h=11 j=933) maxref=5.58519 nmse=2.02809e-05
+FACHECK dev0 node_2506 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0425426 at 6126990 (d=142 h=5 j=1994) maxref=4.59719 nmse=8.42069e-06
+FACHECK dev1 node_2506 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.135018 at 2871876 (d=68 h=10 j=934) maxref=7.29972 nmse=4.32595e-05
+FACHECK dev0 node_2758 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.154057 at 2726207 (d=63 h=5 j=887) maxref=9.10734 nmse=2.83186e-05
+FACHECK dev1 node_2758 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.141573 at 3496922 (d=218 h=3 j=1138) maxref=9.70969 nmse=4.847e-05
+FACHECK dev0 node_3010 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0990371 at 6285395 (d=83 h=0 j=2046) maxref=6.36196 nmse=2.05136e-05
+FACHECK dev1 node_3010 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.153424 at 2853456 (d=80 h=10 j=928) maxref=7.38716 nmse=3.40387e-05
+FACHECK dev0 node_3262 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.143512 at 4702739 (d=19 h=10 j=1530) maxref=8.61464 nmse=2.74057e-05
+FACHECK dev1 node_3262 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.147279 at 6127132 (d=28 h=6 j=1994) maxref=9.86126 nmse=1.49377e-05
+FACHECK dev0 node_3514 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.064361 at 968008 (d=72 h=1 j=315) maxref=8.9159 nmse=1.19497e-05
+FACHECK dev1 node_3514 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.17745 at 6224473 (d=89 h=2 j=2026) maxref=9.45705 nmse=8.22202e-05
+FACHECK dev0 node_3766 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.619638 at 4709178 (d=58 h=11 j=1532) maxref=15.4205 nmse=0.000321658
+FACHECK dev1 node_3766 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.279299 at 6119887 (d=207 h=1 j=1992) maxref=15.3998 nmse=0.00017031
+FACHECK dev0 node_4018 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=1.60705 at 5301035 (d=43 h=7 j=1725) maxref=23.8159 nmse=0.000681934
+FACHECK dev1 node_4018 q=2048 kv=4096 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=1.53088 at 4336407 (d=23 h=7 j=1411) maxref=24.5631 nmse=0.000200632
+FACHECK dev0 node_238 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0444961 at 1686412 (d=140 h=11 j=548) maxref=3.48128 nmse=5.42601e-05
+FACHECK dev1 node_238 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0896203 at 235532 (d=12 h=8 j=76) maxref=3.2128 nmse=0.00018598
+FACHECK dev0 node_490 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0614181 at 3374945 (d=97 h=7 j=1098) maxref=3.48293 nmse=1.73904e-05
+FACHECK dev1 node_490 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0754459 at 1272167 (d=103 h=1 j=414) maxref=2.5959 nmse=5.58413e-05
+FACHECK dev0 node_742 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0356609 at 255035 (d=59 h=0 j=83) maxref=3.8952 nmse=2.31706e-05
+FACHECK dev1 node_742 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0713168 at 3376651 (d=11 h=2 j=1099) maxref=3.64948 nmse=4.92751e-05
+FACHECK dev0 node_994 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0586129 at 3360837 (d=69 h=0 j=1094) maxref=3.40198 nmse=1.17337e-05
+FACHECK dev1 node_994 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0318801 at 388723 (d=115 h=6 j=126) maxref=3.55168 nmse=1.50395e-05
+FACHECK dev0 node_1246 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0352687 at 257574 (d=38 h=10 j=83) maxref=3.46714 nmse=8.66877e-06
+FACHECK dev1 node_1246 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0562469 at 11289 (d=25 h=8 j=3) maxref=4.99875 nmse=1.15585e-05
+FACHECK dev0 node_1498 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0368471 at 256347 (d=91 h=5 j=83) maxref=4.95835 nmse=5.89844e-06
+FACHECK dev1 node_1498 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.059999 at 1795654 (d=70 h=6 j=584) maxref=6.21068 nmse=1.63956e-05
+FACHECK dev0 node_1750 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.103013 at 1589563 (d=59 h=5 j=517) maxref=6.28184 nmse=1.62266e-05
+FACHECK dev1 node_1750 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.195649 at 313611 (d=11 h=1 j=102) maxref=5.84804 nmse=4.53119e-05
+FACHECK dev0 node_2002 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0596955 at 11405 (d=141 h=8 j=3) maxref=4.64994 nmse=1.18208e-05
+FACHECK dev1 node_2002 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.106963 at 82528 (d=96 h=10 j=26) maxref=4.65997 nmse=2.60238e-05
+FACHECK dev0 node_2254 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0767542 at 250629 (d=5 h=7 j=81) maxref=5.05512 nmse=1.04915e-05
+FACHECK dev1 node_2254 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0887632 at 253787 (d=91 h=7 j=82) maxref=6.06575 nmse=1.00766e-05
+FACHECK dev0 node_2506 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0389277 at 253302 (d=118 h=5 j=82) maxref=4.65409 nmse=5.17056e-06
+FACHECK dev1 node_2506 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.10304 at 33354 (d=74 h=10 j=10) maxref=7.09308 nmse=1.85398e-05
+FACHECK dev0 node_2758 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.143472 at 492603 (d=59 h=4 j=160) maxref=9.42448 nmse=1.18156e-05
+FACHECK dev1 node_2758 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.118598 at 264459 (d=11 h=1 j=86) maxref=9.92411 nmse=2.21805e-05
+FACHECK dev0 node_3010 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0914927 at 1809491 (d=83 h=0 j=589) maxref=6.55184 nmse=1.18882e-05
+FACHECK dev1 node_3010 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.127509 at 712282 (d=90 h=10 j=231) maxref=7.695 nmse=1.64278e-05
+FACHECK dev0 node_3262 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.125 at 1418802 (d=50 h=10 j=461) maxref=8.50003 nmse=1.33423e-05
+FACHECK dev1 node_3262 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.154381 at 44689 (d=145 h=6 j=14) maxref=10.7966 nmse=8.04661e-06
+FACHECK dev0 node_3514 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0468478 at 332951 (d=151 h=4 j=108) maxref=9.40939 nmse=7.40142e-06
+FACHECK dev1 node_3514 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.174995 at 317017 (d=89 h=2 j=103) maxref=9.37413 nmse=3.392e-05
+FACHECK dev0 node_3766 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.832026 at 45870 (d=46 h=11 j=14) maxref=16.9735 nmse=0.000150232
+FACHECK dev1 node_3766 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.279986 at 1205199 (d=207 h=3 j=392) maxref=15.1648 nmse=7.62335e-05
+FACHECK dev0 node_4018 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=1.41421 at 607015 (d=39 h=7 j=197) maxref=22.6775 nmse=0.000292199
+FACHECK dev1 node_4018 q=2048 kv=6144 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=1.33115 at 248599 (d=23 h=11 j=80) maxref=27.5235 nmse=9.83451e-05
+FACHECK dev0 node_238 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0373483 at 5562587 (d=219 h=8 j=1810) maxref=3.89703 nmse=2.84575e-05
+FACHECK dev1 node_238 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0563514 at 6017557 (d=21 h=10 j=1958) maxref=3.6054 nmse=4.40602e-05
+FACHECK dev0 node_490 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0387741 at 5572237 (d=141 h=10 j=1813) maxref=3.35813 nmse=1.37994e-05
+FACHECK dev1 node_490 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0576258 at 5732672 (d=64 h=1 j=1866) maxref=2.71672 nmse=4.53511e-05
+FACHECK dev0 node_742 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0421025 at 4958148 (d=196 h=11 j=1613) maxref=3.44193 nmse=4.94001e-05
+FACHECK dev1 node_742 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0598786 at 107544 (d=24 h=0 j=35) maxref=3.3342 nmse=4.0874e-05
+FACHECK dev0 node_994 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0421515 at 5892158 (d=62 h=0 j=1918) maxref=3.16978 nmse=2.55289e-05
+FACHECK dev1 node_994 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0573337 at 5822690 (d=226 h=4 j=1895) maxref=2.87459 nmse=3.55193e-05
+FACHECK dev0 node_1246 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0421346 at 3970598 (d=38 h=6 j=1292) maxref=3.75296 nmse=2.27389e-05
+FACHECK dev1 node_1246 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0543177 at 5119530 (d=42 h=6 j=1666) maxref=4.63287 nmse=1.83648e-05
+FACHECK dev0 node_1498 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0497397 at 3936147 (d=147 h=3 j=1281) maxref=4.84992 nmse=2.15241e-05
+FACHECK dev1 node_1498 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0634152 at 5531401 (d=9 h=7 j=1800) maxref=5.96766 nmse=2.95094e-05
+FACHECK dev0 node_1750 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0827737 at 5035033 (d=25 h=0 j=1639) maxref=6.3218 nmse=2.99914e-05
+FACHECK dev1 node_1750 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.113202 at 617739 (d=11 h=1 j=201) maxref=5.63789 nmse=4.30553e-05
+FACHECK dev0 node_2002 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0684061 at 4805339 (d=219 h=2 j=1564) maxref=4.78344 nmse=3.06822e-05
+FACHECK dev1 node_2002 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0851123 at 5859892 (d=52 h=6 j=1907) maxref=5.29498 nmse=4.23315e-05
+FACHECK dev0 node_2254 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0854084 at 3150359 (d=23 h=6 j=1025) maxref=4.53954 nmse=2.64314e-05
+FACHECK dev1 node_2254 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.102421 at 3571511 (d=55 h=7 j=1162) maxref=6.00398 nmse=1.96197e-05
+FACHECK dev0 node_2506 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0485945 at 5121555 (d=19 h=2 j=1667) maxref=4.95792 nmse=1.34942e-05
+FACHECK dev1 node_2506 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0835862 at 5854525 (d=61 h=9 j=1905) maxref=7.02439 nmse=2.32761e-05
+FACHECK dev0 node_2758 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0949693 at 5856644 (d=132 h=5 j=1906) maxref=8.87903 nmse=2.79266e-05
+FACHECK dev1 node_2758 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.115853 at 4584415 (d=223 h=3 j=1492) maxref=9.64088 nmse=2.10593e-05
+FACHECK dev0 node_3010 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.107628 at 4569579 (d=235 h=5 j=1487) maxref=7.14536 nmse=1.97646e-05
+FACHECK dev1 node_3010 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0943296 at 2407008 (d=96 h=6 j=783) maxref=7.84208 nmse=1.87918e-05
+FACHECK dev0 node_3262 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0955791 at 5494807 (d=23 h=8 j=1788) maxref=9.04435 nmse=1.66168e-05
+FACHECK dev1 node_3262 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.101901 at 6099485 (d=29 h=6 j=1985) maxref=11.172 nmse=7.88879e-06
+FACHECK dev0 node_3514 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.0623717 at 5853472 (d=32 h=5 j=1905) maxref=11.9346 nmse=5.11352e-06
+FACHECK dev1 node_3514 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.136708 at 5796861 (d=253 h=11 j=1886) maxref=9.72672 nmse=1.29679e-05
+FACHECK dev0 node_3766 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.300947 at 2101052 (d=60 h=11 j=683) maxref=17.7168 nmse=1.89501e-05
+FACHECK dev1 node_3766 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.225658 at 4315494 (d=102 h=9 j=1404) maxref=19.3482 nmse=1.81653e-05
+FACHECK dev0 node_4018 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.793604 at 5431083 (d=43 h=11 j=1767) maxref=21.8579 nmse=0.000102255
+FACHECK dev1 node_4018 q=2048 kv=8192 h=12 hkv=2 K=q8_0 Knb=544,272 Qnb=12288,1024 maxdiff=0.742971 at 5864215 (d=23 h=11 j=1908) maxref=26.9667 nmse=4.5401e-05
+4.48.357.913 I perplexity: 36.77 seconds per pass - ETA 0.60 minutes
+[1]68.1716,
+4.49.144.148 I Final estimate: PPL = 68.1716 +/- 7.78474
+
