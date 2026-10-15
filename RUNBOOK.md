@@ -257,7 +257,6 @@ change the serve command. Refreshed 2026-10-15.
 | # | Item | Why | Cost / gate |
 |---|---|---|---|
 | 1 | **H15: power cap 175 → 200 → 220 W**, then the "Re-test at the higher cap" list (§1) | Prefill is compute-bound and capped; parked marginal levers may grow | **Blocked on the user's PSU meter check** (§1) |
-| 2 | Prefill: fork plan P2 (chunked GEMM) / P3 (dequant + converts) | GEMMs are ~87% of prefill (Phase 0) | Profile first; P2 only if prefill idle > 5% |
 | 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
 | 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; after the prefill levers settle |
 | 5 | TurboQuant | Kept last by user call | After everything above |
@@ -282,6 +281,9 @@ command today. Re-open only on the stated unblock.
 | H2, H3 — XL split-stall, stock-quant degradation | Fold into Phase 8 Sweep Q arms 3 and 5, only if Q4_K_M shows a gap | A gap in Sweep Q |
 | q8 KV × ubatch interaction | Noted during H25; not worth its own run | An unexplained q8 result |
 | IQ1_S on mmvh | 0.3% of 1-card bytes | Nothing bigger left on the matvec list |
+| P2 chunked-GEMM comms overlap (fork plan) | Ceiling ≤ +4–5% at 16k and lower at 98k, where attention grows the compute per ubatch and comms stays fixed. Needs a side copy stream plus GEMM splitting. H36 (duplex) took the cheap half | A fresh pp2048 trace showing 2-card idle > 5% |
+| H46 follow-up: GEMM-FA softmax/combine/convert | ~7 of 48 ms per FA call, ≤ ~2–4% of 98k prefill | Prefill becoming the binding target |
+| P3 leftovers: dequant pass + F16↔F32 converts | H39 staged dequant: 2-card +1.0% (noise), already on the 220 W list. HGEMM is at ~90% of FP16 peak with ALGO3 (H33) | H15 (220 W) |
 
 ### Closed — do not spend runs here
 
@@ -301,9 +303,12 @@ command today. Re-open only on the stated unblock.
 | vLLM / vllm-pascal / SGLang / TensorRT-LLM / ExLlamaV3 / ktransformers / FlashQLA | sm_70+ minimum, or no `qwen35` support |
 | MLC-LLM / TVM, tinygrad | No hybrid-SSM support; would mean rewriting the stack |
 | Main-type matvec (Q4_K/Q5_K/IQ4_XS) tuning after H43 | Occupancy, unroll, conversions, wave tail and IQ4 lookup all probed flat (fork plan, 2026-10-15). ≤ ~3% decode left at this kernel structure |
+| fp16-accumulated Q·K in attention (H38 tile half2, H47 GEMM QK16) | Both fail KLD at depth against the non-FA reference (H47: 0.618 vs tile's 0.581). Q·K must accumulate in fp32 |
 | `GGML_CUDA_FORCE_MMQ`, `GGML_CUDA_F16` | No-ops on cc 6.0 (no dp4a; F16 compute already selected) |
 
 ### Measurement rules that constrain later phases
+
+- **Attention levers: gate KLD against a non-FA reference** (`-sm layer -fa 0`, f16 KV; banked at `/root/h28-kld/h46-nofa-base.kld`) and require "no worse than tile". The tile-vs-lever KLD is dominated by a few hypersensitive prompt tokens (~30 KLD each) that any change to attention arithmetic flips. An absolute ≤ 0.001 bar can't be met even by tile vs non-FA (H46).
 
 - Quote every prefill figure with its length **and ubatch**; every acceptance
   figure with its depth. Neither transfers.
