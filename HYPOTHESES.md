@@ -48,6 +48,7 @@ run label so the evidence is traceable.
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
 | H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |
+| H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | Pre-registered (2026-10-15) |
 
 ---
 
@@ -2652,3 +2653,26 @@ so the output should be bit-identical. Micro-bench vs the old code: Q4_K 61.4 / 
 Greedy output is identical to `h41-wide-16k` (1357 chars), with the same acceptance, so H32 still holds.
 Inside the predicted +2–4%. **Verdict: adopted.** The change is in the binary with no flag, so the
 serve command line is unchanged.
+
+## H44 — Q3_K and IQ4_NL onto mmvh for the 2-card command (decode)
+
+**Basis.** The P2 step-1 decode trace (bench 704213f) has two types still on mmvq in the 2-card command:
+`mul_mat_vec_q<Q3_K>` 80.4 ms and `<IQ4_NL>` 45.1 ms of 1566 ms matvec, i.e. 8% of matvec time for 3.6% of
+the bytes (UD-Q4_K_M: Q3_K 1.6%, IQ4_NL 2.0%). H42's `GGML_PASCAL_MMVH_LOWBIT=1` already puts Q3_K on mmvh
+(adopted for 1 card only; 2-card parked by rule zero at "≤ +1%"). The trace now sizes that, so the arm is re-opened.
+Fork 2d3b3bf adds IQ4_NL to the same flag, with aligned 4-byte loads (`mmvh_load16_b2<n>`; the 2-byte loads
+made it a wash). Micro-bench vs mmvq at 8704×5120 / 5120×8704 / 5120×3072: Q3_K 98.9 / 98.4 / 44.3 µs
+(was 180.3 / 168.2 / 76.2), IQ4_NL 81.6 / 102.1 / 37.7 µs (was 113.3 / 105.1 / 47.8). MUL_MAT tests pass.
+
+**Gate (KLD).** Rounding changes (fp16 partial sums), so not bit-identical. Same method as H42, on 2 cards:
+Q5_K_M FP32 reference (build-h17, `-sm tensor`), then UD-Q4_K_M with the full serve env at `-ub 8`
+(the matvec path), LOWBIT off vs on. Pass: on mean KLD ≤ off × 1.05 and same-top ≥ off − 0.5.
+
+**Arm.** The serve command at 16k + `GGML_PASCAL_MMVH_LOWBIT=1`, REPS=2. Control: banked `h43-k4scale-16k`
+(42.39 / 366.4, same binary behaviour without the flag).
+- **Prediction:** trace saving ≈ 45% of the Q3_K time + 25% of the IQ4_NL time ≈ 47 ms of 3705 ms
+  drafter-free tg wall, so **decode +0.8–1.8%**, prefill flat.
+- **1-card arm: parked by rule zero.** UD-IQ3_S has one IQ4_NL tensor (0.0% of bytes), and its Q3_K is
+  already on mmvh under H42, so the 1-card command would not change measurably.
+
+**Driver.** `scripts/run-h44-lowbit-2card.sh`.
