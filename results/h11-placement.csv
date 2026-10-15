@@ -156,3 +156,6 @@ h45-head96k-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,46.35,366.
 h46-1card-iq3-fagemm,none,none,default,1,18.02,200.33,400,0,0,,13161,259,65,197,ok
 h46-1card-iq3-fagemm,none,none,default,2,18.01,207.68,400,0,0,,13161,259,65,197,ok
 h46-1card-iq3-fagemm,none,none,default,3,18.02,207.55,400,0,0,,13161,259,65,197,ok
+h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,29.51,230.36,400,404,264,65.3,12331,12331,67,182,ok
+h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,29.70,232.03,400,404,264,65.3,12331,12331,68,182,ok
+h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,29.73,231.68,400,404,264,65.3,12331,12331,69,182,ok
