@@ -49,7 +49,7 @@ run label so the evidence is traceable.
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
 | H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |
 | H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+6.1%** (42.39 → 44.96), prefill flat; KLD 0.1241 vs 0.1261 off |
-| H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | Pre-registered (2026-10-15) |
+| H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+3.1%** (44.96 → 46.35, 3 reps 46.31/46.38/46.35), acceptance unchanged (72.8%, 273/375), prefill flat, +104 MiB/card |
 
 ---
 
@@ -2718,4 +2718,11 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 - Acceptance no more than about 1 point lower.
 
 **1-card arm:** parked by rule zero. The 1-card command (`h42-1card-iq3-lowbit`) runs with no drafter, so this lever can't touch it.
+
+**Result (2026-10-15).** Confirmed and adopted.
+- **First attempt** failed at load. The drafter context also copies raw logits (warmup/prompt), so the full-width assert fired. Fork fd90268 widens the K-wide rows on the host instead, with ids ≥ K set to −inf.
+- **Rerun** (`h45-head96k-16k`): 46.31 / 46.38 / 46.35 decode, 363.4 / 367.4 / 366.6 prefill.
+- **Gate:** output byte-identical to `h44-lowbit-16k`, and acceptance 273/375 exactly as before, so no draft on this prompt needed an id ≥ 96k.
+- **VRAM:** +104 MiB/card. The unused full `output.weight` is still loaded; 4 GB is spare at 100k, so dropping it isn't worth a change.
+- **Not tested, rule zero:** a smaller K. At 64k, 2.5–2.9% of tokens fall outside, which would cost more acceptance than the further ~1% byte saving.
 

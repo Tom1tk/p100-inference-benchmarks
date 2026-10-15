@@ -7,6 +7,7 @@ set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FORK=/root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server
 MTP=/root/mtp-Qwen3.8-27B-Q4_0.gguf
+MTP_FORK=/root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf  # H45; stock builds reject the trimmed head
 SERVE_ENV="GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_DUPLEX_REDUCE=1 GGML_PASCAL_MMVH_Q6K_WIDE=1 GGML_PASCAL_MMVH_LOWBIT=1"
 export GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 SPLIT=tensor REPS=10 N_PREDICT=400 BATCH=2048 UB=2048
 cool() {
@@ -23,10 +24,10 @@ cool
   ./scripts/run-spec-placement.sh r10-stock-16k draft-mtp $MTP default ); echo "--- r10-stock-16k exit $? ---"; commit r10-stock-16k
 cool
 ( export $SERVE_ENV; CTX=16384 PROMPT_FILE=prompts/h11-depth-prompt.txt BIN=$FORK \
-  ./scripts/run-spec-placement.sh r10-fork-16k draft-mtp $MTP default ); echo "--- r10-fork-16k exit $? ---"; commit r10-fork-16k
+  ./scripts/run-spec-placement.sh r10-fork-16k draft-mtp $MTP_FORK default ); echo "--- r10-fork-16k exit $? ---"; commit r10-fork-16k
 cool
 ( export $SERVE_ENV; CTX=100000 CTK=q8_0 CTV=q8_0 NP=1 REQ_TIMEOUT=1800 PROMPT_FILE=prompts/h26-100k-prompt.txt BIN=$FORK \
-  ./scripts/run-spec-placement.sh r10-fork-100k draft-mtp $MTP default ); echo "--- r10-fork-100k exit $? ---"; commit r10-fork-100k
+  ./scripts/run-spec-placement.sh r10-fork-100k draft-mtp $MTP_FORK default ); echo "--- r10-fork-100k exit $? ---"; commit r10-fork-100k
 python3 - <<'PY'
 import csv, statistics as st
 rows = [r for r in csv.DictReader(open("results/h11-placement.csv")) if r["label"].startswith("r10-") and r["outcome"] == "ok"]
