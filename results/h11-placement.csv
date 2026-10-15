@@ -132,3 +132,13 @@ h43-k4scale-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,42.42,359.95,400,3
 h43-k4scale-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,42.36,366.37,400,375,273,72.8,11053,11053,65,179,ok
 h44-lowbit-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,44.95,361.13,400,375,273,72.8,11053,11053,63,24,ok
 h44-lowbit-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,44.96,366.39,400,375,273,72.8,11053,11053,65,24,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,1,28.22,309.02,400,399,265,66.4,10973,10973,64,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,2,28.32,307.98,400,399,265,66.4,10973,10973,65,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,3,28.21,307.02,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,4,28.30,307.43,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,5,28.30,307.28,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,6,28.33,307.10,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,7,28.32,307.82,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,8,28.35,307.83,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,9,28.30,307.72,400,399,265,66.4,10973,10973,66,10,ok
+r10-stock-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,10,28.35,307.33,400,399,265,66.4,10973,10973,66,10,ok
