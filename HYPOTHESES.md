@@ -51,6 +51,7 @@ run label so the evidence is traceable.
 | H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+6.1%** (42.39 → 44.96), prefill flat; KLD 0.1241 vs 0.1261 off |
 | H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+3.1%** (44.96 → 46.35, 3 reps 46.31/46.38/46.35), acceptance unchanged (72.8%, 273/375), prefill flat, +104 MiB/card |
 | H46 | `GGML_PASCAL_FA_GEMM=1`: prefill flash attention via cuBLAS GEMMs (Q·K fp32-accumulate, P·V HGEMM, online softmax per 4096-token KV chunk) instead of the tile kernel lifts prefill at depth | Pre-registered (2026-10-15) |
+| H47 | `GGML_PASCAL_FA_GEMM_QK16=1`: H46's Q·K GEMM in fp16 compute (Q pre-scaled) lifts prefill at depth within H46's quality | Pre-registered (2026-10-15) |
 
 ---
 
@@ -2770,3 +2771,17 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 - **Prefill at 100k: +19.2%**, reps within ±0.05 t/s. At 16k on one card the gain is ~+3% (rep 1 low), as expected: attention is a small share of prefill at short depth.
 - **Decode −4.3% is the text, not the kernel.** The GEMM path only fires for n_q ≥ 512, so decode and MTP-verify batches run the exact same kernels. Greedy output diverges from control at char 1066 (`compare-outputs`), and the new continuation drafts worse (257/425 vs 264/404 accepted). Same prompt, different words: a content effect, not a speed regression. The 10-rep headline will average this in.
 - Speed gate: **pass**. Adoption waits on the H32 100k haystack (`scripts/run-h46-haystack.sh`).
+
+
+## H47 — fp16-compute Q·K in the GEMM flash-attention path
+
+**Claim.** In H46 the Q·K GEMM (fp32 compute, ~7.6 TFLOPS) is ~65% of attention GEMM time; P·V already runs as an HGEMM at ~14.5. Running Q·K as an HGEMM too (S stored f16, Q multiplied by the softmax scale before the f16 convert so |S| stays far below the f16 range) should cut FA time ~30%. At 100k, where attention is now ~30% of prefill, that would be roughly +8–10% prefill.
+
+**Why it may be allowed now.** H38 dropped fp16 Q·K accumulation on a KLD of 0.321. H46's diagnosis showed that number is the prompt's hypersensitive-token tail, which any attention change hits (tile vs non-FA: 0.58). So the old refutation does not hold. The risk is still real: a 256-term fp16 sum carries an absolute logit error of about |logit|·2⁻¹¹·√256.
+
+**Test.**
+1. test-backend-ops FLASH_ATTN_EXT with the env set (thresholds at 1), against CPU.
+2. Micro-bench (`test-backend-ops perf`, real per-card shape): continue only if FA time falls ≥ 15%.
+3. KLD vs the banked non-FA reference (`/root/h28-kld/h46-nofa-base.kld`, `run-h46-diag.sh`): **pass if mean KLD ≤ 0.581 (tile, today's serve path) and same-top ≥ 92.63%**, i.e. no worse than tile.
+4. Speed: 2-card 100k REPS=3 vs the banked `h46-fagemm-100k` (275.75); 1-card arm IQ3_S 16k REPS=3 vs `h46-1card-iq3-fagemm`.
+5. If adopted: H32 100k haystack before the README changes.
