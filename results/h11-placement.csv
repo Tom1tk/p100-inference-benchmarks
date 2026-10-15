@@ -162,3 +162,5 @@ h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,29.73,231.68
 h46-fagemm-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.38,275.73,400,425,257,60.5,12331,12331,67,60,ok
 h46-fagemm-100k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.36,275.70,400,425,257,60.5,12331,12331,67,10,ok
 h46-fagemm-100k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,28.41,275.81,400,425,257,60.5,12331,12331,67,10,ok
+p15-200w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.49,393.35,400,365,277,75.9,11157,11157,64,100,ok
+p15-200w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.61,393.60,400,365,277,75.9,11157,11157,66,100,ok
