@@ -158,7 +158,7 @@ Update this table when a run claims an index. Never reuse one.
 
 | Index | Site port | Label | Engine / model / split | Status |
 |---|---|---|---|---|
-| 0 | 4000 | p5-fork-serve | fork (Tom1tk/llama.cpp-Pascal) / Q4_K_M + MTP head96k / tensor, README serve command (q8_0 KV, 100k ctx) | Run 2026-10-15 |
+| 0 | 4000 | p5-fork-serve | fork (Tom1tk/llama.cpp-Pascal) / Q4_K_M + MTP head96k / tensor, README serve command (q8_0 KV, 100k ctx) | **Aborted 2026-10-15** after stage 1 (387 s, site OK): pi loaded the repo's CLAUDE.md and committed + pushed the site to this repo (36b6850). Contaminated; fixed with `--no-context-files`. Site left up |
 
 ---
 

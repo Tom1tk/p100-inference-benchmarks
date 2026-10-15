@@ -196,7 +196,8 @@ EOF
         S0=$(date +%s)
         # --continue keeps stages 2 and 3 in the same session, so the agent sees
         # the site it already built rather than rediscovering it.
-        PI_ARGS=(--provider webbench --model "$LABEL" --session-dir "${PI_DIR}/sessions" -p)
+        # -nc: without it pi loads this repo's CLAUDE.md/AGENTS.md (p5-fork-serve, 2026-10-15: the agent committed and pushed here)
+        PI_ARGS=(--provider webbench --model "$LABEL" --session-dir "${PI_DIR}/sessions" --no-context-files --no-skills --no-prompt-templates -p)
         [[ "$STAGE" -gt 1 ]] && PI_ARGS=(--continue "${PI_ARGS[@]}")
 
         ( cd "$SITE_DIR" && PI_OFFLINE=1 PI_CODING_AGENT_DIR="${REPO}/${PI_DIR}" \
