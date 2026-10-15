@@ -50,6 +50,7 @@ run label so the evidence is traceable.
 | H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |
 | H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+6.1%** (42.39 → 44.96), prefill flat; KLD 0.1241 vs 0.1261 off |
 | H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+3.1%** (44.96 → 46.35, 3 reps 46.31/46.38/46.35), acceptance unchanged (72.8%, 273/375), prefill flat, +104 MiB/card |
+| H46 | `GGML_PASCAL_FA_GEMM=1`: prefill flash attention via cuBLAS GEMMs (Q·K fp32-accumulate, P·V HGEMM, online softmax per 4096-token KV chunk) instead of the tile kernel lifts prefill at depth | Pre-registered (2026-10-15) |
 
 ---
 
@@ -2726,3 +2727,19 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 - **VRAM:** +104 MiB/card. The unused full `output.weight` is still loaded; 4 GB is spare at 100k, so dropping it isn't worth a change.
 - **Not tested, rule zero:** a smaller K. At 64k, 2.5–2.9% of tokens fall outside, which would cost more acceptance than the further ~1% byte saving.
 
+
+## H46 — Prefill flash attention through cuBLAS GEMMs
+
+**Claim.** At 98k depth, FA is ~40% of prefill. The sm_60 tile kernel runs at 5.5 TFLOPS. A cuBLAS micro-bench (fork `build-logs/p5-cublas-attn-bench.cu`) on the same shapes (2 kv heads/card, GQA 6, D 256, ubatch 2048, KV chunk 4096) runs Q·K with fp32 accumulate at 7.6 TFLOPS and P·V as an HGEMM at 14.5 TFLOPS. Expected gain: FA ~1.6× faster, 98k prefill +12–18%. Little to none at 16k.
+
+**Precision.** It should match or beat the tile kernel. Q·K accumulates in fp32, as now; logits stay f32 through softmax. The tile kernel already accumulates P·V in half2, and the HGEMM does the same, but per chunk; chunks combine in f32. Q is converted to f16 as now.
+
+**How.** Fork `ggml-cuda/fattn-pascal-gemm.cu`, used only when the env is set and the tile kernel is selected. Conditions: n_q ≥ 512, n_kv ≥ 4096, mask present, no sinks/ALiBi/softcap, D = DV. Everything else falls back to the tile kernel.
+
+**Test.**
+1. test-backend-ops FLASH_ATTN_EXT with the env set, against CPU.
+2. KLD gate at depth, H38 style (`-c 8192 --chunks 2` vs env off): pass if mean ≤ 0.001 and same-top ≥ 99.5%.
+3. Speed: 2-card, REPS=3, prefill at depth. A fresh control is needed because `serve-fork-100k` predates H41b–H45. 16k is checked only through the 1-card arm, since a 16k gain is expected to be small.
+4. 1-card arm: IQ3_S, `-sm none`, at the same depth if it fits.
+
+**Gate.** KLD passes; prefill at depth above control + noise; decode flat; the H32 100k haystack re-run before the README changes.
