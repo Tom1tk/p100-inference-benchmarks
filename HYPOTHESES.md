@@ -10,8 +10,8 @@ run label so the evidence is traceable.
 | ID | Claim | Status |
 |---|---|---|
 | H1 | MTP wins bigger on P100 than on a 3090 | **REFUTED as stated — and speedup is depth-dependent, not a constant: 1.05× @4k, 1.48× @16k** |
-| H2 | XL quants stall one GPU on the split | Untested |
-| H3 | Stock quants below Q6 degrade on `ssm_out` | Untested |
+| H2 | XL quants stall one GPU on the split | **Parked by rule zero** (RUNBOOK §7): Phase 8 showed no Q4_K_M gap to fill |
+| H3 | Stock quants below Q6 degrade on `ssm_out` | **Parked by rule zero** (RUNBOOK §7): confounded (different fine-tune); Phase 8 showed no Q4_K_M gap |
 | H4 | TurboQuant KV avoids the q4_0 KV penalty | **REFUTED — turbo3/turbo3 costs 14.3% of decode to save 788 MiB. `buun` has no remaining advantage** |
 | H5 | NCCL is harmful for split inference | **CONFIRMED and rig-wide — an abort, in both `ik` and mainline** |
 | H6 | `-sm graph` is the best split mode | **REFUTED — `-sm tensor` on `mainline-rebased` wins. `buun`'s tensor is 12–14% slower on prefill** |
@@ -20,10 +20,10 @@ run label so the evidence is traceable.
 | H9 | Q8 drafter beats Q4 by more than it costs | **Provisionally REFUTED — matched DFlash2 pair is 0.1% apart on decode; Q8 costs 872 MiB and accepts less** |
 | H10 | Inter-GPU transport (P2P / AllReduce backend) is leaving performance on the table | **CLOSED — AllReduce: no lever (only butterfly runs on Pascal). P2P: real but small, +2.9% decode / −0.3% prefill** |
 | H11 | Drafter placement across the two cards matters | **REFUTED at 4k and 16k** — placement moves VRAM, not throughput |
-| H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
-| H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
+| H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | **Parked by rule zero** (RUNBOOK §7): `ik` has no tensor split; the serve command is now a mainline fork |
+| H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | **CONFIRMED 2026-08-26** on the number (215.4 t/s), wrong on the shape (−34% 16k→100k). Fork command: 275.75 at 98k (H46) |
 | H14 | `-ub` 512→1024/2048 improves prefill ≥10% | **CONFIRMED 2026-08-25 — +63%.** Use `-ub 2048` |
-| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | **Partly refuted at 16k** (2026-10-15): prefill +4.5% at 200 W, +6.4% at 220 W, +6.5% at 250 W (saturated); decode +0.3%. 98k: +4.4% at 200 W; 220 W pending |
+| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | **Partly refuted at 16k** (2026-10-15): prefill +4.5% at 200 W, +6.4% at 220 W, +6.5% at 250 W (saturated); decode +0.3%. 98k: +4.4% at 200 W. **User set 200 W as the running cap** (2026-10-15); 220 W at 98k not run |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it. **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
@@ -45,6 +45,10 @@ run label so the evidence is traceable.
 | H34 | Fork levers on one rebuilt binary: Q6_K in mmvh (decode), GEMM ALGO3 (prefill, H33), F16 reduce (H31) | **Partly confirmed** (2026-10-14): Q6_K mmvh 2-card decode +5.2%, 1-card flat; F16 reduce +6.8% prefill; ALGO3 **failed its KLD gate** (0.0037 / 97.5%) and was not run → H35 |
 | H35 | GEMM ALGO3 adds no quality loss over the default FP16 GEMM (vs the FP32 Q5 reference), so it can ship | **Confirmed** (2026-10-14): KLD 0.0619 vs 0.0624 default; 2-card prefill +3.1% (360.7 → 371.8); 1-card only +1.0% (predicted +5–10%) |
 | H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
+| H37 | One-shot small-message AllReduce (`GGML_CUDA_ALLREDUCE=internal` path, fork D3) lifts 2-card decode | **Refuted** (2026-10-14): identity passed, decode −0.5%, prefill flat. Not adopted |
+| H38 | half2 Q·K accumulation in the FA tile kernel (fork P5) lifts prefill within quality | **Refuted on quality** (2026-10-14): KLD mean 0.321, max 29.5, same-top 94.6%. Speed arms not run |
+| H39 | Staged, coalesced dequant-to-F16 before the prefill GEMM (`GGML_PASCAL_DEQUANT_STAGED=1`) lifts prefill | **Marginal, parked** (2026-10-14): bit-identical; 1-card +4.5%, 2-card +1.0% (noise). Code kept, off; on the higher-cap re-test list (RUNBOOK §1) |
+| H40 | Parallel host dispatch per card (`GGML_PASCAL_PAR_DISPATCH=1`) lifts 2-card decode | **Refuted** (2026-10-14): bit-identical, decode +0.3% (noise); cards kernel-busy 89% of decode. Code kept, off |
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
 | H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |

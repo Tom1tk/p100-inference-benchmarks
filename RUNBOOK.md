@@ -27,7 +27,7 @@ assumes no prior context beyond what's in this repo. §7 is the work queue.
 ```bash
 nvidia-smi -L                       # expect exactly 2× Tesla P100-PCIE-16GB
 nvidia-smi --query-gpu=index,temperature.gpu,power.limit,persistence_mode \
-           --format=csv             # expect ~45–50 °C idle, 175 W cap, persistence Enabled
+           --format=csv             # expect ~45–50 °C idle, 200 W cap (since 2026-10-15), persistence Enabled
 df -h /root                         # models are 11–22 GB each
 ```
 
@@ -36,7 +36,7 @@ Power cap and persistence do not survive a host reboot (the cards revert to
 
 ```bash
 nvidia-smi -pm 1
-nvidia-smi -pl 175 -i 0 && nvidia-smi -pl 175 -i 1
+nvidia-smi -pl 200 -i 0 && nvidia-smi -pl 200 -i 1   # 175 for any re-run of a pre-2026-10-15 result
 ```
 
 **Power cap gate (H15).** 175 W is the baseline for every result in the repo.
@@ -45,11 +45,13 @@ measured PSU wall draw with a plug-socket meter in person — it is not readable
 from this host. When cleared, step 175 → 200 → 220, one step per run, and
 record the cap as a column. Never change it unprompted.
 
+**Done 2026-10-15 (H15, user-set caps, 2-card serve command, REPS=2):** 16k prefill +4.5% at 200 W, +6.4% at 220 W, +6.5% at 250 W (draw never above 216 W: saturated); 98k +4.4% at 200 W; decode flat at every cap. **The user set 200 W as the running cap.** Results before 2026-10-15 are at 175 W: compare across the change only against a control at the same cap.
+
 **Re-test at the higher cap (user call, 2026-10-14): don't discard marginal compute-side wins.** At 175 W
 the 1-card arm sits at the cap ~50% of its busy time and the 2-card arm 15–30% (gpu-monitor power column,
 util ≥ 90% samples). A lever that removes stalls makes the card draw more and the cap claws the gain back,
 so prefill levers can look marginal here and grow at 220 W. Decode is memory/latency-bound and unaffected.
-Once H15 runs, re-test each of these with one short 16k arm per lever (cite the matching new-cap control):
+Re-test each of these with one short 16k arm per lever at the running cap (200 W; control `p15-200w-16k`). **Still open.** Expect little: at 200 W the 2-card arm only gained 4.5%, so the cap was not holding much back:
 | Lever | At 175 W | Why it may grow |
 |---|---|---|
 | H39 `GGML_PASCAL_DEQUANT_STAGED=1` (bit-identical, code kept, off) | 1-card +4.5%, 2-card +1.0% (rep 2; rep 1 −3.6%) | More dequant throughput = more power in a capped phase |
@@ -256,9 +258,9 @@ change the serve command. Refreshed 2026-10-15.
 
 | # | Item | Why | Cost / gate |
 |---|---|---|---|
-| 1 | **H15: power cap 175 → 200 → 220 W**, then the "Re-test at the higher cap" list (§1) | Prefill is compute-bound and capped; parked marginal levers may grow | **Blocked on the user's PSU meter check** (§1) |
+| 1 | "Re-test at the higher cap" list (§1), at 200 W | H15 done 2026-10-15 (200 W chosen, +4.4% prefill at 98k); parked marginal levers may have grown | One 16k arm per lever, REPS=3; 1-card arms matter most (it was capped ~50% of busy time) |
 | 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
-| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; after the prefill levers settle |
+| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | `scripts/run-p5-fork.sh` (label `p5-fork-serve-r2`); prefill levers are settled, so next |
 | 5 | TurboQuant | Kept last by user call | After everything above |
 | 6 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 

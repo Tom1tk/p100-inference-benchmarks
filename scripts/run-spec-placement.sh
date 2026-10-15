@@ -86,6 +86,7 @@ TEMPS="logs/${LABEL}.temps.log"
 RAW="results/h11/${LABEL}.jsonl"
 CSV="results/h11-placement.csv"
 : > "$RAW"
+nvidia-smi --query-gpu=power.limit --format=csv,noheader | paste -sd' ' > "logs/${LABEL}.cap"  # H15: cap is not in the CSV
 
 if [[ ! -f "$CSV" ]]; then
     echo "label,spec_type,drafter,placement,rep,decode_tps,prefill_tps,n_decoded,draft_n,draft_accepted,accept_pct,gpu0_mib,gpu1_mib,peak_temp,load_s,outcome" > "$CSV"

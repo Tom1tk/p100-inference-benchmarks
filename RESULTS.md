@@ -17,7 +17,7 @@ Table C is the verdict per lever. The reasoning behind each verdict is in
 [RUNLOG.md](RUNLOG.md); what is still open is RUNBOOK §7.
 
 Constant throughout: 2× Tesla P100-PCIE-16GB (16,269 MiB, sm_60, no NVLink),
-**175 W cap**, `-ngl 99 -fa 1 -t 8`, `GGML_CUDA_ALLREDUCE=none` on tensor
+**175 W cap** (until 2026-10-15; `p15-<cap>-*` runs at the cap in their label, later runs at 200 W, see `logs/<label>.cap`), `-ngl 99 -fa 1 -t 8`, `GGML_CUDA_ALLREDUCE=none` on tensor
 split. Rows marked GPUs=1 used `-dev CUDA0`. `results/all-results.csv` is a
 stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 
@@ -128,6 +128,31 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | `saluki-iq2mix-mtp-d16k` | rebased | Saluki IQ2-mix | tensor | 2 | 2048 | f16 | MTP-Q4_0 | 16k | 27.36 | 309.1 | 64.9% | 7075/7075 | 65 C |
 | `saluki-iq2mix-abl-embmtp-d16k` | rebased | Saluki IQ2-mix abl. | tensor | 2 | 2048 | f16 | MTP, embedded | 16k | 23.65 | 310.1 | 50.8% | 6915/6915 | 65 C |
 | `saluki-iq2mix-1card-mtp-d16k` | rebased | Saluki IQ2-mix | none | **1** | 2048 | f16 | MTP-Q4_0 | 16k | 17.45 | 179.2 | 64.9% | 12815/259 | 65 C |
+
+**Fork builds (`Tom1tk/llama.cpp-Pascal`, 2026-10-14 →).** Each row adds one lever to the row above it in its group (HYPOTHESES H27–H47). 2-card rows: Q4_K_M, `-sm tensor`, `-ub 2048`, P2P on. 1-card rows: IQ3_S, `-sm none`, no drafter, q8_0 KV. Accept/VRAM/peak from `results/h11-placement.csv`. 175 W unless the label says otherwise.
+
+| Run | Lever added | Drafter | KV | Ctx | Decode | Prefill | Accept | VRAM/card | Peak |
+|---|---|---|---|---|---|---|---|---|---|
+| `h28-2card-mmvh1-mtp-p2p` | half2 matvec (H28) | MTP | f16 | 16k | 37.66 | 314.3 | 68.2% | 11053 | 63 C |
+| `serve-fork-16k` | + F16 reduce, ALGO3, Q6_K mmvh (H34/H35) | MTP | f16 | 16k | 39.48 | 353.0 | 72.4% | 11053 | 65 C |
+| `h36-duplex-16k` | + duplex reduce (H36) | MTP | f16 | 16k | 40.37 | 365.3 | 72.4% | 11053 | 65 C |
+| `h41-wide-16k` | + Q6_K wide (H41b) | MTP | f16 | 16k | 41.51 | 365.4 | 72.8% | 11053 | 65 C |
+| `h43-k4scale-16k` | + K-quant scale unpack (H43) | MTP | f16 | 16k | 42.39 | 363.2 | 72.8% | 11053 | 65 C |
+| `h44-lowbit-16k` | + LOWBIT on 2 cards (H44) | MTP | f16 | 16k | 44.95 | 363.8 | 72.8% | 11053 | 65 C |
+| `h45-head96k-16k` | + 96k-row drafter head (H45) | MTP head96k | f16 | 16k | 46.35 | 365.8 | 72.8% | 11157 | 65 C |
+| `p15-175w-16k` | + FA_GEMM (H46) | MTP head96k | f16 | 16k | **47.47** | 376.4 | 75.9% | 11157 | 65 C |
+| `p15-200w-16k` | cap 200 W (H15) | MTP head96k | f16 | 16k | 47.55 | 393.5 | 75.9% | 11157 | 66 C |
+| `p15-220w-16k` | cap 220 W (H15) | MTP head96k | f16 | 16k | 47.63 | 400.5 | 75.9% | 11157 | 68 C |
+| `p15-250w-16k` | cap 250 W (H15, one-off) | MTP head96k | f16 | 16k | 47.61 | 400.8 | 75.9% | 11157 | 69 C |
+| `serve-fork-100k` | fork at 100k (pre-H36) | MTP | q8_0 | 98k | 26.94 | 232.0 | 65.3% | 12227 | 66 C |
+| `h46-ctrl-100k` | serve command pre-H46 | MTP head96k | q8_0 | 98k | 29.65 | 231.4 | 65.3% | 12331 | 69 C |
+| `h46-fagemm-100k` | + FA_GEMM (H46) | MTP head96k | q8_0 | 98k | 28.38 | 275.7 | 60.5% | 12331 | 67 C |
+| `p15-200w-98k` | cap 200 W (H15) | MTP head96k | q8_0 | 98k | 28.43 | **287.8** | 60.5% | 12331 | 70 C |
+| `h27-1card-graphs0` | 1-card fork baseline | none | q8_0 | 16k | 11.00 | 196.3 | — | 13161 | 65 C |
+| `h28-1card-mmvh1` | half2 matvec (H28) | none | q8_0 | 16k | 11.82 | 194.0 | — | 13161 | 65 C |
+| `h29-1card-mmvh-iq3` | + IQ3 on mmvh (H29) | none | q8_0 | 16k | 15.86 | 196.7 | — | 13161 | 65 C |
+| `h42-1card-iq3-lowbit` | + LOWBIT (H42) | none | q8_0 | 16k | 17.89 | 201.2 | — | 13161 | 65 C |
+| `h46-1card-iq3-fagemm` | + FA_GEMM (H46) | none | q8_0 | 16k | **18.02** | 205.2 | — | 13161 | 65 C |
 **Reading notes.**
 
 - **`h26-100k-mtp-kvq8` is the deliverable config** and the only row at the
@@ -180,12 +205,13 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | `-ub` | 128 … 8192 | **2048** — +63% prefill at ≤16k, +56% at 16k on the server; 8192 aborts | H14, H24 |
 | `-b` | 2048, 8192 | **2048** — only matters as a ceiling on `-ub` | H14 |
 | KV `-ctk`/`-ctv` | f16, q8_0, q4_0, turbo3 | **`q8_0`** — 1.5% of decode, half the cache; q4_0 adds nothing; turbo3 costs 14.3% | H25, H4 |
-| Model quant | Q4_K_M, Q6_K (PFlash only), IQ3_S (1 card) | **Q4_K_M** by default, **never swept for quality** — Phase 8 | Table A |
+| Model quant | Q4_K_M, Q6_K (PFlash only), IQ3_S (1 card) | **Q4_K_M**. Phase 8 passed: KLD 0.057 vs Q5_K_M FP32, 19/19 haystack at 100k | H30, H32 |
 | Drafter | none, MTP-Q4_0, DFlash2-Q4, DFlash2-Q8 | **MTP**. DFlash2 is layer-only; Q8 drafters not worth it | H8, H9 |
 | Drafter placement `-devd` | default, CUDA0, CUDA1 | No effect | H11 |
-| sm_60 FP16 fast path | stock vs patched out | **Leave on** for speed (patch costs 12–13% prefill). It is a correctness fix, so the quality trade is **open** — must be settled before Phase 8 | H17 |
+| sm_60 FP16 fast path | stock vs patched out | **Leave on** (patch costs 12–13% prefill). Quality trade **closed as negligible** by H30: 0.018 KLD, 0.31× the quant step | H17, H30 |
 | GPUs | 1, 2 | **2 required** | H20/H25 |
-| Power cap | 175 W only | Untested above 175; approved to 220 W pending the PSU meter check | H15 |
+| Power cap | 175, 200, 220, 250 W | **200 W** (user call). Prefill +4.4% at 98k / +4.5% at 16k; 220 W +6.4% at 16k; 250 W no more (draw ≤ 216 W). Decode flat | H15 |
+| Fork levers (Tom1tk/llama.cpp-Pascal) | H27–H47 | **Adopted:** MMVH (H28/H29), F16_REDUCE (H31), GEMM_ALGO3 (H33/H35), DUPLEX_REDUCE (H36), Q6K_WIDE (H41b), K-quant scale unpack (H43), MMVH_LOWBIT (H42/H44), drafter head96k (H45), FA_GEMM (H46). **Refuted:** CUDA graphs (H27), internal AllReduce (H37), half2 tile Q·K (H38), parallel dispatch (H40), fp16 GEMM Q·K (H47). **Marginal, parked:** DEQUANT_STAGED (H39) | Fork-builds block in Table B |
 | Context depth | 2k … **100k end to end** | Serves at 100k with 4,122 MiB/card spare | H13, H26 |
 | Sustained thermals | 2 × ~8 min 100k prefill | 70 °C peak. Not a constraint at 175 W | H26 |
 

@@ -1465,3 +1465,20 @@ to unpatched, so a rebuild of `build-h17` must re-apply the patch first.
   - `GGML_CUDA_P2P=1` with MTP decodes at 28.39 t/s vs 27.41 (+3.6%).
   - Acceptance is unchanged at 66.4%. Prefill is −0.9%.
   - Candidate for the serve command; awaiting the user's call.
+
+## 2026-10-14 → 15 — fork levers H28–H47 (summary entry)
+
+Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHESES.md; this entry only indexes them.
+- **Adopted into the serve command:** H28 (+27% / +32.6% decode with MTP), H31 F16 reduce (+6.8% prefill), H35 ALGO3 (+3.1% prefill), H36 duplex (+3.5% prefill, +2.3% decode), H41b Q6_K wide (+2.8% decode), H43 (+2.1% decode), H44 (+6.1% decode), H45 head96k drafter (+3.1% decode), H46 FA_GEMM (+19.2% prefill at 98k).
+- **1-card:** H29 (+44% decode), H42 (+13.0% decode).
+- **Refuted:** H27 graphs, H37 internal AllReduce, H38 half2 tile Q·K (KLD), H40 parallel dispatch, H47 fp16 GEMM Q·K (KLD). H39 staged dequant marginal, parked.
+- **Quality:** H30 KLD ladder (H17 closed as negligible); H32 100k haystack passed (19/19), re-run for H46 (19/19).
+- **Phase 5:** first fork run `p5-fork-serve` aborted after stage 1: pi loaded the repo CLAUDE.md and pushed 36b6850 itself. pi now runs with `--no-context-files --no-skills --no-prompt-templates`; re-run pending (`scripts/run-p5-fork.sh`).
+
+## 2026-10-15 — H15: power cap 175 → 200 → 220 → 250 W
+
+- User set each cap from the host; 2-card serve command, REPS=2 by user call, 16k first, then 98k at 200 W.
+- 16k prefill: 376.4 → 393.5 (200 W, +4.5%) → 400.5 (220 W, +6.4%) → 400.8 (250 W). Draw never above 216 W at 250 W: saturated, likely clock-bound rather than power-bound (not verified: clocks/throttle reasons not logged).
+- 98k at 200 W: prefill 287.8 vs 275.75 at 175 W (+4.4%), decode flat, peak 70 °C.
+- Decode flat at every cap; output identical across caps.
+- **User set 200 W as the running cap.** `run-spec-placement.sh` now writes `logs/<label>.cap`, since the CSV has no cap column.
