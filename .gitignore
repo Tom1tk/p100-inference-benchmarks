@@ -7,7 +7,7 @@
 
 # Generated sites: keep the source (it's quality evidence), never the deps
 sites/**/node_modules/
-sites/*/.pi-agent/sessions/
+sites/**/.pi-agent/
 
 # nsys sqlite exports are regenerable from the .nsys-rep
 results/phase0/nsys/*.sqlite

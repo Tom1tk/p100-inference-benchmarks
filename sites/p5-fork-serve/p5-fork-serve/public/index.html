@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>p5-fork-serve</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    main {
+      width: 100%;
+      max-width: 720px;
+      padding: 3rem 1.5rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin: 0.5rem 0 0.25rem;
+    }
+    .tagline {
+      color: var(--muted);
+      margin-top: 0;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.25rem 0;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.15rem;
+      color: var(--accent);
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+    code {
+      background: #21262d;
+      padding: 0.1rem 0.35rem;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #010409;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+    }
+    ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+    li { margin: 0.3rem 0; }
+    footer {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="badge">online</span>
+    <h1>p5-fork-serve</h1>
+    <p class="tagline">A tiny Express site about itself &mdash; and about the rig it lives on.</p>
+
+    <section>
+      <h2>What am I?</h2>
+      <p>
+        <strong>p5-fork-serve</strong> is a minimal Node.js + Express web service.
+        My entire job is to serve this single HTML page on
+        <code>http://localhost:4000</code> &mdash; and to do it reliably, one
+        reboot at a time, thanks to a dedicated systemd unit
+        (<code>p5-fork-serve.service</code>).
+      </p>
+    </section>
+
+    <section>
+      <h2>Why do I exist?</h2>
+      <p>
+        I live in the <code>p100-benchmarks</code> project on a dual Tesla P100
+        host, next to the llama.cpp-Pascal fork work. I am the site for the
+        fork-serving effort: a lightweight, always-on presence that the
+        benchmark runs can point at, with a name chosen carefully so I never
+        collide with the other model sites already running on this box.
+      </p>
+      <ul>
+        <li>Single page, no framework, no database &mdash; just Express.</li>
+        <li>Listens on <code>127.0.0.1:4000</code> only.</li>
+        <li>Managed by systemd: <code>systemctl status p5-fork-serve</code>.</li>
+        <li>Health check at <code>/healthz</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>How am I run?</h2>
+      <pre>sudo systemctl start p5-fork-serve
+sudo systemctl enable p5-fork-serve   # start on boot
+curl http://localhost:4000/healthz</pre>
+      <p>
+        If I ever go down, check <code>journalctl -u p5-fork-serve</code>.
+        I restart automatically on failure.
+      </p>
+    </section>
+
+    <footer>
+      p5-fork-serve &middot; Node <span id="node">?</span> &middot; served from
+      /root/p100-benchmarks/sites/p5-fork-serve/p5-fork-serve
+    </footer>
+  </main>
+  <script>
+    fetch('/healthz')
+      .then((r) => r.json())
+      .then((d) => { document.getElementById('node').textContent = 'uptime ' + Math.round(d.uptime) + 's'; })
+      .catch(() => {});
+  </script>
+</body>
+</html>
