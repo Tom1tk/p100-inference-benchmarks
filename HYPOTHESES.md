@@ -56,7 +56,8 @@ run label so the evidence is traceable.
 | H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+3.1%** (44.96 → 46.35, 3 reps 46.31/46.38/46.35), acceptance unchanged (72.8%, 273/375), prefill flat, +104 MiB/card |
 | H46 | `GGML_PASCAL_FA_GEMM=1`: prefill flash attention via cuBLAS GEMMs (Q·K fp32-accumulate, P·V HGEMM, online softmax per 4096-token KV chunk) instead of the tile kernel lifts prefill at depth | **Confirmed, adopted** (2026-10-15): prefill at 98k **+19.2%** (231.36 → 275.75), 1-card 16k ~+3%; KLD no worse than tile vs a non-FA reference (0.555 vs 0.581); H32 haystack 19/19. Decode −4.3% is changed greedy text drafting worse, not the kernel |
 | H47 | `GGML_PASCAL_FA_GEMM_QK16=1`: H46's Q·K GEMM in fp16 compute (Q pre-scaled) lifts prefill at depth within H46's quality | **Refuted** (2026-10-15): FA −29% in micro-bench, but KLD vs the non-FA reference 0.618 > tile's 0.581 and same-top 92.30% < 92.63%. Code reverted (fork d3c1c12) |
-| H48 | f16 KV instead of q8_0 at 98k lifts prefill ≥3% (FA_GEMM skips the per-call q8_0→f16 convert of all of K and V) and fits in VRAM | **Pre-registered** 2026-10-15 |
+| H48 | f16 KV instead of q8_0 at 98k lifts prefill ≥3% (FA_GEMM skips the per-call q8_0→f16 convert of all of K and V) and fits in VRAM | **Refuted (prefill)** 2026-10-15: rep 1 prefill 287.96 vs control 287.87 (3 reps); skip rule fired. Fits (13,573 MiB/card). Decode moved instead → H48b |
+| H48b | f16 KV cuts 98k decode step time ≥5% vs q8_0 (unexpected in H48 rep 1: 88.7 vs 98.4 ms/step, decode 32.91 vs 28.42) | **Pre-registered** 2026-10-15 |
 | H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **Pre-registered** 2026-10-15 |
 | H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Pre-registered** 2026-10-15 (diagnostic) |
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
@@ -2857,6 +2858,16 @@ All arms REPS ≥ 3 (user: "at least 3 runs of each"). Running cap 200 W; contro
 **Reasoning:** `fattn-pascal-gemm.cuh` builds an f16 view of K and V per call; for f16 it is a no-op view, for q8_0 it converts the **whole** cache (up to 98k rows) into the FA buffer, for each of the 16 attention layers on every ubatch. VRAM estimate (4 KV heads × D256, 16 layers, split over 2 cards): f16 ≈ 3.05 GiB/card vs q8_0 ≈ 1.62 GiB → **+1.4 GiB/card**, from 12,331 to ~13,800 of 16,269 MiB. q8_0 was chosen for headroom (H25), not for fit. Quality: f16 is the reference precision, so no KLD gate.
 
 **Test:** `scripts/run-h48-f16kv-98k.sh`. Control: `p15-200w-98k` (2 reps) + one more rep `p15-200w-98k-r3` → 3. Arm `h48-f16kv-98k` REPS=3. **Skip rule:** stop after rep 1 if prefill is not 1.5% over the control mean, or on load OOM.
+
+**Result (2026-10-15, 200 W):** prefill claim refuted. Control `p15-200w-98k` + `-r3`: prefill 287.82 / 287.83 / 287.95, decode 28.40 / 28.47 / 28.39, accept 60.5%. `h48-f16kv-98k` rep 1: prefill 287.96 (+0.03%), so reps 2–3 were skipped as pre-registered. VRAM 13,573 MiB/card, fits. Zero seconds power-capped on either card. **But decode rose to 32.91 t/s (+16%)**, outside the claim's ±3%. Output diverges at char 1344 of ~1,860; a KV precision change is allowed to do that (not a greedy-verification fault). Acceptance went from 60.5% to 64.9%, so part of the gain is the different text. The rest is per-step: steps ≈ n_decoded − accepted, giving 98.4 ms/step for q8_0 (99.2 in `h46-ctrl-100k` at 65% accept) vs 88.7 for f16. → H48b.
+
+## H48b — f16 KV and 98k decode step time
+
+**Claim:** at 98k, f16 KV cuts decode step time ≥5% vs q8_0 (H48 rep 1: −10%). Step time, not t/s, is the metric, because the KV precision changes the text and with it the MTP acceptance.
+
+**Reasoning:** decode attention (n_q 1–4, not the FA_GEMM path: `h46-ctrl-100k` with FA_GEMM off has the same 99 ms/step) reads the whole 98k cache every step. With q8_0 the kernel dequantizes it per step; with f16 it reads twice the bytes but does no dequant work. A 10% step-time cut means attention is a large share of the 98k step (feeds H50).
+
+**Test:** `scripts/run-h48b-f16kv-decode.sh`: 2 more reps of the f16 arm (`h48-f16kv-98k-r23`, `CACHE_PROMPT=1`: one prefill, decode on both), giving 3 reps. Control: the 3 q8_0 reps above. **Pass:** mean ms/step over the 3 f16 reps ≥5% below the q8_0 mean. If it passes, the README serve command moves to `-ctk f16 -ctv f16`. Quality needs no gate (f16 is the reference precision); 100k haystack is re-checked in the final report.
 
 ## H49 — MTP draft length
 
