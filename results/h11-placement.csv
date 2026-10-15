@@ -174,3 +174,5 @@ p15-200w-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.40,287.82,
 p15-200w-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,28.47,287.83,400,425,257,60.5,12331,12331,70,10,ok
 p15-200w-98k-r3,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.39,287.95,400,425,257,60.5,12331,12331,70,10,ok
 h48-f16kv-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,32.91,287.96,400,405,263,64.9,13573,13573,70,10,ok
+h48-f16kv-98k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,32.82,288.20,400,405,263,64.9,13573,13573,70,10,ok
+h48-f16kv-98k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,32.77,4.46,400,408,262,64.2,13573,13573,70,10,ok
