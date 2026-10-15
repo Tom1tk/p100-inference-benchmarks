@@ -159,3 +159,6 @@ h46-1card-iq3-fagemm,none,none,default,3,18.02,207.55,400,0,0,,13161,259,65,197,
 h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,29.51,230.36,400,404,264,65.3,12331,12331,67,182,ok
 h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,29.70,232.03,400,404,264,65.3,12331,12331,68,182,ok
 h46-ctrl-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,29.73,231.68,400,404,264,65.3,12331,12331,69,182,ok
+h46-fagemm-100k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.38,275.73,400,425,257,60.5,12331,12331,67,60,ok
+h46-fagemm-100k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.36,275.70,400,425,257,60.5,12331,12331,67,10,ok
+h46-fagemm-100k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,28.41,275.81,400,425,257,60.5,12331,12331,67,10,ok
