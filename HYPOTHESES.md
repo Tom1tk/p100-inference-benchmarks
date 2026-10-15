@@ -62,7 +62,7 @@ run label so the evidence is traceable.
 | H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Below bar** 2026-10-15: f16 decode attention ≈ 20.0 ms of the 88.7 ms 98k step (22.5% < 30%); no kernel lever by the rule. Kernel runs at ~160 GB/s of ~550 → candidate H54 |
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
 | H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **Pre-registered** 2026-10-15; instrumentation only, read from every run's `logs/<label>.cap` |
-| H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **Pre-registered** 2026-10-15; needs a download and the KLD + haystack gate |
+| H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **REFUTED** 2026-10-15 at the KLD gate: mean KLD 0.0719 vs Q4_K_M 0.0593 (+21%, gate ≤ 0.0643), p99 2.1×, same-top 95.2% vs 96.6%. Speed and haystack not run |
 | H39r | At 200 W, `GGML_PASCAL_DEQUANT_STAGED=1` lifts 1-card IQ3_S 16k prefill ≥2% (was +1–4.5% at 175 W) | **Pre-registered** 2026-10-15; `scripts/run-h39r-1card-200w.sh` |
 
 ---
@@ -2928,6 +2928,15 @@ Served step (f16 KV, 200 W): 68.4 ms at 16k (`p15-200w-16k`, 3.25 tok/step) → 
 **Test:** download, KLD first (cheapest; abort if clearly worse), then 16k speed REPS=3, then haystack. IQ4_XS already runs on mmvh (fork), so no kernel work.
 
 **Gates as run** (`scripts/run-h53-iq4xs.sh`, fixed before the run): KLD 8x512 ub 8 vs a fresh Q5_K_M FP32 reference, Q4_K_M re-measured in the same run under the current env; pass = IQ4_XS mean KLD ≤ Q4_K_M + 0.005 and same-top ≥ Q4_K_M − 0.5 pt. Then 16k decode REPS=3 vs `p15-200w-16k(-r3)`, pass ≥ 5%. Then the 100k haystack with f16 KV, pass = every question `p8-ref` answers. Each failed gate stops the driver.
+
+**Result (REFUTED at gate 1, `results/h53-kld.csv`):** vs a fresh Q5_K_M FP32 reference, current serve env, ub 8:
+
+| Quant | mean KLD | p99 KLD | p99.9 KLD | same top |
+|---|---|---|---|---|
+| Q4_K_M | 0.0593 | 0.369 | 18.6 | 96.62% |
+| IQ4_XS | 0.0719 | 0.761 | 15.7 | 95.25% |
+
+Mean KLD is 21% worse and the p99 tail is 2× worse, beyond the pre-set +0.005 margin. Same-top is 1.4 pt lower against a −0.5 pt limit. Q4_K_M re-measured here (0.0593) agrees with H30 (0.0568–0.0592), so the reference is sound. The 16k speed arm and the haystack were cancelled by the driver; no decode number exists for IQ4_XS, and none is needed. The GGUF stays on disk (14 GB, 36 GB free); delete it if space is needed.
 
 ## H39r — staged dequant re-test, 1 card, 200 W
 
