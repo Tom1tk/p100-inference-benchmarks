@@ -49,6 +49,7 @@ run label so the evidence is traceable.
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
 | H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |
 | H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+6.1%** (42.39 → 44.96), prefill flat; KLD 0.1241 vs 0.1261 off |
+| H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | Pre-registered (2026-10-15) |
 
 ---
 
@@ -2697,3 +2698,24 @@ The gain is ~4× the prediction, because the prediction came from the drafter-fr
 (`mtp-Qwen3.8-27B-Q4_0.gguf`; the name is misleading) has **no Q4_0 tensors**. Its `output.weight`
 (248320×5120) is **Q3_K, 546 MB**, read on every draft token. LOWBIT moves it from mmvq to mmvh. Lesson for
 sizing: size decode levers from a trace *with* the drafter on, and check the drafter's tensor types.
+
+## H45 — Drafter LM head trimmed to a vocab prefix
+
+**Claim.** The drafter's `output.weight` (Q3_K, 546 MB, split 273 MB/card) is read on every draft token, about 9% of decode bytes. A head of the first K = 98,304 rows (216 MB, 108 MB/card) cuts that by 60%. Expected gain: up to about +5% decode.
+
+**Why lossless.** The target verifies every draft token, so output must be byte-identical to `h44-lowbit-16k`. Only acceptance can fall: a draft can never be an id ≥ K. Offline tokenisation of code and Markdown (CPU, llama-tokenize) puts ids ≥ 96k at 0.01–0.6% of tokens; ids ≥ 64k were 2.5–2.9%, so K = 64k was rejected.
+
+**How.**
+- `scripts/pascal-trim-mtp-head.py` in the fork writes `blk.64.nextn.shared_head_head.weight` as the row prefix. The MTP graph already prefers that tensor.
+- The fork loader accepts ne[1] ≤ n_vocab, and the tensor split puts it on axis 1, like `output.weight`.
+- Drafter sampling runs on the backend (top-k 10 on a K-wide row), so ids need no remap. The raw-logits copy asserts a full-width head.
+
+**Test.** 2-card 16k, REPS=3, serve env, the trimmed drafter swapped in. Control is banked: `h44-lowbit-16k` 44.96 / 366.4, acceptance 72.8% (2 reps).
+
+**Gate.**
+- Output identical to the control.
+- Decode above 44.96 + noise.
+- Acceptance no more than about 1 point lower.
+
+**1-card arm:** parked by rule zero. The 1-card command (`h42-1card-iq3-lowbit`) runs with no drafter, so this lever can't touch it.
+

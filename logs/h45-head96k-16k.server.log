@@ -1,0 +1,56 @@
+0.00.306.819 I srv  llama_server: initializing ...
+0.00.306.835 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.307.735 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.310.007 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+0.00.310.167 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.10.854.947 I cmn          init: llama threadpool init, n_threads = 8
+0.11.521.413 I common_speculative_init_result: loading draft model '/root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf'
+0.17.799.275 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 16384, kv_unified = 'true'
+0.17.799.359 W set_sampler: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU
+0.17.799.360 W spec common_specu: backend offload failed for seq_id=0; using CPU sampler
+0.17.799.364 W spec common_specu: backend offload failed for seq_id=1; using CPU sampler
+0.17.799.365 W spec common_specu: backend offload failed for seq_id=2; using CPU sampler
+0.17.799.365 W spec common_specu: backend offload failed for seq_id=3; using CPU sampler
+/root/llama.cpp-Pascal/src/llama-context.cpp:2056: GGML_ASSERT(t_logits->ne[0] == n_vocab && "trimmed LM head needs backend sampling") failed
+[New LWP 531234]
+[New LWP 531233]
+[New LWP 531232]
+[New LWP 531231]
+[New LWP 531230]
+[New LWP 531229]
+[New LWP 531228]
+[New LWP 531227]
+[New LWP 531226]
+[New LWP 531225]
+[New LWP 531224]
+[New LWP 531223]
+[New LWP 531222]
+[New LWP 531221]
+[New LWP 531220]
+[New LWP 531219]
+[New LWP 531218]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x00007972c4910813 in __GI___wait4 (pid=531401, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+#0  0x00007972c4910813 in __GI___wait4 (pid=531401, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x00007972c4f37d43 in ggml_print_backtrace () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libggml-base.so.0
+#2  0x00007972c4f37eeb in ggml_abort () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libggml-base.so.0
+#3  0x00007972c3e3b63a in llama_context::decode(llama_batch_ext const&) () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libllama.so.0
+#4  0x00007972c444b7ca in common_context_can_seq_rm(llama_context*) () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libllama-common.so.0
+#5  0x00007972c517a2cb in server_context_impl::load_model(common_params&) () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libllama-server-impl.so
+#6  0x00007972c50d01ff in llama_server(common_params&, int, char**, server_child&) () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libllama-server-impl.so
+#7  0x00007972c50d1701 in llama_server(int, char**) () from /root/llama.cpp-Pascal/build-cuda-p100/bin/libllama-server-impl.so
+#8  0x00007972c482a1ca in __libc_start_call_main (main=main@entry=0x59197361f270 <main>, argc=argc@entry=29, argv=argv@entry=0x7ffed1a02a48) at ../sysdeps/nptl/libc_start_call_main.h:58
+warning: 58	../sysdeps/nptl/libc_start_call_main.h: No such file or directory
+#9  0x00007972c482a28b in __libc_start_main_impl (main=0x59197361f270 <main>, argc=29, argv=0x7ffed1a02a48, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7ffed1a02a38) at ../csu/libc-start.c:360
+warning: 360	../csu/libc-start.c: No such file or directory
+#10 0x000059197361f2a5 in _start ()
+[Inferior 1 (process 531162) detached]
