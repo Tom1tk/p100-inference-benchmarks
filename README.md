@@ -40,12 +40,12 @@ Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 
 Adopted 2026-10-14 after it passed the Phase 8 quality gate (H32: 19/19 at 100k, vs 18/19
 for the Q5_K_M FP32 reference). Fork levers: half2 matvec incl. Q6_K (H28, H34), F16
-AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run).
+AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run), branch-free Q4_K/Q5_K scale unpack (H43, output identical, no flag).
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
 | 98k | 26.94 t/s | 231.97 t/s (~421 s TTFT) | 65.3% | 12,227 MiB | 66 °C | `serve-fork-100k` (q8_0 KV, REPS=1) |
-| 16k | 41.51 t/s | 365.4 t/s | 72.8% | 11,053 MiB | 65 °C | `h41-wide-16k` (f16 KV, REPS=2; +2.8% decode from the Q6_K 4-lane matvec vs `h36-duplex-16k` 40.37 / 365.3) |
+| 16k | 42.39 t/s | 366.4 t/s | 72.8% | 11,053 MiB | 65 °C | `h43-k4scale-16k` (f16 KV, REPS=2; +2.1% decode from branch-free Q4_K/Q5_K scales, fork aea9046, vs `h41-wide-16k` 41.51 / 365.4) |
 
 Every lever behind that line, and every number, is in
 [RESULTS.md](RESULTS.md). What is still open is in RUNBOOK §7.

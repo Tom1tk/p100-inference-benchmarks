@@ -47,7 +47,7 @@ run label so the evidence is traceable.
 | H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
-| H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | Pre-registered (2026-10-15) |
+| H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |
 
 ---
 
@@ -2642,3 +2642,13 @@ so the output should be bit-identical. Micro-bench vs the old code: Q4_K 61.4 / 
   inside REPS=2 noise. The change is bit-identical, so there is no quality question to answer on 1 card.
 
 **Driver.** `scripts/run-h43-k4scale.sh`.
+
+**Result (2026-10-15, bench "H43 branch-free K-quant scales 2-card 16k").**
+
+| Arm (rep 1 / rep 2) | decode t/s | prefill t/s | accept | vs `h41-wide-16k` (41.51 / 365.4) |
+|---|---|---|---|---|
+| `h43-k4scale-16k` | 42.42 / 42.36 | 359.95 / 366.37 | 72.8% | decode **+2.1%**, prefill flat |
+
+Greedy output is identical to `h41-wide-16k` (1357 chars), with the same acceptance, so H32 still holds.
+Inside the predicted +2–4%. **Verdict: adopted.** The change is in the binary with no flag, so the
+serve command line is unchanged.
