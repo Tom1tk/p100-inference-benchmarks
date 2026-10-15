@@ -2757,3 +2757,16 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 - **Reading.** Any change to the attention arithmetic flips a handful of hypersensitive tokens in `h26-100k-prompt.txt` at 4–8k depth, each with a KLD of about 30. The mean KLD of an attention lever is therefore dominated by that tail. An absolute "≤ 0.001" gate can't be met even by the tile kernel vs non-FA.
 - **H38 was refuted on this artifact.** Its 0.321 (median 0.000065, max 29.5) has the same shape. The H38 code is gone, and H46 is faster than H38 was, so H38 stays closed.
 - **Re-specified gate (applied after the result, stated openly):** GEMM's KLD vs the non-FA reference must be ≤ tile's. It is (0.555 vs 0.581; same top 92.87 vs 92.63%). **Pass.** The H32 100k haystack before any README change stays as the end-to-end quality check.
+
+**Speed (2026-10-15, `scripts/run-h46-fa-gemm.sh`, SKIP_KLD=1).**
+
+| Arm | reps | decode t/s | prefill t/s | accept |
+|---|---|---|---|---|
+| 1-card IQ3_S 16k, control `h42-1card-iq3-lowbit` | 2 | 17.90 | 201.2 | — |
+| 1-card IQ3_S 16k, `h46-1card-iq3-fagemm` | 3 | 18.02 | 205.2 (200.3 / 207.7 / 207.6) | — |
+| 2-card serve 100k, control `h46-ctrl-100k` | 3 | 29.65 | 231.36 | 65.3% |
+| **2-card serve 100k, `h46-fagemm-100k`** | 3 | 28.38 | **275.75** | 60.5% |
+
+- **Prefill at 100k: +19.2%**, reps within ±0.05 t/s. At 16k on one card the gain is ~+3% (rep 1 low), as expected: attention is a small share of prefill at short depth.
+- **Decode −4.3% is the text, not the kernel.** The GEMM path only fires for n_q ≥ 512, so decode and MTP-verify batches run the exact same kernels. Greedy output diverges from control at char 1066 (`compare-outputs`), and the new continuation drafts worse (257/425 vs 264/404 accepted). Same prompt, different words: a content effect, not a speed regression. The 10-rep headline will average this in.
+- Speed gate: **pass**. Adoption waits on the H32 100k haystack (`scripts/run-h46-haystack.sh`).
