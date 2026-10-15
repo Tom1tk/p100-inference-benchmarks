@@ -2913,3 +2913,5 @@ Served step (f16 KV, 200 W): 68.4 ms at 16k (`p15-200w-16k`, 3.25 tok/step) → 
 **Claim:** IQ4_XS (~10% fewer weight bytes than Q4_K_M) lifts 2-card decode ≥5% and passes the Phase 8 gate (KLD vs the Q5_K_M FP32 reference no worse than ~Q4_K_M's 0.057 + noise; 100k haystack ≥ 18/19).
 
 **Test:** download, KLD first (cheapest; abort if clearly worse), then 16k speed REPS=3, then haystack. IQ4_XS already runs on mmvh (fork), so no kernel work.
+
+**Gates as run** (`scripts/run-h53-iq4xs.sh`, fixed before the run): KLD 8x512 ub 8 vs a fresh Q5_K_M FP32 reference, Q4_K_M re-measured in the same run under the current env; pass = IQ4_XS mean KLD ≤ Q4_K_M + 0.005 and same-top ≥ Q4_K_M − 0.5 pt. Then 16k decode REPS=3 vs `p15-200w-16k(-r3)`, pass ≥ 5%. Then the 100k haystack with f16 KV, pass = every question `p8-ref` answers. Each failed gate stops the driver.

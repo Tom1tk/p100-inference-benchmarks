@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Phase 8 tier 2: one 100k haystack, 19 questions, on one serve config.
-# Usage: [BIN=..] [MODEL=..] [SPEC=mtp|none] [SPLIT=tensor|none] [env GGML_CUDA_*] run-phase8-tier2.sh <label>
+# Usage: [BIN=..] [MODEL=..] [SPEC=mtp|none] [SPLIT=tensor|none] [KV=q8_0|f16] [env GGML_CUDA_*] run-phase8-tier2.sh <label>
 # Everything not listed is the frozen serve command (QUALITY-PLAN §0).
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,7 +12,7 @@ DRAFT=(); [[ $SPEC == mtp ]] && DRAFT=(--spec-type draft-mtp -md /root/mtp-Qwen3
 mkdir -p logs
 ABORT_TEMP=80 INTERVAL=2 ./scripts/gpu-monitor.sh > "logs/p8-$LABEL-temps.log" 2>/dev/null &
 MON=$!
-"$BIN" -m "$MODEL" "${DRAFT[@]}" -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 \
+"$BIN" -m "$MODEL" "${DRAFT[@]}" -ngl 99 -fa 1 -t 8 -ctk "${KV:-q8_0}" -ctv "${KV:-q8_0}" -b 2048 -ub 2048 \
     -c 100000 -np 1 -sm "$SPLIT" --host 127.0.0.1 --port $PORT > "logs/p8-$LABEL-server.log" 2>&1 &
 SRV=$!
 for _ in $(seq 1 180); do
