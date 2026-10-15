@@ -1,0 +1,35 @@
+0.00.315.133 I srv  llama_server: initializing ...
+0.00.315.149 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.316.055 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.318.294 I srv    load_model: loading model '/root/Qwen3.8-27B-UD-Q4_K_M.gguf'
+0.00.318.460 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.04.790.136 I cmn          init: llama threadpool init, n_threads = 8
+0.10.887.738 I common_speculative_init_result: loading draft model '/root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf'
+0.11.995.995 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 16384, kv_unified = 'true'
+0.11.996.079 W set_sampler: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU
+0.11.996.082 W spec common_specu: backend offload failed for seq_id=0; using CPU sampler
+0.11.996.086 W spec common_specu: backend offload failed for seq_id=1; using CPU sampler
+0.11.996.088 W spec common_specu: backend offload failed for seq_id=2; using CPU sampler
+0.11.996.088 W spec common_specu: backend offload failed for seq_id=3; using CPU sampler
+0.12.177.577 W srv          init: chat template supports preserving reasoning, it is enabled by default (may use more tokens, disable via --no-reasoning-preserve)
+0.12.177.627 I srv  llama_server: model loaded
+0.12.177.632 I srv  llama_server: listening on http://127.0.0.1:8300
+0.19.923.560 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.19.923.684 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.25.757.933 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   2090, progress = 0.15, t =   4.37 s / 478.35 tokens per second
+0.30.546.945 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4138, progress = 0.29, t =   9.24 s / 447.99 tokens per second
+0.35.413.500 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6186, progress = 0.44, t =  14.08 s / 439.46 tokens per second
+0.40.405.381 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   8234, progress = 0.58, t =  19.07 s / 431.75 tokens per second
+0.45.486.497 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  10282, progress = 0.72, t =  24.12 s / 426.26 tokens per second
+0.50.441.193 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  12139, progress = 0.86, t =  29.11 s / 416.94 tokens per second
+0.55.883.029 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  14183, progress = 1.00, t =  34.47 s / 411.41 tokens per second
+0.59.217.827 I slot print_timing: id  3 | task 0 | n_gen =    150, tg =  49.45 t/s, tg_3s =  49.78 t/s
+1.02.248.114 I slot print_timing: id  3 | task 0 | n_gen =    283, tg =  46.66 t/s, tg_3s =  43.89 t/s
+1.04.673.489 I slot print_timing: id  3 | task 0 | prompt eval time =   36280.64 ms / 14187 tokens (    2.56 ms per token,   391.03 tokens per second)
+1.04.673.498 I slot print_timing: id  3 | task 0 |        eval time =    8468.92 ms /   400 tokens (   21.23 ms per token,    47.11 tokens per second)
+1.04.673.500 I slot print_timing: id  3 | task 0 |       total time =   44749.56 ms / 14587 tokens
+1.04.673.506 I slot print_timing: id  3 | task 0 |    graphs reused =        119
+1.04.673.507 I slot print_timing: id  3 | task 0 |   graph reallocs =          0    /     0        (same size) / (changed size)
+1.04.673.515 I slot print_timing: id  3 | task 0 | draft acceptance = 0.75890 (  277 accepted /   365 generated), mean len =  3.27
+1.04.674.442 I slot      release: id  3 | task 0 | stop processing: n_tokens = 14586, truncated = 0
+1.04.752.563 I srv    operator(): operator(): cleaning up before exit...
