@@ -63,6 +63,7 @@ run label so the evidence is traceable.
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
 | H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **Pre-registered** 2026-10-15; instrumentation only, read from every run's `logs/<label>.cap` |
 | H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **Pre-registered** 2026-10-15; needs a download and the KLD + haystack gate |
+| H39r | At 200 W, `GGML_PASCAL_DEQUANT_STAGED=1` lifts 1-card IQ3_S 16k prefill ≥2% (was +1–4.5% at 175 W) | **Pre-registered** 2026-10-15; `scripts/run-h39r-1card-200w.sh` |
 
 ---
 
@@ -2915,3 +2916,12 @@ Served step (f16 KV, 200 W): 68.4 ms at 16k (`p15-200w-16k`, 3.25 tok/step) → 
 **Test:** download, KLD first (cheapest; abort if clearly worse), then 16k speed REPS=3, then haystack. IQ4_XS already runs on mmvh (fork), so no kernel work.
 
 **Gates as run** (`scripts/run-h53-iq4xs.sh`, fixed before the run): KLD 8x512 ub 8 vs a fresh Q5_K_M FP32 reference, Q4_K_M re-measured in the same run under the current env; pass = IQ4_XS mean KLD ≤ Q4_K_M + 0.005 and same-top ≥ Q4_K_M − 0.5 pt. Then 16k decode REPS=3 vs `p15-200w-16k(-r3)`, pass ≥ 5%. Then the 100k haystack with f16 KV, pass = every question `p8-ref` answers. Each failed gate stops the driver.
+
+## H39r — staged dequant re-test, 1 card, 200 W
+
+**Why only this one:** the RUNBOOK §1 re-test list assumed the cap clawed back prefill gains. H52 counters show the 2-card arm at 0 s power-capped at 200 W (16k and 98k), so the 2-card re-tests (H39 2-card, H14 `-ub 4096`, H40, P5 FA tiles) are parked by rule zero. The 1-card arm was capped ~50% of busy time at 175 W and has no 200 W data.
+
+**Claim:** staged dequant lifts 1-card IQ3_S 16k prefill ≥2% at 200 W with identical output.
+
+**Test:** fresh 1-card control at 200 W (banked 1-card rows are 175 W), then staged; REPS=3 each, current env. The control also gives the 1-card H52 reading.
+
