@@ -260,8 +260,8 @@ change the serve command. Refreshed 2026-10-15.
 |---|---|---|---|
 | 1 | "Re-test at the higher cap" list (§1), at 200 W | H15 done 2026-10-15 (200 W chosen, +4.4% prefill at 98k); parked marginal levers may have grown | One 16k arm per lever, REPS=3; 1-card arms matter most (it was capped ~50% of busy time) |
 | 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
-| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | `scripts/run-p5-fork.sh` (label `p5-fork-serve-r2`); prefill levers are settled, so next |
-| 5 | TurboQuant | Kept last by user call | After everything above |
+| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) on **opencode v2** (replaces pi, user call 2026-10-15) | The deployment target itself; carries H51 | **Pause for the user before the GPU run** (heavy) |
+| 2 | **Round 3 (H48–H53, HYPOTHESES):** f16 KV at 98k, draft length, 98k decode profile, power-cap counter, UD-IQ4_XS | User call 2026-10-15, each REPS ≥ 3 | H51 runs inside Phase 5 |
 | 6 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 
 Done on 2026-10-14 and folded into the command or the 1-card arm: H19 prompt cache (defaults), H17 (closed as
@@ -294,7 +294,7 @@ command today. Re-open only on the stated unblock.
 | Single-GPU serving on stock builds (H20/H25) | 56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k. **User call, 2026-08-27.** Reopened 2026-10-14 for fork builds only, see CLAUDE.md Scope |
 | PFlash — product, fork, technique (H21) | sm_80-only, no v2, hand-port not worth it. Fork kept on disk only for `llama-niah` |
 | TurboPrefill (H16) | Forces `-sm layer`, −35% decode. User call |
-| TurboQuant KV (H4/H7) | −14.3% decode for 788 MiB |
+| TurboQuant KV (H4/H7) | −14.3% decode for 788 MiB. **Dropped from the queue, user call 2026-10-15** |
 | `buun` as an engine | Its prefill deficit was the H17 fix; its only exclusive feature is TurboQuant |
 | DFlash2 as the drafter (H8) | Layer-only; tensor + MTP beats layer + DFlash2 by +71% decode. Still an arm in Phase 8 Sweep D |
 | Q8 drafters (H9) | Accept less, same speed, +0.87 GiB |

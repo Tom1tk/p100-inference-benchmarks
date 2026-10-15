@@ -56,6 +56,12 @@ run label so the evidence is traceable.
 | H45 | Trimming the MTP drafter's LM head to the first 98,304 vocab rows (`mtp-…-head96k.gguf`, fork loader change) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+3.1%** (44.96 → 46.35, 3 reps 46.31/46.38/46.35), acceptance unchanged (72.8%, 273/375), prefill flat, +104 MiB/card |
 | H46 | `GGML_PASCAL_FA_GEMM=1`: prefill flash attention via cuBLAS GEMMs (Q·K fp32-accumulate, P·V HGEMM, online softmax per 4096-token KV chunk) instead of the tile kernel lifts prefill at depth | **Confirmed, adopted** (2026-10-15): prefill at 98k **+19.2%** (231.36 → 275.75), 1-card 16k ~+3%; KLD no worse than tile vs a non-FA reference (0.555 vs 0.581); H32 haystack 19/19. Decode −4.3% is changed greedy text drafting worse, not the kernel |
 | H47 | `GGML_PASCAL_FA_GEMM_QK16=1`: H46's Q·K GEMM in fp16 compute (Q pre-scaled) lifts prefill at depth within H46's quality | **Refuted** (2026-10-15): FA −29% in micro-bench, but KLD vs the non-FA reference 0.618 > tile's 0.581 and same-top 92.30% < 92.63%. Code reverted (fork d3c1c12) |
+| H48 | f16 KV instead of q8_0 at 98k lifts prefill ≥3% (FA_GEMM skips the per-call q8_0→f16 convert of all of K and V) and fits in VRAM | **Pre-registered** 2026-10-15 |
+| H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **Pre-registered** 2026-10-15 |
+| H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Pre-registered** 2026-10-15 (diagnostic) |
+| H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
+| H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **Pre-registered** 2026-10-15; instrumentation only, read from every run's `logs/<label>.cap` |
+| H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **Pre-registered** 2026-10-15; needs a download and the KLD + haystack gate |
 
 ---
 
@@ -2837,3 +2843,49 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 | 200 W `p15-200w-98k` | 28.44 | 287.8 | **+4.4%** | 70 °C |
 
 - 98k gains the same as 16k at 200 W (+4.4% vs +4.5%): the long prompt is not more cap-bound than the short one. 220 W at 98k not yet run (user's call).
+
+---
+
+# Round 3 (2026-10-15, user call: ideas 1–6 from the wrap-up review; TurboQuant dropped)
+
+All arms REPS ≥ 3 (user: "at least 3 runs of each"). Running cap 200 W; controls must be at 200 W.
+
+## H48 — f16 KV at 98k
+
+**Claim:** with `-ctk f16 -ctv f16` instead of `q8_0`, 98k prefill rises ≥3%, decode moves less than ±3%, and the command still fits.
+
+**Reasoning:** `fattn-pascal-gemm.cuh` builds an f16 view of K and V per call; for f16 it is a no-op view, for q8_0 it converts the **whole** cache (up to 98k rows) into the FA buffer, for each of the 16 attention layers on every ubatch. VRAM estimate (4 KV heads × D256, 16 layers, split over 2 cards): f16 ≈ 3.05 GiB/card vs q8_0 ≈ 1.62 GiB → **+1.4 GiB/card**, from 12,331 to ~13,800 of 16,269 MiB. q8_0 was chosen for headroom (H25), not for fit. Quality: f16 is the reference precision, so no KLD gate.
+
+**Test:** `scripts/run-h48-f16kv-98k.sh`. Control: `p15-200w-98k` (2 reps) + one more rep `p15-200w-98k-r3` → 3. Arm `h48-f16kv-98k` REPS=3. **Skip rule:** stop after rep 1 if prefill is not 1.5% over the control mean, or on load OOM.
+
+## H49 — MTP draft length
+
+**Claim:** `--spec-draft-n-max` ≠ 3 lifts decode ≥2% at one of the two depths. Greedy verification means the output must be identical; if it is not, the arm is invalid.
+
+**Reasoning:** ~3 drafts per step today. Acceptance is 75.9% at 16k but 60.5% at 98k, so the best length likely differs by depth (longer at 16k, shorter at 98k).
+
+**Test:** `scripts/run-h49-draft-n.sh`. 16k: n = 2, 4, 5, REPS=3 each, control `p15-200w-16k` + `p15-200w-16k-r3`. 98k: decode-only via `CACHE_PROMPT=1` (rep 1 prefills, reps 2+ reuse the prompt KV), n = 3 (control under the same cache path), then the 16k winner's direction. **Skip rule:** at 16k, stop going further in a direction once a step loses; at 98k only test the direction that won at 16k plus n=2.
+
+## H50 — what bounds decode at 98k
+
+**Claim:** attention over the 98k KV cache is the largest cause of the 40% decode drop from 16k to 98k (the rest: acceptance 75.9% → 60.5%).
+
+**Test (diagnostic, cheapest first):** `test-backend-ops perf -o FLASH_ATTN_EXT` at the decode shapes (n_q = verify batch 1–4, kv 16k and 98k, q8_0 and f16, D256, GQA 6, per-card heads), seconds of GPU. Multiply by 16 layers and compare with the measured step time. Only if attention is > ~30% of the 98k step: design a fork kernel lever (split-KV decode for sm_60), pre-registered separately.
+
+## H51 — opencode agentic serving (inside Phase 5)
+
+**Claim:** with opencode v2 as the harness (user call 2026-10-15, replaces pi: it is what the user runs for real and is reported to keep a stable prompt prefix), the server's prompt-cache hit rate is ≥90% of prompt tokens after turn 1, and `--slot-save-path` (KV persisted across a restart) plus context checkpoints (`--ctx-checkpoints`, `--checkpoint-min-step`; the GDN layers are recurrent, so a diverging prefix can only roll back to a checkpoint) cut the remaining re-prefill.
+
+**Test:** Phase 5 re-run on opencode. Per request, record `n_prompt_tokens`, cached tokens and prefill time from the server log. **Paused before the GPU run (user call).**
+
+## H52 — is 200 W still limiting?
+
+**Claim:** at 200 W the cards spend ≥10% of an arm clock-limited by the power cap.
+
+**Test:** no run of its own. `run-spec-placement.sh` now reads the driver's `clocks_event_reasons_counters.sw_power_cap` before and after each arm and writes seconds capped per card into `logs/<label>.cap`. Read across H48/H49. Background: boost reaches 1328 MHz, the P100 maximum, which is why 250 W bought nothing at 16k.
+
+## H53 — UD-IQ4_XS on 2 cards
+
+**Claim:** IQ4_XS (~10% fewer weight bytes than Q4_K_M) lifts 2-card decode ≥5% and passes the Phase 8 gate (KLD vs the Q5_K_M FP32 reference no worse than ~Q4_K_M's 0.057 + noise; 100k haystack ≥ 18/19).
+
+**Test:** download, KLD first (cheapest; abort if clearly worse), then 16k speed REPS=3, then haystack. IQ4_XS already runs on mmvh (fork), so no kernel work.

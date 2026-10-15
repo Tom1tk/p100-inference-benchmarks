@@ -73,12 +73,13 @@ if [[ -z "$PROMPT_FILE" ]]; then
     printf '%s' "$DEFAULT_PROMPT" > "$PROMPT_FILE"
 fi
 PAYLOAD="logs/${LABEL}.payload.json"
-python3 - "$PROMPT_FILE" "$N_PREDICT" "$PAYLOAD" <<'PYBUILD' || { echo "ERROR: could not build request payload" >&2; exit 2; }
+# CACHE_PROMPT=1: reps after the first reuse the prompt KV, so only rep 1 has a real prefill figure (decode-only levers at depth)
+python3 - "$PROMPT_FILE" "$N_PREDICT" "$PAYLOAD" "${CACHE_PROMPT:-0}" <<'PYBUILD' || { echo "ERROR: could not build request payload" >&2; exit 2; }
 import json, sys
 prompt = open(sys.argv[1], encoding='utf-8').read()
 json.dump({"messages": [{"role": "user", "content": prompt}],
            "temperature": 0, "top_k": 1, "seed": 42,
-           "max_tokens": int(sys.argv[2]), "cache_prompt": False,
+           "max_tokens": int(sys.argv[2]), "cache_prompt": sys.argv[4] == "1",
            "timings_per_token": False}, open(sys.argv[3], 'w', encoding='utf-8'))
 PYBUILD
 SERVER_LOG="logs/${LABEL}.server.log"
@@ -87,6 +88,8 @@ RAW="results/h11/${LABEL}.jsonl"
 CSV="results/h11-placement.csv"
 : > "$RAW"
 nvidia-smi --query-gpu=power.limit --format=csv,noheader | paste -sd' ' > "logs/${LABEL}.cap"  # H15: cap is not in the CSV
+pcap() { nvidia-smi --query-gpu=clocks_event_reasons_counters.sw_power_cap --format=csv,noheader,nounits | paste -sd' '; }
+PCAP0=$(pcap); T0=$SECONDS
 
 if [[ ! -f "$CSV" ]]; then
     echo "label,spec_type,drafter,placement,rep,decode_tps,prefill_tps,n_decoded,draft_n,draft_accepted,accept_pct,gpu0_mib,gpu1_mib,peak_temp,load_s,outcome" > "$CSV"
@@ -131,6 +134,8 @@ SERVER_CMD=(
 [[ -n "$BATCH" ]] && SERVER_CMD+=( -b "$BATCH" )
 [[ -n "$UB"    ]] && SERVER_CMD+=( -ub "$UB" )
 [[ -n "$NP"    ]] && SERVER_CMD+=( -np "$NP" )
+# EXTRA_ARGS: extra llama-server flags, word-split (e.g. "--spec-draft-n-max 4")
+[[ -n "${EXTRA_ARGS:-}" ]] && SERVER_CMD+=( $EXTRA_ARGS )
 if [[ "$DRAFTER" == embedded ]]; then
     # MTP head inside the target GGUF (nextn_predict_layers=1): no -md needed.
     SERVER_CMD+=( --spec-type "$SPEC_TYPE" )
@@ -212,4 +217,8 @@ PY
     OK_REPS=$(( OK_REPS + 1 ))
 done
 
+# Idea 5: time each card spent clock-limited by the power cap, over the whole arm (load + idle included)
+read -ra P0 <<<"$PCAP0"; read -ra P1 <<<"$(pcap)"
+msg="power-capped over $(( SECONDS - T0 ))s wall:"; for i in "${!P1[@]}"; do msg+=" gpu$i $(( (P1[i] - P0[i]) / 1000000 ))s"; done
+echo "$msg" | tee -a "logs/${LABEL}.cap"
 [[ "$OK_REPS" -gt 0 ]] || { echo "ERROR: $LABEL produced no successful reps" >&2; exit 1; }
