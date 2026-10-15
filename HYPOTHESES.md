@@ -23,7 +23,7 @@ run label so the evidence is traceable.
 | H12 | `ik`'s graph-split tuning knobs (`-smf16`, `-gap`, `-smgs`, `-sas`) change the `-sm graph` verdict | Untested (unblocked — target: graph's -23% prefill decay) |
 | H13 | 27B prefill holds ≥150 t/s at 100k — it decays less than the 9B did, because 49 of 65 layers are linear-cost | Untested — **run first** |
 | H14 | `-ub` 512→1024/2048 improves prefill ≥10% | **CONFIRMED 2026-08-25 — +63%.** Use `-ub 2048` |
-| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | Untested — **approved to 220 W** |
+| H15 | Lifting the 175 W cap to 220 W improves prefill ≥15% and decode <3% | **Partly refuted at 16k** (2026-10-15): prefill +4.5% at 200 W, +6.4% at 220 W; decode +0.3%. 98k pending |
 | H16 | ~~TurboPrefill nets a TTFT win at 64k~~ | **Withdrawn 2026-08-25** — user call. Costs 35% of decode |
 | H17 | The sm_60 FP16 fast-path fix is throughput-free and changes model output | **Measured 2026-08-27 — REFUTED on throughput.** Costs **12-13% of prefill**, gains only **+0.36%** decode (claimed +1.4%). Not free, so not adopted; **parked for a decision** that needs quality data. It also explains ~all of buun's prefill deficit |
 | H18 | Gated-delta-net layers, not GEMMs, dominate prefill | **Supported 2026-08-27, numerically, as a free side effect of H17.** Halving the GEMM rate cost only 12-13% of prefill, implying **~15% of prefill time is GEMM-rate-bound and ~85% is not.** Still a diagnostic, not a lever — the prize is real but H22 crashes trying to collect it. **Refuted 2026-10-14 by Phase 0 op timings: GEMMs ~87% of prefill, GDN scan ~6% (`results/phase0/`).** |
@@ -2802,3 +2802,14 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 - **Prefill +4.5%, decode flat (+0.2%)**, output identical (1224 chars). Heat: +1 °C peak.
 - Side result: H46 at 16k on 2 cards (175 W) is 376.4 vs `h45-head96k-16k` 365.8, +2.9%.
 - Cap restored to the user's 200 W after the control arm.
+
+**Step 2 — 220 W (user-set, `scripts/run-h15-220w.sh`, controls banked above):** `p15-220w-16k` decode 47.63 (47.63 / 47.63), prefill **400.5** (398.7 / 402.4), peak 68 °C, peak power 221 / 213 W. Output identical.
+
+| Cap | prefill | vs 175 W | step gain |
+|---|---|---|---|
+| 175 W | 376.4 | — | — |
+| 200 W | 393.5 | +4.5% | +4.5% per 25 W |
+| 220 W | 400.5 | +6.4% | +1.8% per 20 W |
+
+- **Diminishing returns.** At 220 W card 1 peaks at 213 W, under the cap: at 16k the 2-card arm is mostly no longer power-limited, so 250 W would add little here. Decode is flat at every cap (+0.3% total).
+- 98k (attention-heavy, longer sustained load) may still be cap-bound; next step is the user's call.
