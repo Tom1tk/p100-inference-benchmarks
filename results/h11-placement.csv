@@ -195,3 +195,6 @@ h39r-1card-ctrl,none,none,default,3,18.37,214.11,400,0,0,,13161,259,70,183,ok
 h39r-1card-staged,none,none,default,1,18.40,220.76,400,0,0,,13161,259,68,20,ok
 h39r-1card-staged,none,none,default,2,18.39,220.22,400,0,0,,13161,259,69,20,ok
 h39r-1card-staged,none,none,default,3,18.39,220.03,400,0,0,,13161,259,70,20,ok
+h39r-2card-staged,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.42,354.11,400,365,277,75.9,11157,11157,63,305,ok
+h39r-2card-staged,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.47,397.11,400,365,277,75.9,11157,11157,66,305,ok
+h39r-2card-staged,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,47.70,395.77,400,365,277,75.9,11157,11157,68,305,ok
