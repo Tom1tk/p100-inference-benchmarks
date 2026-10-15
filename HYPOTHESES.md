@@ -58,7 +58,7 @@ run label so the evidence is traceable.
 | H47 | `GGML_PASCAL_FA_GEMM_QK16=1`: H46's Q·K GEMM in fp16 compute (Q pre-scaled) lifts prefill at depth within H46's quality | **Refuted** (2026-10-15): FA −29% in micro-bench, but KLD vs the non-FA reference 0.618 > tile's 0.581 and same-top 92.30% < 92.63%. Code reverted (fork d3c1c12) |
 | H48 | f16 KV instead of q8_0 at 98k lifts prefill ≥3% (FA_GEMM skips the per-call q8_0→f16 convert of all of K and V) and fits in VRAM | **Refuted (prefill)** 2026-10-15: rep 1 prefill 287.96 vs control 287.87 (3 reps); skip rule fired. Fits (13,573 MiB/card). Decode moved instead → H48b |
 | H48b | f16 KV cuts 98k decode step time ≥5% vs q8_0 (unexpected in H48 rep 1: 88.7 vs 98.4 ms/step, decode 32.91 vs 28.42) | **Confirmed** 2026-10-15: 88.7 vs 98.4 ms/step (−9.9%, REPS=3 each), decode 32.83 vs 28.42 t/s; adopted (`-ctk f16 -ctv f16`) |
-| H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **Pre-registered** 2026-10-15 |
+| H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **REFUTED** 2026-10-15: n=3 is best. 16k n=2 −4.5%, n=4 −26%; 98k n=2 −8.0%. Output identical everywhere. n=4 step-time cliff (+36 ms at a 5-token verify batch) → candidate H55 |
 | H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Below bar** 2026-10-15: f16 decode attention ≈ 20.0 ms of the 88.7 ms 98k step (22.5% < 30%); no kernel lever by the rule. Kernel runs at ~160 GB/s of ~550 → candidate H54 |
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
 | H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **Pre-registered** 2026-10-15; instrumentation only, read from every run's `logs/<label>.cap` |
@@ -2879,6 +2879,18 @@ All arms REPS ≥ 3 (user: "at least 3 runs of each"). Running cap 200 W; contro
 **Reasoning:** ~3 drafts per step today. Acceptance is 75.9% at 16k but 60.5% at 98k, so the best length likely differs by depth (longer at 16k, shorter at 98k).
 
 **Test:** `scripts/run-h49-draft-n.sh`. 16k: n = 2, 4, 5, REPS=3 each, control `p15-200w-16k` + `p15-200w-16k-r3`. 98k: decode-only via `CACHE_PROMPT=1` (rep 1 prefills, reps 2+ reuse the prompt KV), n = 3 (control under the same cache path), then the 16k winner's direction. **Skip rule:** at 16k, stop going further in a direction once a step loses; at 98k only test the direction that won at 16k plus n=2.
+
+**Result (REFUTED, 200 W, f16 KV, REPS=3 each, output identical to control in every arm):**
+
+| Arm | decode t/s | accept | ms/step | tokens/step |
+|---|---|---|---|---|
+| 16k n=3 (control `p15-200w-16k(-r3)`) | 47.40 | 277/365 = 75.9% | 68.6 | 3.25 |
+| 16k n=2 | 45.29 (−4.5%) | 251/294 = 85.4% | 59.3 | 2.68 |
+| 16k n=4 | 35.08 (−26.0%) | 291/429 = 67.8% | 104.6 | 3.67 |
+| 98k n=3 (`h49-n3-98k`) | 32.97 | 262/408 = 64.2% | 88.3 | 2.91 |
+| 98k n=2 | 30.33 (−8.0%) | 232/332 = 69.9% | 78.5 | 2.38 |
+
+n=5 and 98k n=4 were cancelled by the skip rule. ms/step = 1000·n_decoded / tps / (n_decoded − accepted). Shortening the draft saves ~9–10 ms/step, but not enough to pay for the lost tokens. Lengthening it to n=4 would pay (+13% tokens/step), but the step jumps from 68.6 to 104.6 ms when the verify batch goes from 4 to 5 tokens. Something in the step has a fast path for ≤4 columns. **Candidate H55:** find that kernel (test-backend-ops at ne11 = 4 vs 5 for MUL_MAT per quant type and FLASH_ATTN_EXT). If the step stayed ~72 ms at n=4, decode would be ≈ +7% at 16k. Cap counters: 0 s power-capped on every arm (H52).
 
 ## H50 — what bounds decode at 98k
 
