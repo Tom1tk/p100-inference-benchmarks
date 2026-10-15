@@ -2743,3 +2743,17 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 4. 1-card arm: IQ3_S, `-sm none`, at the same depth if it fits.
 
 **Gate.** KLD passes; prefill at depth above control + noise; decode flat; the H32 100k haystack re-run before the README changes.
+
+**KLD gate (2026-10-15): failed as pre-registered, then diagnosed as unmeetable.** GEMM vs tile at q8_0 KV: mean **0.320**, median 0.000066, max 33.0, same-top 94.0%.
+- **Not a kernel bug.** A per-call tile-vs-GEMM diff on the real graph (temporary `GGML_PASCAL_FA_GEMM_CHECK`, 96 calls at kv 4096–8192) gave NMSE 3–8e-5 on average and 6.8e-4 at most. Making P·V more precise (fp32 accumulate) moved KLD *up* to 0.431.
+- **The tail is the prompt, not the kernel.** All arms are scored against a non-FA reference (`-sm layer -fa 0 -ub 1024`, f16 KV, `logs/h46-diag-*`):
+
+| Arm vs non-FA reference | mean KLD | median | max | same top |
+|---|---|---|---|---|
+| tile FA, `-sm layer` | 0.444 | 0.000084 | 36.5 | 93.32% |
+| tile FA, `-sm tensor` (today's serve path) | 0.581 | 0.000101 | 36.0 | 92.63% |
+| **GEMM FA, `-sm tensor`** | **0.555** | 0.000093 | 33.0 | **92.87%** |
+
+- **Reading.** Any change to the attention arithmetic flips a handful of hypersensitive tokens in `h26-100k-prompt.txt` at 4–8k depth, each with a KLD of about 30. The mean KLD of an attention lever is therefore dominated by that tail. An absolute "≤ 0.001" gate can't be met even by the tile kernel vs non-FA.
+- **H38 was refuted on this artifact.** Its 0.321 (median 0.000065, max 29.5) has the same shape. The H38 code is gone, and H46 is faster than H38 was, so H38 stays closed.
+- **Re-specified gate (applied after the result, stated openly):** GEMM's KLD vs the non-FA reference must be ≤ tile's. It is (0.555 vs 0.581; same top 92.87 vs 92.63%). **Pass.** The H32 100k haystack before any README change stays as the end-to-end quality check.

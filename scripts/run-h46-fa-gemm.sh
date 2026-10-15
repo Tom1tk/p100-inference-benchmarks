@@ -36,6 +36,7 @@ prefill_mean() {  # label -> mean prefill_tps of ok rows
     awk -F, -v l="$1" '$1==l && $16=="ok" {s+=$7; n++} END {if (n) printf "%.2f", s/n; else print 0}' results/h11-placement.csv
 }
 
+if [[ -z ${SKIP_KLD:-} ]]; then  # SKIP_KLD=1: gate settled by run-h46-diag.sh (non-FA reference)
 BASE=/root/h28-kld/h46-base.kld; mkdir -p /root/h28-kld
 ppl off 0 --kl-divergence-base "$BASE" || { rm -f "$BASE"; fin "perplexity failed"; exit 1; }
 ppl gemm 1 --kl-divergence-base "$BASE" --kl-divergence || { rm -f "$BASE"; fin "perplexity failed"; exit 1; }
@@ -47,6 +48,7 @@ python3 -c "import sys; sys.exit(0 if float('$K') <= 0.001 and float('$T') >= 99
     || { echo "gate: KLD FAIL"; fin "KLD gate FAILED"; exit 1; }
 echo "gate: KLD PASS"
 fin "KLD gate"
+fi
 
 export N_PREDICT=400 BATCH=2048 UB=2048 BIN=$FORK/llama-server
 cool
