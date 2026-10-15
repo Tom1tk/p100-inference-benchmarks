@@ -266,7 +266,7 @@ change the serve command. Refreshed 2026-10-15.
 Done on 2026-10-14 and folded into the command or the 1-card arm: H19 prompt cache (defaults), H17 (closed as
 negligible by H30), Phase 8 (H32), P2P with MTP (H27), the fork levers H28/H31/H34/H35/H36/H41b, and for
 1-card only H42 (`GGML_PASCAL_MMVH_LOWBIT=1`, +13.0% decode). 2026-10-15: H43 (branch-free K-quant scales,
-+2.1% decode). H44 (LOWBIT incl. IQ4_NL on 2 cards; the P2 step-1 trace sized Q3_K + IQ4_NL at 8% of matvec time) is in flight.
++2.1% decode). H44 (`GGML_PASCAL_MMVH_LOWBIT=1` on 2 cards, Q3_K + IQ4_NL on mmvh: +6.1% decode, output identical).
 
 ### Parked by rule zero
 

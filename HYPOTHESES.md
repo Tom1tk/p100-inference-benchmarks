@@ -48,7 +48,7 @@ run label so the evidence is traceable.
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
 | H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+2.1%** (41.51 → 42.39), prefill flat |
-| H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | Pre-registered (2026-10-15) |
+| H44 | `GGML_PASCAL_MMVH_LOWBIT=1` (Q3_K and, from fork 2d3b3bf, IQ4_NL on mmvh) lifts 2-card decode | **Confirmed, adopted** (2026-10-15): output identical; decode **+6.1%** (42.39 → 44.96), prefill flat; KLD 0.1241 vs 0.1261 off |
 
 ---
 
@@ -2676,3 +2676,24 @@ Q5_K_M FP32 reference (build-h17, `-sm tensor`), then UD-Q4_K_M with the full se
   already on mmvh under H42, so the 1-card command would not change measurably.
 
 **Driver.** `scripts/run-h44-lowbit-2card.sh`.
+
+**Result (2026-10-15, bench "H44 low-bit mmvh 2-card").**
+
+| KLD vs Q5 FP32 ref (`-ub 8`, 2 chunks) | mean | p99 | p99.9 | same top |
+|---|---|---|---|---|
+| `q4-lowbit-off` | 0.126126 ± 0.029 | 1.760 | 22.50 | 95.015% |
+| `q4-lowbit-on` | 0.124071 ± 0.029 | 1.749 | 22.67 | 95.015% |
+
+Gate passed (on ≤ off; same top identical).
+
+| Arm (rep 1 / rep 2) | decode t/s | prefill t/s | accept | vs `h43-k4scale-16k` (42.39 / 366.4) |
+|---|---|---|---|---|
+| `h44-lowbit-16k` | 44.95 / 44.96 | 361.13 / 366.39 | 72.8% | decode **+6.1%**, prefill flat |
+
+Greedy output is identical to `h43-k4scale-16k` (1357 chars), with the same acceptance. **Verdict: adopted.**
+`GGML_PASCAL_MMVH_LOWBIT=1` joins the serve env.
+
+The gain is ~4× the prediction. The prediction came from the drafter-free trace (ncols = 1). With MTP,
+most target passes are verify batches (ncols 2–4), and mmvq's cost there grows with ncols much faster
+than mmvh's, which shares each weight load across columns. That is the likely reason; it has not been
+traced. Lesson for sizing: size decode levers from a trace *with* the drafter on.

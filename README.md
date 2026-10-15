@@ -17,7 +17,7 @@ that command."
 | Target | Status |
 |---|---|
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
-| Highest decode | **42.4 t/s at 16k** (fork command, `h43-k4scale-16k`); **26.9 t/s at 98k** (`serve-fork-100k`, +35% vs 20.02 on the old stock command, H26) |
+| Highest decode | **45.0 t/s at 16k** (fork command, `h44-lowbit-16k`); **26.9 t/s at 98k** (`serve-fork-100k`, +35% vs 20.02 on the old stock command, H26) |
 | Highest prefill / TTFT | **232 t/s, ~421 s TTFT at 98k** (`serve-fork-100k`; +12% vs 207 stock, H26); 365 t/s at 16k |
 | Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
@@ -33,19 +33,19 @@ value practical lever left.
 
 ```
 Tom1tk/llama.cpp-Pascal (fork, /root/llama.cpp-Pascal/build-cuda-p100)  ·  -sm tensor
-GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_DUPLEX_REDUCE=1 GGML_PASCAL_MMVH_Q6K_WIDE=1
+GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_DUPLEX_REDUCE=1 GGML_PASCAL_MMVH_Q6K_WIDE=1 GGML_PASCAL_MMVH_LOWBIT=1
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0.gguf
 -ngl 99 -fa 1 -t 8 -ctk q8_0 -ctv q8_0 -b 2048 -ub 2048 -c 100000 -np 1
 ```
 
 Adopted 2026-10-14 after it passed the Phase 8 quality gate (H32: 19/19 at 100k, vs 18/19
 for the Q5_K_M FP32 reference). Fork levers: half2 matvec incl. Q6_K (H28, H34), F16
-AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run), branch-free Q4_K/Q5_K scale unpack (H43, output identical, no flag).
+AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run), branch-free Q4_K/Q5_K scale unpack (H43, output identical, no flag), Q3_K + IQ4_NL on mmvh (H44, `LOWBIT`, output identical, KLD gate passed). The 98k row predates H41b–H44.
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
 | 98k | 26.94 t/s | 231.97 t/s (~421 s TTFT) | 65.3% | 12,227 MiB | 66 °C | `serve-fork-100k` (q8_0 KV, REPS=1) |
-| 16k | 42.39 t/s | 366.4 t/s | 72.8% | 11,053 MiB | 65 °C | `h43-k4scale-16k` (f16 KV, REPS=2; +2.1% decode from branch-free Q4_K/Q5_K scales, fork aea9046, vs `h41-wide-16k` 41.51 / 365.4) |
+| 16k | 44.96 t/s | 366.4 t/s | 72.8% | 11,053 MiB | 65 °C | `h44-lowbit-16k` (f16 KV, REPS=2; +6.1% decode from Q3_K/IQ4_NL on mmvh, fork 2d3b3bf, vs `h43-k4scale-16k` 42.39 / 366.4) |
 
 Every lever behind that line, and every number, is in
 [RESULTS.md](RESULTS.md). What is still open is in RUNBOOK §7.
