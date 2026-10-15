@@ -307,7 +307,8 @@ command today. Re-open only on the stated unblock.
 
 - Quote every prefill figure with its length **and ubatch**; every acceptance
   figure with its depth. Neither transfers.
-- Speculative runs: ≥400 output tokens, ≥2 reps. Never compare acceptance
+- Speculative runs: ≥400 output tokens, **≥3 reps for every hypothesis arm** (user, 2026-10-15: rules out outliers).
+  REPS=10 only for the final headline report (`scripts/run-headline-r10.sh`), once the lever work is done. Never compare acceptance
   across engines without pinning `n_max`/`p_min`.
 - Phase 8 freezes the serve command before its first arm and moves one lever
   per run: the model file in Sweep Q, the drafter in Sweep D.
