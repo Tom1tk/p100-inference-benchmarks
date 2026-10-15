@@ -168,3 +168,5 @@ p15-175w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.39,375.09,
 p15-175w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.54,377.69,400,365,277,75.9,11157,11157,65,10,ok
 p15-220w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.63,398.65,400,365,277,75.9,11157,11157,64,10,ok
 p15-220w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.63,402.43,400,365,277,75.9,11157,11157,68,10,ok
+p15-250w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.56,398.30,400,365,277,75.9,11157,11157,64,10,ok
+p15-250w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.65,403.23,400,365,277,75.9,11157,11157,69,10,ok
