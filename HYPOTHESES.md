@@ -47,6 +47,7 @@ run label so the evidence is traceable.
 | H36 | Overlapping the two directions of each 2-card AllReduce copy (`GGML_PASCAL_DUPLEX_REDUCE=1`) lifts prefill | **Confirmed, adopted** (2026-10-14): bit-identical (KLD −0.000005, 100% top-1); prefill +3.5% (353.0 → 365.3), decode +2.3% (39.48 → 40.37), above the ±1% predicted |
 | H41 | Q6_K mmvh with 4 lanes per superblock (`GGML_PASCAL_MMVH_Q6K_WIDE=1`) lifts 2-card decode | **Confirmed, adopted** (2026-10-14, as H41b): matvec −40% (~190 → ~330 GB/s); decode +2.8% (40.37 → 41.51), prefill flat. The ub-8 KLD gate (H41) failed on rounding-order *difference* only, kernel diff ~1e-6 relative |
 | H42 | Low-bit types (Q3_K, Q2_K, IQ2_S/XS/XXS) on mmvh (`GGML_PASCAL_MMVH_LOWBIT=1`) lift 1-card decode | **Confirmed, adopted for 1-card** (2026-10-14): decode **+13.0%** (15.84 → 17.90), prefill flat; KLD vs FP32 Q5 +2.8% (0.3203 → 0.3294, ±0.044), same-top identical. 2-card parked (rule zero) |
+| H43 | Branch-free Q4_K/Q5_K scale unpack in mmvh (fork aea9046, always on) lifts 2-card decode | Pre-registered (2026-10-15) |
 
 ---
 
@@ -2619,3 +2620,25 @@ Worth a look if LOWBIT ever goes into the 2-card command; not chased for 1-card.
 
 **Verdict: adopt `GGML_PASCAL_MMVH_LOWBIT=1` for the 1-card arm.** The 2-card serve command is
 unchanged (rule-zero park stands: Q3_K only, ≤ +1%).
+
+## H43 — branch-free Q4_K/Q5_K scale unpack (decode)
+
+**Basis.** A loads-only skeleton of the Q5_K matvec ran 365 → 489 GB/s at 8704×5120, so the main
+K-quant matvecs are ALU/issue-bound, not memory-bound (fork plan, "Decode prize sizing"). Their
+scale/min unpack branched on `is < 4`, which diverges across the 8 lanes of a superblock. Fork
+aea9046 computes both forms from three aligned int loads and selects. The integer values are the same,
+so the output should be bit-identical. Micro-bench vs the old code: Q4_K 61.4 / 66.2 / 28.2 µs (was
+70.7 / 79.7 / 30.9; +10–20%), Q5_K 74.7 / 77.9 / 33.7 µs (was 83.3 / 90.6 / 36.3; +8–16%) at
+8704×5120 / 5120×8704 / 5120×3072. MUL_MAT tests pass.
+
+**Arm.** The serve command at 16k, REPS=2, on the new binary (no env change). Control: banked
+`h41-wide-16k` (41.51 / 365.4).
+- **Identity:** greedy output identical to `h41-wide-16k` (`compare-outputs.py`). If it differs,
+  the change is not what it claims, so stop and investigate before reading the speed.
+- **Prediction:** Q4_K + Q5_K are ~53% of decode weight bytes. ~13% off their matvec time is ~7% off
+  all matvec time, and matvec is ~45% of a token. So **decode +2–4%**, prefill flat (n > 8 never uses
+  mmvh).
+- **1-card arm: parked by rule zero.** Q5_K + Q4_K are ~10.6% of UD-IQ3_S bytes, so ≤ +1% is expected,
+  inside REPS=2 noise. The change is bit-identical, so there is no quality question to answer on 1 card.
+
+**Driver.** `scripts/run-h43-k4scale.sh`.
