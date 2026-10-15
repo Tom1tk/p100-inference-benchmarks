@@ -61,9 +61,9 @@ run label so the evidence is traceable.
 | H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **REFUTED** 2026-10-15: n=3 is best. 16k n=2 −4.5%, n=4 −26%; 98k n=2 −8.0%. Output identical everywhere. n=4 step-time cliff (+36 ms at a 5-token verify batch) → candidate H55 |
 | H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Below bar** 2026-10-15: f16 decode attention ≈ 20.0 ms of the 88.7 ms 98k step (22.5% < 30%); no kernel lever by the rule. Kernel runs at ~160 GB/s of ~550 → candidate H54 |
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
-| H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **Pre-registered** 2026-10-15; instrumentation only, read from every run's `logs/<label>.cap` |
+| H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **REFUTED** 2026-10-15: 0 s power-capped on every arm at 200 W — 2-card 16k and 98k (H48, H49), 1-card 16k (H39r). 200 W does not bind; 220 W would buy nothing on this evidence |
 | H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **REFUTED** 2026-10-15 at the KLD gate: mean KLD 0.0719 vs Q4_K_M 0.0593 (+21%, gate ≤ 0.0643), p99 2.1×, same-top 95.2% vs 96.6%. Speed and haystack not run |
-| H39r | At 200 W, `GGML_PASCAL_DEQUANT_STAGED=1` lifts 1-card IQ3_S 16k prefill ≥2% (was +1–4.5% at 175 W) | **Pre-registered** 2026-10-15; `scripts/run-h39r-1card-200w.sh` |
+| H39r | At 200 W, `GGML_PASCAL_DEQUANT_STAGED=1` lifts 1-card IQ3_S 16k prefill ≥2% (was +1–4.5% at 175 W) | **CONFIRMED** 2026-10-15: 211.98 → 220.34 t/s (+3.9%; +2.8% vs warm control reps only), output identical, decode flat. Adopted for 1-card. 2-card arm REPS=3 follows (`h39r-2card-staged`) |
 
 ---
 
@@ -2945,4 +2945,6 @@ Mean KLD is 21% worse and the p99 tail is 2× worse, beyond the pre-set +0.005 m
 **Claim:** staged dequant lifts 1-card IQ3_S 16k prefill ≥2% at 200 W with identical output.
 
 **Test:** fresh 1-card control at 200 W (banked 1-card rows are 175 W), then staged; REPS=3 each, current env. The control also gives the 1-card H52 reading.
+
+**Result (CONFIRMED, 1 card):** control `h39r-1card-ctrl` prefill 207.38 / 214.46 / 214.11 (rep 1 follows a cold 183 s load), staged 220.76 / 220.22 / 220.03. Mean +3.9%, +2.8% against reps 2–3 alone; both pass the 2% bar. Decode 18.36 → 18.39. Output identical. Cap counters: 0 s capped on both arms, so 1 card is not cap-limited at 200 W either (H52), and the gain is the kernel's own, not a cap effect. **2-card follow-up:** H39's 2-card result was 2 contradictory reps at 175 W (−3.6%, +1.0%); one staged arm REPS=3 against the banked `p15-200w-16k(-r3)` control decides the serve command.
 
