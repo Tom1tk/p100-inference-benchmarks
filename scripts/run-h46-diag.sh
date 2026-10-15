@@ -17,3 +17,4 @@ env "$@" "$FORK/llama-perplexity" -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf -f prompts
 rc=$?; kill $mon
 echo "--- $L ($* | ${PPL_ARGS:-})  rc=$rc, $(grep -m1 -E 'Final estimate|Mean    KLD' "logs/h46-diag-$L.log"), $(grep -m1 'Same top p:' "logs/h46-diag-$L.log") ---"
 git add -A logs scripts/run-h46-diag.sh && git commit -q -m "bench: H46 diag $L ($*)" && git push -q
+exit $rc
