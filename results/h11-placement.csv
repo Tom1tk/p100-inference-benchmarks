@@ -164,3 +164,5 @@ h46-fagemm-100k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,28.36,
 h46-fagemm-100k-r23,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,28.41,275.81,400,425,257,60.5,12331,12331,67,10,ok
 p15-200w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.49,393.35,400,365,277,75.9,11157,11157,64,100,ok
 p15-200w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.61,393.60,400,365,277,75.9,11157,11157,66,100,ok
+p15-175w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.39,375.09,400,365,277,75.9,11157,11157,64,10,ok
+p15-175w-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.54,377.69,400,365,277,75.9,11157,11157,65,10,ok
