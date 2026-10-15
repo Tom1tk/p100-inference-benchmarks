@@ -59,7 +59,7 @@ run label so the evidence is traceable.
 | H48 | f16 KV instead of q8_0 at 98k lifts prefill ≥3% (FA_GEMM skips the per-call q8_0→f16 convert of all of K and V) and fits in VRAM | **Refuted (prefill)** 2026-10-15: rep 1 prefill 287.96 vs control 287.87 (3 reps); skip rule fired. Fits (13,573 MiB/card). Decode moved instead → H48b |
 | H48b | f16 KV cuts 98k decode step time ≥5% vs q8_0 (unexpected in H48 rep 1: 88.7 vs 98.4 ms/step, decode 32.91 vs 28.42) | **Confirmed** 2026-10-15: 88.7 vs 98.4 ms/step (−9.9%, REPS=3 each), decode 32.83 vs 28.42 t/s; adopted (`-ctk f16 -ctv f16`) |
 | H49 | MTP draft length (`--spec-draft-n-max`, default 3) is mis-tuned: another value lifts decode ≥2% at 16k and/or 98k, output identical | **Pre-registered** 2026-10-15 |
-| H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Pre-registered** 2026-10-15 (diagnostic) |
+| H50 | Attention over the KV cache is the main reason decode at 98k (28.4 t/s) is 40% below 16k (47.5) | **Below bar** 2026-10-15: f16 decode attention ≈ 20.0 ms of the 88.7 ms 98k step (22.5% < 30%); no kernel lever by the rule. Kernel runs at ~160 GB/s of ~550 → candidate H54 |
 | H51 | Agentic serving with opencode: prompt-cache hit rate is high, and `--slot-save-path` / context checkpoints cut real TTFT further | **Pre-registered** 2026-10-15; measured inside Phase 5 (opencode replaces pi, user call) |
 | H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **Pre-registered** 2026-10-15; instrumentation only, read from every run's `logs/<label>.cap` |
 | H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **Pre-registered** 2026-10-15; needs a download and the KLD + haystack gate |
@@ -2884,6 +2884,17 @@ All arms REPS ≥ 3 (user: "at least 3 runs of each"). Running cap 200 W; contro
 **Claim:** attention over the 98k KV cache is the largest cause of the 40% decode drop from 16k to 98k (the rest: acceptance 75.9% → 60.5%).
 
 **Test (diagnostic, cheapest first):** `test-backend-ops perf -o FLASH_ATTN_EXT` at the decode shapes (n_q = verify batch 1–4, kv 16k and 98k, q8_0 and f16, D256, GQA 6, per-card heads), seconds of GPU. Multiply by 16 layers and compare with the measured step time. Only if attention is > ~30% of the 98k step: design a fork kernel lever (split-KV decode for sm_60), pre-registered separately.
+
+**Result (2026-10-15, `results/h50-fa-decode.txt`, CUDA0, REPS=3, spread < 1%):** per-card decode FA, µs per call → ×16 attention layers:
+
+| KV | kv | nb 1 | nb 4 (MTP verify) | ×16 at nb 4 |
+|---|---|---|---|---|
+| f16 | 16k | 102 | 222 | 3.6 ms |
+| f16 | 98k | 625 | 1,248 | 20.0 ms |
+| q8_0 | 16k | 249 | 558 | 8.9 ms |
+| q8_0 | 98k | 1,477 | 2,990 | 47.8 ms |
+
+Served step (f16 KV, 200 W): 68.4 ms at 16k (`p15-200w-16k`, 3.25 tok/step) → 88.7 ms at 98k (H48b, 2.92 tok/step). Attention grows by +16.4 ms of the +20.3 ms step growth, so it is most of the step growth, and the rest of the 31% decode drop is acceptance (−10% tok/step). But at 98k attention is **~22.5% of the step, below the 30% bar**, so no kernel lever is designed under H50. Two observations, not conclusions: (1) the q8_0 micro-bench over-predicts the served q8_0→f16 difference (27.8 ms predicted vs 9.7 measured), so the q8_0 serving path is not the one the test case hits; moot now that f16 is adopted. (2) f16 nb 4 at 98k moves ~201 MB (K+V, 2 heads) per call in 1.25 ms ≈ 160 GB/s, under a third of the P100's ~550 GB/s practical bandwidth, and nb 4 costs twice nb 1 for the same bytes. A split-KV decode kernel that reached ~450 GB/s would save ~13 ms/step (~15% decode at 98k). That is a fork kernel project; it is written down as candidate H54 and not started.
 
 ## H51 — opencode agentic serving (inside Phase 5)
 
