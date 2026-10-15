@@ -250,7 +250,7 @@ and 8 are done: the command passed the Phase 8 gate (H32) on 2026-10-14 and now
 only changes by fork levers, each one gated (KLD vs the FP32 Q5 reference, H35
 style) and measured against the banked control. Fork design notes live in the
 fork repo, `docs/pascal/fork-plan-2026-10-14.md`. Ranked by whether an item can
-change the serve command. Refreshed 2026-10-14.
+change the serve command. Refreshed 2026-10-15.
 
 ### Open
 
@@ -258,14 +258,15 @@ change the serve command. Refreshed 2026-10-14.
 |---|---|---|---|
 | 1 | **H15: power cap 175 → 200 → 220 W**, then the "Re-test at the higher cap" list (§1) | Prefill is compute-bound and capped; parked marginal levers may grow | **Blocked on the user's PSU meter check** (§1) |
 | 2 | Prefill: fork plan P2 (chunked GEMM) / P3 (dequant + converts) | GEMMs are ~87% of prefill (Phase 0) | Profile first; P2 only if prefill idle > 5% |
-| 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Micro-bench first; wider loads were slower (H42 notes), needs fewer smem lookups per weight |
+| 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
 | 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) | The deployment target itself | Long runs; after the prefill levers settle |
 | 5 | TurboQuant | Kept last by user call | After everything above |
 | 6 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 
 Done on 2026-10-14 and folded into the command or the 1-card arm: H19 prompt cache (defaults), H17 (closed as
 negligible by H30), Phase 8 (H32), P2P with MTP (H27), the fork levers H28/H31/H34/H35/H36/H41b, and for
-1-card only H42 (`GGML_PASCAL_MMVH_LOWBIT=1`, +13.0% decode).
+1-card only H42 (`GGML_PASCAL_MMVH_LOWBIT=1`, +13.0% decode). 2026-10-15: H43 (branch-free K-quant scales,
++2.1% decode). H44 (LOWBIT incl. IQ4_NL on 2 cards; the P2 step-1 trace sized Q3_K + IQ4_NL at 8% of matvec time) is in flight.
 
 ### Parked by rule zero
 
@@ -280,8 +281,7 @@ command today. Re-open only on the stated unblock.
 | H12 — `ik` graph-split knobs | `ik` has no tensor split and lost Phase 1 | `ik` gaining tensor split |
 | H2, H3 — XL split-stall, stock-quant degradation | Fold into Phase 8 Sweep Q arms 3 and 5, only if Q4_K_M shows a gap | A gap in Sweep Q |
 | q8 KV × ubatch interaction | Noted during H25; not worth its own run | An unexplained q8 result |
-| H42 LOWBIT on the 2-card command | Only Q3_K (1.7% of Q4_K_M bytes) is affected: ≤ +1% decode, inside REPS=2 noise | A 2-card re-bench for another reason |
-| IQ4_NL and IQ1_S on mmvh | 2.1% of 2-card bytes / 0.3% of 1-card bytes: ≤ 1% decode each | Nothing bigger left on the matvec list |
+| IQ1_S on mmvh | 0.3% of 1-card bytes | Nothing bigger left on the matvec list |
 
 ### Closed — do not spend runs here
 
@@ -300,6 +300,7 @@ command today. Re-open only on the stated unblock.
 | KV quant as a way to *reach* 100k | Unnecessary — f16 fits. `q8_0` is used for headroom, not fit |
 | vLLM / vllm-pascal / SGLang / TensorRT-LLM / ExLlamaV3 / ktransformers / FlashQLA | sm_70+ minimum, or no `qwen35` support |
 | MLC-LLM / TVM, tinygrad | No hybrid-SSM support; would mean rewriting the stack |
+| Main-type matvec (Q4_K/Q5_K/IQ4_XS) tuning after H43 | Occupancy, unroll, conversions, wave tail and IQ4 lookup all probed flat (fork plan, 2026-10-15). ≤ ~3% decode left at this kernel structure |
 | `GGML_CUDA_FORCE_MMQ`, `GGML_CUDA_F16` | No-ops on cc 6.0 (no dp4a; F16 compute already selected) |
 
 ### Measurement rules that constrain later phases
