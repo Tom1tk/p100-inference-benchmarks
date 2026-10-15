@@ -158,7 +158,7 @@ Update this table when a run claims an index. Never reuse one.
 
 | Index | Site port | Label | Engine / model / split | Status |
 |---|---|---|---|---|
-| _(none yet)_ | | | | |
+| 0 | 4000 | p5-fork-serve | fork (Tom1tk/llama.cpp-Pascal) / Q4_K_M + MTP head96k / tensor, README serve command (q8_0 KV, 100k ctx) | Run 2026-10-15 |
 
 ---
 

@@ -2,7 +2,7 @@
 # Phase 5: agentic web-build benchmark for one model version.
 #
 # Usage: ./scripts/run-web-bench.sh <engine> <model-path> <split-mode> <label> <index> [extra llama-server args...]
-#   engine      pflash | buun | ik | ik-nonccl | mainline
+#   engine      pflash | buun | ik | ik-nonccl | mainline | fork (Tom1tk/llama.cpp-Pascal; export the serve env first)
 #   split-mode  see METHODOLOGY.md -- support differs per engine
 #   label       e.g. p5-buun-layer-q6k-mtp   (folder, systemd unit, and commit message all key off this)
 #   index       0,1,2,... unique per model version. Every port derives from it, so
@@ -23,8 +23,8 @@ cd "$REPO"
 NGL=99
 THREADS=8
 FA=1
-CTK=f16
-CTV=f16
+CTK="${CTK:-f16}"
+CTV="${CTV:-f16}"
 CTX="${CTX:-32768}"                 # agentic transcripts run long; drop to 16384 if the server OOMs
 STAGE_TIMEOUT="${STAGE_TIMEOUT:-3600}"
 LOAD_TIMEOUT="${LOAD_TIMEOUT:-900}" # model load is 4-8 min; 15 min covers disk contention
@@ -50,7 +50,8 @@ case "$ENGINE" in
     ik-nonccl) BIN=/root/ik_llama.cpp/build-nonccl/bin/llama-server ;;   # H5: same tree, -DGGML_NCCL=OFF
     mainline) BIN=/root/dflash2-llama.cpp/build-cuda-p100/bin/llama-server ;;
     mainline-rebased) BIN=/root/dflash2-rebased/build-cuda-p100/bin/llama-server ;;   # pr-27342 rebased onto 75844307
-    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|ik-nonccl|mainline|mainline-rebased)" >&2; exit 2 ;;
+    fork)   BIN=/root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server ;;
+    *)      echo "ERROR: unknown engine '$ENGINE' (expected pflash|buun|ik|ik-nonccl|mainline|mainline-rebased|fork)" >&2; exit 2 ;;
 esac
 
 [[ -x "$BIN"   ]] || { echo "ERROR: engine binary not found: $BIN" >&2; exit 2; }
