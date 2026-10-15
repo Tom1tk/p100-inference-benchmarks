@@ -2693,7 +2693,7 @@ Gate passed (on ≤ off; same top identical).
 Greedy output is identical to `h43-k4scale-16k` (1357 chars), with the same acceptance. **Verdict: adopted.**
 `GGML_PASCAL_MMVH_LOWBIT=1` joins the serve env.
 
-The gain is ~4× the prediction. The prediction came from the drafter-free trace (ncols = 1). With MTP,
-most target passes are verify batches (ncols 2–4), and mmvq's cost there grows with ncols much faster
-than mmvh's, which shares each weight load across columns. That is the likely reason; it has not been
-traced. Lesson for sizing: size decode levers from a trace *with* the drafter on.
+The gain is ~4× the prediction, because the prediction came from the drafter-free trace. The MTP drafter
+(`mtp-Qwen3.8-27B-Q4_0.gguf`; the name is misleading) has **no Q4_0 tensors**. Its `output.weight`
+(248320×5120) is **Q3_K, 546 MB**, read on every draft token. LOWBIT moves it from mmvq to mmvh. Lesson for
+sizing: size decode levers from a trace *with* the drafter on, and check the drafter's tensor types.
