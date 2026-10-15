@@ -212,7 +212,7 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | sm_60 FP16 fast path | stock vs patched out | **Leave on** (patch costs 12–13% prefill). Quality trade **closed as negligible** by H30: 0.018 KLD, 0.31× the quant step | H17, H30 |
 | GPUs | 1, 2 | **2 required** | H20/H25 |
 | Power cap | 175, 200, 220, 250 W | **200 W** (user call). Prefill +4.4% at 98k / +4.5% at 16k; 220 W +6.4% at 16k; 250 W no more (draw ≤ 216 W). Decode flat | H15 |
-| Fork levers (Tom1tk/llama.cpp-Pascal) | H27–H47 | **Adopted:** MMVH (H28/H29), F16_REDUCE (H31), GEMM_ALGO3 (H33/H35), DUPLEX_REDUCE (H36), Q6K_WIDE (H41b), K-quant scale unpack (H43), MMVH_LOWBIT (H42/H44), drafter head96k (H45), FA_GEMM (H46). **Refuted:** CUDA graphs (H27), internal AllReduce (H37), half2 tile Q·K (H38), parallel dispatch (H40), fp16 GEMM Q·K (H47). **Marginal, parked:** DEQUANT_STAGED (H39) | Fork-builds block in Table B |
+| Fork levers (Tom1tk/llama.cpp-Pascal) | H27–H47 | **Adopted:** MMVH (H28/H29), F16_REDUCE (H31), GEMM_ALGO3 (H33/H35), DUPLEX_REDUCE (H36), Q6K_WIDE (H41b), K-quant scale unpack (H43), MMVH_LOWBIT (H42/H44), drafter head96k (H45), FA_GEMM (H46). **Refuted:** CUDA graphs (H27), internal AllReduce (H37), half2 tile Q·K (H38), parallel dispatch (H40), fp16 GEMM Q·K (H47). **1-card only:** DEQUANT_STAGED (H39r, +3.9% 1-card prefill at 200 W; 2-card +0.9%, not adopted) | Fork-builds block in Table B |
 | Context depth | 2k … **100k end to end** | Serves at 100k with 4,122 MiB/card spare | H13, H26 |
 | Sustained thermals | 2 × ~8 min 100k prefill | 70 °C peak. Not a constraint at 175 W | H26 |
 

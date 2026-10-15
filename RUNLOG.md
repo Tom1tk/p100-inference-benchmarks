@@ -1491,3 +1491,4 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - **H52 (cap telemetry): 2-card refuted.** 0 s power-capped at 200 W on every 2-card arm, 16k and 98k. That parks the 2-card re-tests on the RUNBOOK §1 list. The 1-card arm is measured in H39r.
 - **H53 (UD-IQ4_XS, 2 cards): refuted at the KLD gate.** Mean KLD 0.0719 vs Q4_K_M 0.0593, same-top 95.2 vs 96.6%. The speed run was skipped.
 - **H51 (opencode agentic levers):** harness re-engineered for opencode v2 (`run-web-bench.sh`); Phase 5 run is held for the user (GPU-heavy).
+- **H39r (staged dequant re-test at 200 W): 1-card confirmed, 2-card not adopted.** 1-card IQ3_S 16k prefill 211.98 → 220.34 (+3.9%), output identical. 2-card warm reps +0.9% (mean −2.6% with a cold-load rep 1). 1-card also shows 0 s power-capped, so **H52 is refuted on both arms**.

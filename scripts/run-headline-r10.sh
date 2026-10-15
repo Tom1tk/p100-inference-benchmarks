@@ -2,7 +2,7 @@
 # Headline re-measure at REPS=10, for the FINAL report only (user, 2026-10-15). First use (r10-*) was stopped
 # early and is at 175 W; this run (r10s-*) re-takes every arm at the 200 W running cap, f16 KV everywhere.
 # Measurement only, no lever. Arms: stock baseline 16k (as d5-p2p-mtp-16k), current serve command
-# 16k (as h44-lowbit-16k), current serve command 98k (as serve-fork-100k), 1-card IQ3_S 16k fork arm,
+# 16k (as h44-lowbit-16k), current serve command 98k (as serve-fork-100k), 1-card IQ3_S 16k fork arm (+DEQUANT_STAGED, H39r),
 # then the 100k haystack with f16 KV (Phase 8 tier 2, pass = every question p8-ref answers). Commit after each arm.
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,7 +33,7 @@ cool
 ( export $SERVE_ENV; CTX=100000 CTK=f16 CTV=f16 NP=1 REQ_TIMEOUT=1800 PROMPT_FILE=prompts/h26-100k-prompt.txt BIN=$FORK \
   ./scripts/run-spec-placement.sh r10s-fork-100k draft-mtp $MTP_FORK default ); echo "--- r10s-fork-100k exit $? ---"; commit r10s-fork-100k
 cool
-( export $SERVE_ENV; CTX=16384 PROMPT_FILE=prompts/h11-depth-prompt.txt BIN=$FORK SPLIT=none MODEL=$IQ3 \
+( export $SERVE_ENV GGML_PASCAL_DEQUANT_STAGED=1; CTX=16384 PROMPT_FILE=prompts/h11-depth-prompt.txt BIN=$FORK SPLIT=none MODEL=$IQ3 \
   ./scripts/run-spec-placement.sh r10s-fork-1card-16k none none default ); echo "--- r10s-fork-1card-16k exit $? ---"; commit r10s-fork-1card-16k
 cool
 ( export $SERVE_ENV; BIN=$FORK KV=f16 SPEC=mtp ./scripts/run-phase8-tier2.sh p8-final-f16 ); echo "--- p8-final-f16 exit $? ---"
