@@ -2789,3 +2789,16 @@ sizing: size decode levers from a trace *with* the drafter on, and check the dra
 **H32 haystack (2026-10-15, `scripts/run-h46-haystack.sh`):** `p8-h46-fagemm` **19/19** (reference 18/19, previous candidate 19/19). **Adopted** into the serve command.
 
 **Result (2026-10-15).** Micro-bench at the real per-card shape: FA 48.5 → 34.6 ms (−29%, 11.9 TFLOPS); test-backend-ops 3993/3993. **KLD gate failed:** mean 0.618 (bar 0.581), same-top 92.30% (bar 92.63%), median 1.03e-4, max 32.8 (`logs/h46-diag-h47-qk16.log`). **Refuted** without a speed run. The fork code is committed for the record (8fa4400) and reverted (d3c1c12).
+
+## H15 step 1 — 175 → 200 W (2026-10-15, user-set 200 W cap, `scripts/run-h15-200w.sh`)
+
+2-card serve command (incl. H46), 16k, REPS=2 by user call (quick trajectory check; 98k after review).
+
+| Cap | decode t/s | prefill t/s | peak temp | peak power gpu0 / gpu1 |
+|---|---|---|---|---|
+| 175 W `p15-175w-16k` | 47.47 (47.39 / 47.54) | 376.4 (375.1 / 377.7) | 65 °C | 178 / 192 W |
+| **200 W `p15-200w-16k`** | 47.55 (47.49 / 47.61) | **393.5** (393.4 / 393.6) | 66 °C | 203 / 206 W |
+
+- **Prefill +4.5%, decode flat (+0.2%)**, output identical (1224 chars). Heat: +1 °C peak.
+- Side result: H46 at 16k on 2 cards (175 W) is 376.4 vs `h45-head96k-16k` 365.8, +2.9%.
+- Cap restored to the user's 200 W after the control arm.
