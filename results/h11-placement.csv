@@ -150,3 +150,6 @@ r10-fork-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,5,44.99,366.23,400,375,
 r10-fork-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,6,44.97,366.25,400,375,273,72.8,11053,11053,66,20,ok
 r10-fork-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0.gguf,default,7,44.97,366.15,400,375,273,72.8,11053,11053,66,20,ok
 h45-head96k-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,0,,,,,,,,,,30,FAILED(load)
+h45-head96k-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,46.31,363.41,400,375,273,72.8,11157,11157,62,10,ok
+h45-head96k-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,46.38,367.41,400,375,273,72.8,11157,11157,65,10,ok
+h45-head96k-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,46.35,366.62,400,375,273,72.8,11157,11157,65,10,ok
