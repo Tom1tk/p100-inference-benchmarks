@@ -1482,3 +1482,12 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - 98k at 200 W: prefill 287.8 vs 275.75 at 175 W (+4.4%), decode flat, peak 70 °C.
 - Decode flat at every cap; output identical across caps.
 - **User set 200 W as the running cap.** `run-spec-placement.sh` now writes `logs/<label>.cap`, since the CSV has no cap column.
+
+## 2026-10-15 — H48–H53 at 200 W (user's six ideas)
+
+- **H48 (f16 KV, prefill at 98k): refuted.** 287.96 vs 287.87 t/s. **H48b (f16 KV, decode at 98k): confirmed and adopted.** Step 98.4 → 88.7 ms, 28.42 → 32.83 t/s, acceptance 60.5 → 64.7%. Serve command, `run-p5-fork.sh` and `run-headline-r10.sh` now use `-ctk f16 -ctv f16`.
+- **H49 (MTP draft length): refuted.** n=3 stays. 16k: n=2 −4.5%, n=4 −26%. 98k: n=2 −8.0%. Output identical in every arm. The n=4 step jumps 68.6 → 104.6 ms at a 5-token verify batch → candidate H55.
+- **H50 (what bounds 98k decode): below bar.** Attention is ~22.5% of the 98k step (< 30%), but the FA decode kernel runs at ~160 of ~550 GB/s → candidate H54 (split-KV decode kernel, ~13 ms/step).
+- **H52 (cap telemetry): 2-card refuted.** 0 s power-capped at 200 W on every 2-card arm, 16k and 98k. That parks the 2-card re-tests on the RUNBOOK §1 list. The 1-card arm is measured in H39r.
+- **H53 (UD-IQ4_XS, 2 cards): refuted at the KLD gate.** Mean KLD 0.0719 vs Q4_K_M 0.0593, same-top 95.2 vs 96.6%. The speed run was skipped.
+- **H51 (opencode agentic levers):** harness re-engineered for opencode v2 (`run-web-bench.sh`); Phase 5 run is held for the user (GPU-heavy).

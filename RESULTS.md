@@ -204,9 +204,10 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | P2P | on, off | +2.9% decode drafter-free; +3.6% with MTP (`d5-p2p-mtp-16k`). **Adopted 2026-10-14** | H10 |
 | `-ub` | 128 … 8192 | **2048** — +63% prefill at ≤16k, +56% at 16k on the server; 8192 aborts | H14, H24 |
 | `-b` | 2048, 8192 | **2048** — only matters as a ceiling on `-ub` | H14 |
-| KV `-ctk`/`-ctv` | f16, q8_0, q4_0, turbo3 | **`q8_0`** — 1.5% of decode, half the cache; q4_0 adds nothing; turbo3 costs 14.3% | H25, H4 |
-| Model quant | Q4_K_M, Q6_K (PFlash only), IQ3_S (1 card) | **Q4_K_M**. Phase 8 passed: KLD 0.057 vs Q5_K_M FP32, 19/19 haystack at 100k | H30, H32 |
+| KV `-ctk`/`-ctv` | f16, q8_0, q4_0, turbo3 | **`f16`** since 2026-10-15 (H48b): 98k decode step 98.4 → 88.7 ms (−9.9%, 28.4 → 32.8 t/s), prefill unchanged, fits at 13,573 MiB/card. Earlier q8_0 verdict was at 16k, before the fork's FA kernels; q4_0 adds nothing; turbo3 costs 14.3% | H25, H4, H48, H48b |
+| Model quant | Q4_K_M, Q6_K (PFlash only), IQ3_S (1 card), IQ4_XS | **Q4_K_M**. IQ4_XS failed the KLD gate (0.072 vs 0.059, H53). Phase 8 passed: KLD 0.057 vs Q5_K_M FP32, 19/19 haystack at 100k | H30, H32 |
 | Drafter | none, MTP-Q4_0, DFlash2-Q4, DFlash2-Q8 | **MTP**. DFlash2 is layer-only; Q8 drafters not worth it | H8, H9 |
+| Draft length `--spec-draft-n-max` | 2, 3, 4 (5 skipped) | **3 (default)**. n=2 −4.5% at 16k, −8.0% at 98k; n=4 −26% (step-time cliff at a 5-token verify batch, candidate H55) | H49 |
 | Drafter placement `-devd` | default, CUDA0, CUDA1 | No effect | H11 |
 | sm_60 FP16 fast path | stock vs patched out | **Leave on** (patch costs 12–13% prefill). Quality trade **closed as negligible** by H30: 0.018 KLD, 0.31× the quant step | H17, H30 |
 | GPUs | 1, 2 | **2 required** | H20/H25 |
