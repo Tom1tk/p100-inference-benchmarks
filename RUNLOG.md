@@ -1506,3 +1506,9 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 
 - **100k haystack with f16 KV (`p8-final-f16`): 19/19.** That is every question the Q5_K_M reference `p8-ref` answers (18/19), plus one, the same as `p8-h46-fagemm` (q8_0 KV). The f16 KV switch (H48b) passes the Phase 8 quality gate.
 - 0 s power-capped on every arm.
+
+## 2026-10-16 — H55, H54 (REPS=3 each, 200 W)
+
+- **H55 (n=4 step cliff): cause found, lever refuted.** mmvh drops rows/warp 4 → 2 above 4 columns, so a 5th column costs +47–107% (`results/h55-ncols*.txt`). Fork `GGML_PASCAL_MMVH_R4=1` (opt-in, bit-identical) cuts that to +12–33%. Served n=4 16k `h55-r4-n4-16k` 44.66 t/s vs n=3 47.54 (−6.1%; H49 n=4 was 35.08), output identical. n=3 stays. 1-card arm parked (drafter-free, path never runs).
+- **H54 (FA decode at 98k): refuted.** The tile kernel already splits KV; the waste is GQA 6 packed as GQA 2 (`results/h54-gqa-probe.txt`). Fork `GGML_PASCAL_FA_GQA6=1` (7b6a784): micro 98k nb4 1244 → 925 µs. Served `h54-gqa6-98k` 32.51 vs `h49-n3-98k` 32.97 (−1.4%): step −3.0%, but output diverges at char 1531 and acceptance fell 263/405 → 256/425. 1-card `h54-1card-gqa6` 18.56 vs 18.39 (+0.9%), output identical. Not adopted.
+- 0 s power-capped on every arm.

@@ -17,9 +17,9 @@ that command."
 | Target | Status |
 |---|---|
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
-| Highest decode | **47.5 t/s at 16k** (fork command incl. H46, `p15-175w-16k`); **32.8 t/s at 98k** (`h48-f16kv-98k`, f16 KV at 200 W, H48b; 28.4 with q8_0 KV, +42% vs 20.02 on the old stock command, H26) |
-| Highest prefill / TTFT | **276 t/s, ~355 s TTFT at 98k** at 175 W (`h46-fagemm-100k`; +33% vs 207 stock, H26); **288 t/s, ~340 s at 200 W** (`p15-200w-98k`, H15); 376 t/s at 16k (394 at 200 W) |
-| Output quality indistinguishable from baseline | **Met** (H32): 19/19 on the 100k haystack vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
+| Highest decode | **47.5 t/s at 16k, 33.1 t/s at 100k** (final report, `r10s-fork-*`, 200 W): +65.6% and +58.5% vs the stock build (28.7 / 20.9) |
+| Highest prefill / TTFT | **288 t/s, ~340 s TTFT at 100k; 392 t/s at 16k** (final report, 200 W): +34.4% and +23.2% vs stock (214 / 318) |
+| Output quality indistinguishable from baseline | **Met**: 19/19 on the 100k haystack with the final f16-KV command (`p8-final-f16`; H32 19/19 with q8_0) vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
 Quality is the binding constraint: it is why PFlash and DFlash v1 are excluded,
 why TurboQuant's 14.3% decode cost was refused, and why any lossy speed win
@@ -47,6 +47,7 @@ The trimmed drafter is generated, not downloaded: `python3 /root/llama.cpp-Pasca
 
 | Depth | Decode | Prefill | Acceptance | VRAM/card | Peak | Run |
 |---|---|---|---|---|---|---|
+| **Final report** (200 W, f16 KV) | **16k 47.54 ±0.09 · 100k 33.07 ±0.07 t/s** | **16k 392.1 · 100k 288.1 t/s** | — | 13,573 MiB (100k) | 70 °C | `r10s-fork-16k` (REPS=10), `r10s-fork-100k` (9 reps); stock `r10s-stock-16k` 28.71 / 318.3, `r10s-stock-100k` (q8_0, 3 reps) 20.87 / 214.3. Full table: RUNLOG 2026-10-15 → 16 |
 | 98k (200 W, f16 KV) | 32.83 t/s | 288.1 t/s (~340 s TTFT) | 64.7% | 13,573 MiB | 70 °C | `h48-f16kv-98k` + `-r23` (REPS=3; q8_0 control `p15-200w-98k` + `-r3` 28.42 / 287.9 / 60.5%, 12,331 MiB) |
 | 98k | 28.38 t/s | 275.75 t/s (~355 s TTFT) | 60.5% | 12,331 MiB | 67 °C | `h46-fagemm-100k` (q8_0 KV, REPS=3; control `h46-ctrl-100k` 29.65 / 231.36 / 65.3%; decode dip is the changed greedy text drafting worse, not the kernel, which only runs for n_q ≥ 512) |
 | 16k | 47.47 t/s | 376.4 t/s | 75.9% | 11,157 MiB | 65 °C | `p15-175w-16k` (f16 KV, REPS=2, incl. H46; pre-H46 `h45-head96k-16k` 46.35 / 365.8 / 72.8%, REPS=3) |
