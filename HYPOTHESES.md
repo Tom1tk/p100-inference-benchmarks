@@ -64,6 +64,8 @@ run label so the evidence is traceable.
 | H52 | At 200 W the cards still spend a material share (≥10%) of prefill clock-limited by the cap | **REFUTED** 2026-10-15: 0 s power-capped on every arm at 200 W — 2-card 16k and 98k (H48, H49), 1-card 16k (H39r). Caveat: H15 still measured +1.8% 16k prefill at 220 W over 200 W, so the `sw_power_cap` counter may not see every limiter (clock/thermal reasons were not logged); the cap is at most a small effect at 200 W |
 | H53 | `UD-IQ4_XS` on 2 cards lifts decode ≥5% over Q4_K_M within the Phase 8 quality gate | **REFUTED** 2026-10-15 at the KLD gate: mean KLD 0.0719 vs Q4_K_M 0.0593 (+21%, gate ≤ 0.0643), p99 2.1×, same-top 95.2% vs 96.6%. Speed and haystack not run |
 | H39r | At 200 W, `GGML_PASCAL_DEQUANT_STAGED=1` lifts 1-card IQ3_S 16k prefill ≥2% (was +1–4.5% at 175 W) | **CONFIRMED** 2026-10-15: 211.98 → 220.34 t/s (+3.9%; +2.8% vs warm control reps only), output identical, decode flat. Adopted for 1-card. 2-card `h39r-2card-staged`: 354.1 (cold load) / 397.1 / 395.8 vs control 392.66 → −2.6% mean, +0.9% warm reps; below bar, **not adopted on 2 cards** |
+| H55 | The n=4 step cliff (68.6 → 104.6 ms when the verify batch goes 4 → 5 tokens) is one fixable kernel path; with it fixed, n=4 lifts 16k decode ≥3% over n=3, output identical | **Pre-registered** 2026-10-16 |
+| H54 | A split-KV (flash-decoding) FA kernel for sm_60 decode (nb ≤ 5, f16 KV, D256, GQA 6) cuts the 98k step ≥5%, output identical / KLD within noise | **Pre-registered** 2026-10-16 |
 
 ---
 
@@ -2949,3 +2951,15 @@ Mean KLD is 21% worse and the p99 tail is 2× worse, beyond the pre-set +0.005 m
 **Result (CONFIRMED, 1 card):** control `h39r-1card-ctrl` prefill 207.38 / 214.46 / 214.11 (rep 1 follows a cold 183 s load), staged 220.76 / 220.22 / 220.03. Mean +3.9%, +2.8% against reps 2–3 alone; both pass the 2% bar. Decode 18.36 → 18.39. Output identical. Cap counters: 0 s capped on both arms, so 1 card is not cap-limited at 200 W either (H52), and the gain is the kernel's own, not a cap effect. **2-card follow-up:** H39's 2-card result was 2 contradictory reps at 175 W (−3.6%, +1.0%); one staged arm REPS=3 against the banked `p15-200w-16k(-r3)` control decides the serve command.
 
 **2-card result (not adopted):** staged prefill 354.11 / 397.11 / 395.77 vs banked control `p15-200w-16k(-r3)` 392.66. Rep 1 followed a cold model load (the 1-card run had evicted Q4_K_M from the page cache). Mean −2.6%; the warm reps alone +0.9%, under the 2% bar. Output identical, decode flat (47.53 vs 47.40). The lever stays a 1-card setting: Q4_K dequant is a smaller share of 2-card prefill than IQ3_S dequant is of 1-card.
+
+## H55 — the 5-token verify-batch cliff
+
+**Claim:** some op in the step has a fast path for ≤4 batch columns and falls off it at 5 (H49: n=4 step 104.6 ms vs n=3 68.6 ms, +36 ms). Fixing that one path brings the n=4 step near ~72 ms, so n=4 (3.67 tok/step vs 3.25) lifts 16k decode ≥3% over n=3 with identical output.
+
+**Test:** (1) locate it with test-backend-ops perf on CUDA0, serve env, REPS=3: MUL_MAT at ne11 = 4 vs 5 for every weight type on the 2-card per-card shapes (Q3_K, Q4_K, Q5_K, Q6_K, IQ4_NL, Q8_0, plus the drafter's Q4_0), and FLASH_ATTN_EXT at nb 4 vs 5 (16k, f16). Sum per-op deltas × layer counts and compare with +36 ms. No server. If no op explains ≥ half of +36 ms, stop and write it up. (2) Fix behind an env var in the fork, micro-bench again (3 reps). (3) Served A/B at 16k, REPS=3: n=4 with the fix vs n=3 control; output identical. Plus the 1-card arm (IQ3_S, `-sm none`).
+
+## H54 — split-KV decode attention
+
+**Claim:** the f16 decode FA kernel runs at ~160 GB/s (H50). A split-KV kernel (each block a KV chunk, then a combine) reaching ≥350 GB/s saves ≥5% of the 88.7 ms 98k step.
+
+**Test:** fork kernel behind an env var; micro-bench with the H50 FA cases (nb 1/4, 16k/98k, f16), REPS=3; identity/KLD gate; served 98k decode A/B (`CACHE_PROMPT=1`) REPS=3, plus the 1-card arm. Pass ≥5% decode at 98k.
