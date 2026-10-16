@@ -6,7 +6,7 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_FA_GEMM=1 \
        GGML_PASCAL_MMVH_Q6K_WIDE=1 GGML_PASCAL_MMVH_LOWBIT=1
 TBO=/root/llama.cpp-Pascal/build-cuda-p100/bin/test-backend-ops
-OUT=results/h55-ncols.txt
+OUT=results/h55-ncols${TAG:+-$TAG}.txt  # TAG=r4 with GGML_PASCAL_MMVH_R4=1 (fork H55)
 for _ in $(seq 1 30); do
     t=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | sort -n | tail -1)
     [[ "$t" -le 55 ]] && break; echo "cooling: hottest card ${t}C"; sleep 20
@@ -34,4 +34,4 @@ for (op, key), xs in sorted(d.items()):
     print(f"{op:15s} {short[:60]:60s} {a:9.1f} {b:9.1f} {b-a:+9.1f} ({100*(b/a-1) if a else 0:+.0f}%)")
 ' | tee -a "$OUT"
 git add "$OUT" scripts/run-h55-ncols.sh
-git commit -q -m "bench: H55 4 vs 5 column micro-bench" && { git push -q && echo pushed || echo "WARNING: push failed" >&2; }
+git commit -q -m "bench: H55 4 vs 5 column micro-bench${TAG:+ ($TAG)}" && { git push -q && echo pushed || echo "WARNING: push failed" >&2; }
