@@ -240,3 +240,6 @@ h54-gqa6-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,32.49,4.71,40
 h54-1card-gqa6,none,none,default,1,18.54,212.85,400,0,0,,13161,259,67,189,ok
 h54-1card-gqa6,none,none,default,2,18.57,220.10,400,0,0,,13161,259,69,189,ok
 h54-1card-gqa6,none,none,default,3,18.56,220.15,400,0,0,,13161,259,70,189,ok
+h56-rebase-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,46.93,326.48,400,370,275,74.3,11157,11157,65,311,ok
+h56-rebase-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,46.82,396.47,400,373,274,73.5,11157,11157,67,311,ok
+h56-rebase-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,46.77,397.35,400,373,274,73.5,11157,11157,68,311,ok

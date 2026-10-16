@@ -1,0 +1,10 @@
+cap: 200.00 W 200.00 W
+GGML_CUDA_ALLREDUCE=none
+GGML_CUDA_P2P=1
+=== h56-rebase-16k === (idle 50C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 311s | VRAM 11157/11157 MiB
+  rep1: decode 46.93 t/s | prefill 326.48 t/s | accept 275/370 = 74.3% | peak 65C
+  rep2: decode 46.82 t/s | prefill 396.47 t/s | accept 274/373 = 73.5% | peak 67C
+  rep3: decode 46.77 t/s | prefill 397.35 t/s | accept 274/373 = 73.5% | peak 68C
+power-capped over 455s wall: gpu0 0s gpu1 0s
