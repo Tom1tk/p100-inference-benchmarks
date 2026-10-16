@@ -1492,3 +1492,17 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - **H53 (UD-IQ4_XS, 2 cards): refuted at the KLD gate.** Mean KLD 0.0719 vs Q4_K_M 0.0593, same-top 95.2 vs 96.6%. The speed run was skipped.
 - **H51 (opencode agentic levers):** harness re-engineered for opencode v2 (`run-web-bench.sh`); Phase 5 run is held for the user (GPU-heavy).
 - **H39r (staged dequant re-test at 200 W): 1-card confirmed, 2-card not adopted.** 1-card IQ3_S 16k prefill 211.98 → 220.34 (+3.9%), output identical. 2-card warm reps +0.9% (mean −2.6% with a cold-load rep 1). 1-card also shows 0 s power-capped, so **H52 is refuted on both arms**.
+
+## 2026-10-15 → 16 — final report numbers at 200 W (REPS=10 unless noted)
+
+- User stopped the run partway for noise (100k rep 10 cancelled); resumed 2026-10-16 with `scripts/run-r10s-resume.sh`. The 1-card r10 arm is deferred (user call).
+
+| Arm | n | decode t/s | prefill t/s |
+|---|---|---|---|
+| `r10s-stock-16k` (rebased build, P2P, MTP) | 10 | 28.71 ±0.04 | 318.3 ±0.8 |
+| `r10s-fork-16k` (current serve command) | 10 | 47.54 ±0.09 (+65.6%) | 392.1 ±0.8 (+23.2%) |
+| `r10s-stock-100k` (stock, q8_0 KV; user: 3 reps) | 3 | 20.87 ±0.08 | 214.3 ±0.0 |
+| `r10s-fork-100k` (current serve command, f16 KV) | 9 | 33.07 ±0.07 (+58.5%) | 288.1 ±0.2 (+34.4%) |
+
+- **100k haystack with f16 KV (`p8-final-f16`): 19/19.** That is every question the Q5_K_M reference `p8-ref` answers (18/19), plus one, the same as `p8-h46-fagemm` (q8_0 KV). The f16 KV switch (H48b) passes the Phase 8 quality gate.
+- 0 s power-capped on every arm.
