@@ -1512,3 +1512,11 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - **H55 (n=4 step cliff): cause found, lever refuted.** mmvh drops rows/warp 4 → 2 above 4 columns, so a 5th column costs +47–107% (`results/h55-ncols*.txt`). Fork `GGML_PASCAL_MMVH_R4=1` (opt-in, bit-identical) cuts that to +12–33%. Served n=4 16k `h55-r4-n4-16k` 44.66 t/s vs n=3 47.54 (−6.1%; H49 n=4 was 35.08), output identical. n=3 stays. 1-card arm parked (drafter-free, path never runs).
 - **H54 (FA decode at 98k): refuted.** The tile kernel already splits KV; the waste is GQA 6 packed as GQA 2 (`results/h54-gqa-probe.txt`). Fork `GGML_PASCAL_FA_GQA6=1` (7b6a784): micro 98k nb4 1244 → 925 µs. Served `h54-gqa6-98k` 32.51 vs `h49-n3-98k` 32.97 (−1.4%): step −3.0%, but output diverges at char 1531 and acceptance fell 263/405 → 256/425. 1-card `h54-1card-gqa6` 18.56 vs 18.39 (+0.9%), output identical. Not adopted.
 - 0 s power-capped on every arm.
+
+## 2026-10-16 — H56 fork tidy + rebase check, H56b attribution (REPS=3 each, 200 W)
+
+- **Fork:** refuted levers removed, adopted levers default-on for sm_60, `docs/pascal/README.md` added, rebased onto ggml-org `7182ef7` (tag `pre-tidy-2026-10-16` = old head). **Not force-pushed yet.**
+- **test-backend-ops (new build):** FLASH_ATTN_EXT 4004/4004, RMS_NORM 53/53, MUL_MAT 2210/2210 excluding `k_v>0` views. A q4_K view case asserts in the cuBLAS fallback on this build and on the pre-rebase builds alike: pre-existing, off the serve path.
+- **H56 (no Pascal env, 2-card 16k):** decode 46.84 (0.985×), prefill 326 / 396 / 397 (rep 1 one-off; mean 0.952×). Text deterministic but differs from `r10s-fork-16k` at char 431 (fluent reword). Driver stopped; 1-card arm not run.
+- **H56b (rebased, pre-tidy, all levers =1):** decode 46.85, prefill 397.5. Text identical to H56. **The text flip and −1.5% decode are upstream; the tidy is neutral.** User call pending: accept the new text, or gate on a quality check, before force-pushing.
+- 0 s power-capped on every arm.
