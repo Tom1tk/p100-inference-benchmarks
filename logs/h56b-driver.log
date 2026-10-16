@@ -1,0 +1,22 @@
+cap: 200.00 W 200.00 W
+GGML_CUDA_ALLREDUCE=none
+GGML_CUDA_P2P=1
+GGML_CUDA_PASCAL_GEMM_ALGO=1
+GGML_CUDA_PASCAL_MMVH=1
+GGML_PASCAL_DUPLEX_REDUCE=1
+GGML_PASCAL_F16_REDUCE=1
+GGML_PASCAL_FA_GEMM=1
+GGML_PASCAL_MMVH_LOWBIT=1
+GGML_PASCAL_MMVH_Q6K_WIDE=1
+=== h56b-pretidy-16k === (idle 49C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/lcp-h56b/build/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 89s | VRAM 11157/11157 MiB
+  rep1: decode 46.98 t/s | prefill 396.52 t/s | accept 275/370 = 74.3% | peak 65C
+  rep2: decode 46.78 t/s | prefill 398.02 t/s | accept 274/373 = 73.5% | peak 67C
+  rep3: decode 46.78 t/s | prefill 397.87 t/s | accept 274/373 = 73.5% | peak 68C
+power-capped over 222s wall: gpu0 0s gpu1 0s
+h56-rebase-16k h56b-pretidy-16k identical (1273,1273 chars)
+r10s-fork-16k h56b-pretidy-16k differ@431 (1224,1273 chars)
+h56b-pretidy-16k  1  46.98  396.52  ok
+h56b-pretidy-16k  2  46.78  398.02  ok
+h56b-pretidy-16k  3  46.78  397.87  ok

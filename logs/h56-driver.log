@@ -14,3 +14,4 @@ h56-rebase-16k: decode 46.84 vs 47.54, prefill 373.43 vs 392.10
 FAIL: 2-card check, 1-card arm cancelled
 200.00 W 200.00 W
 power-capped over 455s wall: gpu0 0s gpu1 0s
+pushed
