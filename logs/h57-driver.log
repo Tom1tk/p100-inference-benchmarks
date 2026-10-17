@@ -22,3 +22,19 @@ h57-rebase-f16 L2 d92 HIT  'llama_perf_context_print' prompt_n=66 2s
 h57-rebase-f16 L2 d95 HIT  'print_rule_binary' prompt_n=49 2s
 --- h57-rebase-f16 rc=0 peak 70C, VRAM  ---
 haystack: 19/19 (p8-final-f16 19/19, p8-ref 18/19)
+pushed
+cooling: hottest card 57C
+=== h57-rebase-1card === (idle 54C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-IQ3_S.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm none -c 16384 -b 2048 -ub 2048 
+loaded in 182s | VRAM 13161/259 MiB
+  rep1: decode 18.50 t/s | prefill 214.68 t/s | accept 0/0 = n/a% | peak 66C
+  rep2: decode 18.50 t/s | prefill 222.44 t/s | accept 0/0 = n/a% | peak 67C
+  rep3: decode 18.50 t/s | prefill 222.12 t/s | accept 0/0 = n/a% | peak 68C
+power-capped over 442s wall: gpu0 0s gpu1 0s
+h39r-1card-staged h57-rebase-1card differ@435 (1593,1539 chars)
+h39r-1card-staged  1  18.40  220.76  ok
+h39r-1card-staged  2  18.39  220.22  ok
+h39r-1card-staged  3  18.39  220.03  ok
+h57-rebase-1card   1  18.50  214.68  ok
+h57-rebase-1card   2  18.50  222.44  ok
+h57-rebase-1card   3  18.50  222.12  ok

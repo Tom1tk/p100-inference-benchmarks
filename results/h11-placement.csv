@@ -246,3 +246,6 @@ h56-rebase-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,46.77,397.3
 h56b-pretidy-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,46.98,396.52,400,370,275,74.3,11157,11157,65,89,ok
 h56b-pretidy-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,46.78,398.02,400,373,274,73.5,11157,11157,67,89,ok
 h56b-pretidy-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,46.78,397.87,400,373,274,73.5,11157,11157,68,89,ok
+h57-rebase-1card,none,none,default,1,18.50,214.68,400,0,0,,13161,259,66,182,ok
+h57-rebase-1card,none,none,default,2,18.50,222.44,400,0,0,,13161,259,67,182,ok
+h57-rebase-1card,none,none,default,3,18.50,222.12,400,0,0,,13161,259,68,182,ok
