@@ -33,7 +33,7 @@ value practical lever left.
 
 ```
 Tom1tk/llama.cpp-Pascal (fork, /root/llama.cpp-Pascal/build-cuda-p100)  ·  -sm tensor
-GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1 GGML_CUDA_PASCAL_MMVH=1 GGML_PASCAL_F16_REDUCE=1 GGML_CUDA_PASCAL_GEMM_ALGO=1 GGML_PASCAL_DUPLEX_REDUCE=1 GGML_PASCAL_MMVH_Q6K_WIDE=1 GGML_PASCAL_MMVH_LOWBIT=1 GGML_PASCAL_FA_GEMM=1
+GGML_CUDA_ALLREDUCE=none GGML_CUDA_P2P=1   (fork ≥ 5542bf9: the Pascal levers are on by default on sm_60)
 Qwen3.8-27B-UD-Q4_K_M  ·  --spec-type draft-mtp -md mtp-Qwen3.8-27B-Q4_0-head96k.gguf
 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -b 2048 -ub 2048 -c 100000 -np 1
 Power cap: 200 W per card (user-set 2026-10-15; `nvidia-smi -pl 200`, does not survive a host reboot)
@@ -42,6 +42,8 @@ Power cap: 200 W per card (user-set 2026-10-15; `nvidia-smi -pl 200`, does not s
 Adopted 2026-10-14 after it passed the Phase 8 quality gate (H32: 19/19 at 100k, vs 18/19
 for the Q5_K_M FP32 reference). Fork levers: half2 matvec incl. Q6_K (H28, H34), F16
 AllReduce payload (H31/H34), cuBLAS ALGO3 for n ≥ 512 (H33, H35), full-duplex AllReduce copies (H36, bit-identical, so H32 still holds), 4-lane Q6_K matvec (H41b; fp32 reorder only, ~1e-6 relative, PPL not worse; H32 not re-run), branch-free Q4_K/Q5_K scale unpack (H43, output identical, no flag), Q3_K + IQ4_NL on mmvh (H44, `LOWBIT`, output identical, KLD gate passed), drafter LM head trimmed to the first 98,304 vocab rows (H45; lossless by construction since the target verifies every draft, output identical, acceptance unchanged), prefill flash attention through cuBLAS GEMMs at depth (H46, `FA_GEMM`: +19.2% prefill at 98k; lossy, so the H32 haystack was re-run: 19/19). The table is at 175 W. H15 (2026-10-15): 200 W adds +4.4% prefill at 98k and +4.5% at 16k, decode flat; 220 W adds +6.4% at 16k, 250 W nothing more (HYPOTHESES H15 steps 1–4). f16 KV instead of q8_0 (H48b, 2026-10-15, 200 W): 98k decode step 88.7 vs 98.4 ms (−9.9%, REPS=3 each), decode 32.8 vs 28.4 t/s, prefill unchanged, 13,573 MiB/card; f16 is the reference KV precision, the haystack is re-checked in the final report.
+
+Fork tidy + rebase onto mainline 7182ef7 (2026-10-16/17, H56, H56b, H57): adopted levers are default-on for sm_60 (older fork builds need the `=1` env vars; tag `pre-tidy-2026-10-16`). The 100k haystack is still 19/19. Per-step decode is +0.7% and 16k prefill +1.4% (397 t/s). The greedy text changed upstream, so 16k acceptance on the bench prompt moved 75.9% → 73.5% (16k decode 46.8 t/s on that prompt). The table below is the pre-rebase REPS=10 final report.
 
 The trimmed drafter is generated, not downloaded: `python3 /root/llama.cpp-Pascal/scripts/pascal-trim-mtp-head.py /root/mtp-Qwen3.8-27B-Q4_0.gguf /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 98304` (needs fork cfea757+fd90268; stock builds reject the shorter head).
 
