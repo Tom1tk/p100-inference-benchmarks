@@ -1520,3 +1520,10 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - **H56 (no Pascal env, 2-card 16k):** decode 46.84 (0.985×), prefill 326 / 396 / 397 (rep 1 one-off; mean 0.952×). Text deterministic but differs from `r10s-fork-16k` at char 431 (fluent reword). Driver stopped; 1-card arm not run.
 - **H56b (rebased, pre-tidy, all levers =1):** decode 46.85, prefill 397.5. Text identical to H56. **The text flip and −1.5% decode are upstream; the tidy is neutral.** User call pending: accept the new text, or gate on a quality check, before force-pushing.
 - 0 s power-capped on every arm.
+
+## 2026-10-17 — H57 rebased-fork quality gate (200 W)
+
+- **100k haystack: 19/19** on the rebased fork, with no Pascal env (sm_60 defaults), f16 KV and MTP. Same as `p8-final-f16`.
+- **1-card IQ3_S 16k (REPS=3):** decode 18.50 (1.006×), prefill 219.75 (0.997×). The text flips at char 435, which points at an upstream numerics change, not the meta backend.
+- **2-card decode "−1.5%" explained:** acceptance on the flipped text is 274/373 vs 277/365, so 2–3 more target steps. Per step the rebased build is 0.7% faster (67.96 vs 68.41 ms). No bisect.
+- New controls: `h56-rebase-16k` (2-card), `h57-rebase-1card` (1-card). The fork force-push waits for the user.
