@@ -1546,3 +1546,8 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - Found their model: lmstudio-community `Qwen3.8-27B-Q6_K.gguf`. Our UD-Q4_K_M is a seven-type mix; H62 tests a standard two-type Q4_K_M (downloading `/root/Qwen3.8-27B-Q4_K_M-lms.gguf`).
 
 - Single card dropped for good (user call): no more 1-card arms. CLAUDE.md Scope and RUNBOOK item 3 updated.
+
+## 2026-10-17 — H62 standard Q4_K_M: FAIL (quality)
+
+lmstudio Q4_K_M vs UD-Q4_K_M on the rebased fork. 5–6.5% faster per target step (16k and 98k), prefill flat at 98k,
+but KLD 0.0883 vs 0.0595 fails the tier 1 gate. UD-Q4_K_M stays. Details in HYPOTHESES Round 4.
