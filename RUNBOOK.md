@@ -260,7 +260,7 @@ change the serve command. Refreshed 2026-10-15.
 |---|---|---|---|
 | 1 | "Re-test at the higher cap" list (§1), at 200 W | **Closed 2026-10-15:** 2-card rows parked by H52 (0 s capped at 200 W); 1-card H39 re-tested as H39r | — |
 | 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
-| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) on **opencode v2** (replaces pi, user call 2026-10-15) | The deployment target itself; carries H51 | **Pause for the user before the GPU run** (heavy) |
+| 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) on **opencode v2** (replaces pi, user call 2026-10-15) | The deployment target itself; carries H51 | **Done 2026-10-17:** 2136 s, 3/3 stages (RESULTS Phase 5) |
 | 2 | **Round 3 (H48–H53, HYPOTHESES):** f16 KV at 98k, draft length, 98k decode profile, power-cap counter, UD-IQ4_XS | User call 2026-10-15, each REPS ≥ 3 | H51 runs inside Phase 5 |
 | 6 | Concurrency (`-np` > 1) | Only if the harness issues parallel requests | Ask first |
 

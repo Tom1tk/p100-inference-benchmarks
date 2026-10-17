@@ -104,3 +104,6 @@ stage 3: 759s (exit 0)
 
 Site should now be live at http://localhost:4001 (systemd unit p5-fork-opencode.service)
 active
+pushed
+
+Next: update RESULTS.md Phase 5 table and WEB_BENCH.md's port registry (see RUNBOOK.md section 4).
