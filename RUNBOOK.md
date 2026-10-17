@@ -252,14 +252,14 @@ and 8 are done: the command passed the Phase 8 gate (H32) on 2026-10-14 and now
 only changes by fork levers, each one gated (KLD vs the FP32 Q5 reference, H35
 style) and measured against the banked control. Fork design notes live in the
 fork repo, `docs/pascal/fork-plan-2026-10-14.md`. Ranked by whether an item can
-change the serve command. Refreshed 2026-10-17. **Reopened 2026-10-17 (user call)** for Round 4 (H58–H64, from the Kmic-68 P100 fork): item 7. Items 3 and 6 stay open.
+change the serve command. Refreshed 2026-10-17. **Reopened 2026-10-17 (user call)** for Round 4 (H58–H64, from the Kmic-68 P100 fork): item 7. Item 6 stays open; item 3 closed (single card dropped).
 
 ### Open
 
 | # | Item | Why | Cost / gate |
 |---|---|---|---|
 | 1 | "Re-test at the higher cap" list (§1), at 200 W | **Closed 2026-10-15:** 2-card rows parked by H52 (0 s capped at 200 W); 1-card H39 re-tested as H39r | — |
-| 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | Probes 2026-10-15 (fork plan): not the smem lookups, bank conflicts, sign math or 2-byte loads. No lead left; needs a new kernel structure |
+| 3 | 1-card decode: IQ3_S / IQ3_XXS matvec (~228 GB/s, ~47% of 1-card matvec time) | Biggest remaining 1-card decode share | **Closed 2026-10-17:** single card dropped (user call) |
 | 4 | Phase 5: agentic web build ([WEB_BENCH.md](WEB_BENCH.md)) on **opencode v2** (replaces pi, user call 2026-10-15) | The deployment target itself; carries H51 | **Done 2026-10-17:** 2136 s, 3/3 stages (RESULTS Phase 5) |
 | 2 | **Round 3 (H48–H53, HYPOTHESES):** f16 KV at 98k, draft length, 98k decode profile, power-cap counter, UD-IQ4_XS | User call 2026-10-15, each REPS ≥ 3 | **Done:** H48–H53 all closed (HYPOTHESES); H51 cache part passed in Phase 5 |
 | 7 | **Round 4 (H58–H64, HYPOTHESES):** verify kernels, sampled drafts, draft-step graphs, prefill overlap, homogeneous quant, Q6_K, race audit | Kmic-68 fork shows MTP decode headroom at depth | Order in HYPOTHESES "Round 4"; each REPS ≥ 3 |
@@ -292,7 +292,7 @@ command today. Re-open only on the stated unblock.
 
 | Line of enquiry | Why |
 |---|---|
-| Single-GPU serving on stock builds (H20/H25) | 56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k. **User call, 2026-08-27.** Reopened 2026-10-14 for fork builds only, see CLAUDE.md Scope |
+| Single-GPU serving on stock builds (H20/H25) | 56% of the pair's prefill, 38% of its real decode, MTP OOMs, cannot reach 100k. **User call, 2026-08-27.** Reopened 2026-10-14 for fork builds; **dropped for good 2026-10-17 (user call)**, see CLAUDE.md Scope |
 | PFlash — product, fork, technique (H21) | sm_80-only, no v2, hand-port not worth it. Fork kept on disk only for `llama-niah` |
 | TurboPrefill (H16) | Forces `-sm layer`, −35% decode. User call |
 | TurboQuant KV (H4/H7) | −14.3% decode for 788 MiB. **Dropped from the queue, user call 2026-10-15** |

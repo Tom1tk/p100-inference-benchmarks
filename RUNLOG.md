@@ -1544,3 +1544,5 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 
 - Reviewed the Kmic-68 P100 fork. It overlaps ours on single-column matvec and prefill, and adds verify kernels and MTP sampling work. Pre-registered H58–H64 (HYPOTHESES "Round 4").
 - Found their model: lmstudio-community `Qwen3.8-27B-Q6_K.gguf`. Our UD-Q4_K_M is a seven-type mix; H62 tests a standard two-type Q4_K_M (downloading `/root/Qwen3.8-27B-Q4_K_M-lms.gguf`).
+
+- Single card dropped for good (user call): no more 1-card arms. CLAUDE.md Scope and RUNBOOK item 3 updated.

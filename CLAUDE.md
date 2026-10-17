@@ -34,12 +34,9 @@ restates the rules that must never be re-derived from context.
 - **DFlash2 v1 is excluded**; DFlash2 (v2) is in scope.
 - Power cap is approved to **220 W per card, not 250 W**, and is gated on the
   user's own in-person PSU plug-meter check. Do not raise it unprompted.
-- The single-GPU arm is **`Qwen3.8-27B-UD-IQ3_S`** — the same model at a lower
-  quant, never a different model.
-- **Single card is a secondary target again (user call, 2026-10-14)** for builds of
-  the fork [Tom1tk/llama.cpp-Pascal](https://github.com/Tom1tk/llama.cpp-Pascal):
-  every fork A/B run includes a 1-card arm (`UD-IQ3_S`, `-sm none`) next to the
-  2-card arm. Single-GPU serving on stock builds stays closed.
+- **Single card is dropped (user call, 2026-10-17).** It is not the use case: no
+  1-card arms, no 1-card hypotheses. Earlier 1-card results (`UD-IQ3_S`, `-sm none`)
+  stay in the record as history.
 - **This repo is for benchmarks only.** Fork plans and design docs live in the
   fork repo (`docs/pascal/`), never here.
 
