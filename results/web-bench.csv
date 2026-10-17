@@ -1,0 +1,2 @@
+label,engine,model,site_port,total_s,requests,prompt_tokens,generated_tokens,prefill_avg,prefill_min,prefill_max,decode_avg,decode_min,decode_max
+p5-fork-opencode,fork,Qwen3.8-27B-UD-Q4_K_M.gguf,4001,2136.0,27,11054,69496,98.65,27.05,374.26,41.78,31.53,51.92

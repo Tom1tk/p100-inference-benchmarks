@@ -1,0 +1,106 @@
+=== preflight ===
+GPUs: 2 | hottest card: 49C | site :4001 | server :8101 | proxy :8201
+=== starting server: p5-fork-opencode ===
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8101 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 100000 --jinja --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf -b 2048 -ub 2048 -np 1 
+NOTE: model load takes 4-8 min with no output. This is not a hang.
+=== server healthy after 322s ===
+=== stage 1 ===
+stage 1: 364s (exit 0)
+=== stage 2 ===
+stage 2: 689s (exit 0)
+=== stage 3 ===
+stage 3: 759s (exit 0)
+=== finished in 2136s | ok | peak 65C ===
+{
+  "label": "p5-fork-opencode",
+  "engine": "fork",
+  "model": "/root/Qwen3.8-27B-UD-Q4_K_M.gguf",
+  "site_port": 4001,
+  "total_task_seconds": 2136.0,
+  "stage_seconds": {
+    "3": 759,
+    "2": 689,
+    "1": 364
+  },
+  "overall": {
+    "requests": 27,
+    "prompt_tokens": 11054,
+    "generated_tokens": 69496,
+    "cached_tokens": 883449,
+    "cache_hit_rate": 0.9876,
+    "prefill_tps": {
+      "avg": 98.65,
+      "min": 27.05,
+      "max": 374.26,
+      "n": 27
+    },
+    "decode_tps": {
+      "avg": 41.78,
+      "min": 31.53,
+      "max": 51.92,
+      "n": 27
+    }
+  },
+  "stages": {
+    "1": {
+      "requests": 14,
+      "prompt_tokens": 9786,
+      "generated_tokens": 12237,
+      "cached_tokens": 130124,
+      "cache_hit_rate": 0.9301,
+      "prefill_tps": {
+        "avg": 127.85,
+        "min": 33.19,
+        "max": 374.26,
+        "n": 14
+      },
+      "decode_tps": {
+        "avg": 44.94,
+        "min": 38.45,
+        "max": 51.92,
+        "n": 14
+      }
+    },
+    "2": {
+      "requests": 3,
+      "prompt_tokens": 267,
+      "generated_tokens": 29832,
+      "cached_tokens": 101656,
+      "cache_hit_rate": 0.9974,
+      "prefill_tps": {
+        "avg": 65.49,
+        "min": 30.38,
+        "max": 108.69,
+        "n": 3
+      },
+      "decode_tps": {
+        "avg": 41.41,
+        "min": 37.03,
+        "max": 43.95,
+        "n": 3
+      }
+    },
+    "3": {
+      "requests": 10,
+      "prompt_tokens": 1001,
+      "generated_tokens": 27427,
+      "cached_tokens": 651669,
+      "cache_hit_rate": 0.9985,
+      "prefill_tps": {
+        "avg": 67.72,
+        "min": 27.05,
+        "max": 124.36,
+        "n": 10
+      },
+      "decode_tps": {
+        "avg": 37.48,
+        "min": 31.53,
+        "max": 47.08,
+        "n": 10
+      }
+    }
+  }
+}
+
+Site should now be live at http://localhost:4001 (systemd unit p5-fork-opencode.service)
+active

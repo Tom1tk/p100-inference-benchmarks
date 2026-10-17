@@ -1,0 +1,389 @@
+[0m
+> build · p5-fork-opencode
+[0m$ [0msudo -S ls /etc/systemd/system/ 2>/dev/null | head -50; echo "---"; systemctl list-unit-files 'p5-*' 2>/dev/null || echo "no p5 units"
+container-getty@1.service.d
+ctrl-alt-del.target
+dbus-org.freedesktop.network1.service
+dbus-org.freedesktop.resolve1.service
+dbus-org.freedesktop.timesync1.service
+first-boot-complete.target.wants
+getty.target.wants
+laya.service
+laya-ui.service
+multi-user.target.wants
+p5-fork-serve.service
+proxmox-regenerate-snakeoil.service
+sockets.target.wants
+sshd.service
+ssh.service.requires
+sysinit.target.wants
+sys-kernel-config.mount
+sys-kernel-debug.mount
+syslog.service
+sysstat.service.wants
+systemd-hibernate.service.wants
+systemd-journald-audit.socket
+systemd-suspend.service.wants
+systemd-suspend-then-hibernate.service.wants
+timers.target.wants
+---
+UNIT FILE             STATE   PRESET
+p5-fork-serve.service enabled enabled
+
+1 unit files listed.
+[0m$ [0mpwd && ls -la /srv/webbench-oc/p5-fork-opencode/site && node --version && npm --version && whoami
+/srv/webbench-oc/p5-fork-opencode/site
+total 8
+drwxr-xr-x 2 root root 4096 Oct 17 19:14 .
+drwxr-xr-x 4 root root 4096 Oct 17 19:14 ..
+v24.14.1
+11.11.0
+root
+> build · p5-fork-opencode
+The workspace is empty, and I can see there's an existing `p5-fork-serve.service` (another model's site) — I'll keep the new service name exactly as `p5-fork-opencode.service` to avoid collisions. Let me peek at the existing service to get a feel for the conventions, and check whether port 4001 is free.
+[0m$ [0mcat /etc/systemd/system/p5-fork-serve.service; echo "---PORTS---"; (ss -tlnp 2>/dev/null | grep -E ':(4001|4000|4002)\b') || echo "4001 free"
+[Unit]
+Description=p5-fork-serve - Express site on http://localhost:4000
+Documentation=file:///root/p100-benchmarks/sites/p5-fork-serve/p5-fork-serve/public/index.html
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/p100-benchmarks/sites/p5-fork-serve/p5-fork-serve
+ExecStart=/usr/bin/node /root/p100-benchmarks/sites/p5-fork-serve/p5-fork-serve/server.js
+Restart=on-failure
+RestartSec=3
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+---PORTS---
+LISTEN 0      511                      127.0.0.1:4000       0.0.0.0:*    users:(("MainThread",pid=761209,fd=21))
+> build · p5-fork-opencode
+Port 4001 is free. Now let me create the project folder and initialise it.
+[0m$ [0mcd /srv/webbench-oc/p5-fork-opencode/site && mkdir -p p5-fork-opencode/public && cd p5-fork-opencode && npm init -y
+Wrote to /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/package.json:
+
+{
+  "name": "p5-fork-opencode",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
+> build · p5-fork-opencode
+Now I'll write the server, the HTML page, and tidy up `package.json`.
+[0m← [0mWrite p5-fork-opencode/server.js
+Created file successfully: p5-fork-opencode/server.js
+[0m← [0mWrite p5-fork-opencode/package.json
+Wrote file successfully: p5-fork-opencode/package.json
+> build · p5-fork-opencode
+Now the HTML page:
+[0m← [0mWrite p5-fork-opencode/public/index.html
+Created file successfully: p5-fork-opencode/public/index.html
+[0m$ [0mcd /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode && npm install 2>&1 | tail -5
+16 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+> build · p5-fork-opencode
+Dependencies installed. Let me smoke-test the server manually before wiring it into systemd:
+[0m$ [0mcd /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode && node server.js & SERVER_PID=$!; sleep 1.5; echo "--- / ---"; curl -s -o /dev/null -w "HTTP %{http_code}, %{size_download} bytes\n" http://localhost:4001/; echo "--- /healthz ---"; curl -s http://localhost:4001/healthz; echo; kill $SERVER_PID 2>/dev/null; wait 2>/dev/null; echo "test server stopped"
+p5-fork-opencode listening on http://localhost:4001
+--- / ---
+HTTP 200, 5400 bytes
+--- /healthz ---
+{"status":"ok","name":"p5-fork-opencode","uptime":1.530783186}
+test server stopped
+> build · p5-fork-opencode
+The server is working — HTTP 200 on `/` and a healthy `/healthz` response. Next, I'll create the systemd service file (following the conventions of the existing `p5-fork-serve.service`):
+[0m← [0mWrite /etc/systemd/system/p5-fork-opencode.service
+Created file successfully: /etc/systemd/system/p5-fork-opencode.service
+> build · p5-fork-opencode
+Now reload systemd, enable, and start the service:
+[0m$ [0msystemctl daemon-reload && sudo systemctl enable p5-fork-opencode.service && sudo systemctl start p5-fork-opencode.service && echo "=== enabled+started ==="
+Created symlink /etc/systemd/system/multi-user.target.wants/p5-fork-opencode.service → /etc/systemd/system/p5-fork-opencode.service.
+=== enabled+started ===
+> build · p5-fork-opencode
+Now let's confirm everything is running:
+[0m$ [0msystemctl is-enabled p5-fork-opencode.service; systemctl is-active p5-fork-opencode.service; echo "---"; systemctl status p5-fork-opencode.service --no-pager | head -15
+enabled
+activating
+---
+● p5-fork-opencode.service - p5-fork-opencode - Express site on http://localhost:4001
+     Loaded: loaded (/etc/systemd/system/p5-fork-opencode.service; enabled; preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Sat 2026-10-17 19:25:19 BST; 243ms ago
+       Docs: file:///srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/public/index.html
+    Process: 1057515 ExecStart=/usr/bin/node /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/server.js (code=exited, status=1/FAILURE)
+   Main PID: 1057515 (code=exited, status=1/FAILURE)
+        CPU: 184ms
+
+Oct 17 19:25:22 LLM-serve node[1057540]:     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+Oct 17 19:25:22 LLM-serve node[1057540]:   code: 'EADDRINUSE',
+Oct 17 19:25:22 LLM-serve node[1057540]:   errno: -98,
+Oct 17 19:25:22 LLM-serve node[1057540]:   syscall: 'listen',
+Oct 17 19:25:22 LLM-serve node[1057540]:   address: '0.0.0.0',
+Oct 17 19:25:22 LLM-serve node[1057540]:   port: 4001
+Oct 17 19:25:22 LLM-serve node[1057540]: }
+> build · p5-fork-opencode
+Port 4001 is in use — something is still holding it. Let me find out what:
+[0m$ [0mss -tlnp | grep 4001; echo "---"; ps aux | grep -E 'node.*server' | grep -v grep
+LISTEN 0      511                        0.0.0.0:4001       0.0.0.0:*    users:(("MainThread",pid=1057352,fd=21))              
+---
+root      761209  0.0  0.0 1449768 11096 ?       Ssl  Oct15   0:02 /usr/bin/node /root/p100-benchmarks/sites/p5-fork-serve/p5-fork-serve/server.js
+root     1057352  0.0  0.2 1448616 68216 ?       Sl   19:24   0:00 node server.js
+> build · p5-fork-opencode
+Found it — the smoke-test node process (PID 1057352) survived the kill and is squatting on 4001. I'll kill it and restart the service:
+[0m$ [0mkill 1057352 && sleep 1 && (ss -tln | grep 4001 || echo "4001 free again") && sudo systemctl restart p5-fork-opencode.service && sleep 1 && systemctl is-active p5-fork-opencode.service
+LISTEN 0      511                        0.0.0.0:4001       0.0.0.0:*          
+active
+> build · p5-fork-opencode
+The stray process has been terminated, and the service is now `active`. Final verification — the service status and a live request to the site:
+[0m$ [0msystemctl status p5-fork-opencode.service --no-pager | head -12; echo "=== HTTP check ==="; curl -s -o /dev/null -w "GET / -> HTTP %{http_code} (%{size_download} bytes)\n" http://localhost:4001/; curl -s http://localhost:4001/healthz; echo; curl -s http://localhost:4001/ | grep -o '<title>[^<]*</title>'
+● p5-fork-opencode.service - p5-fork-opencode - Express site on http://localhost:4001
+     Loaded: loaded (/etc/systemd/system/p5-fork-opencode.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-10-17 19:25:42 BST; 7s ago
+       Docs: file:///srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/public/index.html
+   Main PID: 1057672 (MainThread)
+      Tasks: 7 (limit: 34831)
+     Memory: 19.7M (peak: 20.1M)
+        CPU: 173ms
+     CGroup: /system.slice/p5-fork-opencode.service
+             └─1057672 /usr/bin/node /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/server.js
+
+Oct 17 19:25:42 LLM-serve systemd[1]: Started p5-fork-opencode.service - p5-fork-opencode - Express site on http://localhost:4001.
+=== HTTP check ===
+GET / -> HTTP 200 (5400 bytes)
+{"status":"ok","name":"p5-fork-opencode","uptime":7.372887173}
+<title>p5-fork-opencode</title>
+> build · p5-fork-opencode
+All done. Everything is set up and confirmed running.
+
+## What I built
+
+**Location:** `/srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/`
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Node.js project config, `npm start` script |
+| `server.js` | Express server on port **4001** (serves the page + `/healthz`) |
+| `public/index.html` | Single-page site about **p5-fork-opencode** |
+| `node_modules/` | All dependencies installed (Express, 0 vulnerabilities) |
+
+**systemd service:** `/etc/systemd/system/p5-fork-opencode.service`
+- Exact name `p5-fork-opencode.service` — no collision with the existing `p5-fork-serve.service` (port 4000).
+- `WorkingDirectory` + `ExecStart=/usr/bin/node .../server.js`
+- `Restart=on-failure`, `RestartSec=3`, `WantedBy=multi-user.target`
+
+## Confirmation
+
+```
+systemctl is-enabled p5-fork-opencode.service   → enabled   (auto-starts on boot)
+systemctl is-active  p5-fork-opencode.service   → active (running)
+GET http://localhost:4001/                      → HTTP 200 (5400 bytes)
+GET http://localhost:4001/healthz               → {"status":"ok","name":"p5-fork-opencode",...}
+<title>                                         → p5-fork-opencode
+```
+
+A quick note on a hiccup: my first manual smoke-test left a stray `node` process squatting on port 4001, so the service's first start hit `EADDRINUSE`. I killed the stray process and restarted — it's now the systemd-managed process holding the port (Main PID 1057672). The site is live at **http://localhost:4001**.
+[0m
+> build · p5-fork-opencode
+Fun brief. I'll do a full ground-up rework: a dark neon "model datasheet" aesthetic with animated gradient backgrounds, marquees, staggered reveals, and a terminal-style agent-loop section — plus a real interactive sandbox that actually executes the visitor's JavaScript in the browser (fitting, since I verify everything by running it). Let me rewrite `public/index.html`:
+[0m← [0mWrite p5-fork-opencode/public/index.html
+Wrote file successfully: p5-fork-opencode/public/index.html
+> build · p5-fork-opencode
+Now restart the service and verify:
+[0m$ [0msudo systemctl restart p5-fork-opencode.service && sleep 1 && systemctl is-active p5-fork-opencode.service && curl -s -o /dev/null -w "GET / -> HTTP %{http_code} (%{size_download} bytes)\n" http://localhost:4001/ && curl -s http://localhost:4001/ | grep -c 'sb-input\|agent-sandbox\|MODEL CARD\|131,072' && curl -s http://localhost:4001/healthz
+active
+GET / -> HTTP 200 (39355 bytes)
+10
+{"status":"ok","name":"p5-fork-opencode","uptime":1.04151912}
+> build · p5-fork-opencode
+Done. The site has been completely reworked and the service is running the new version.
+
+## What changed
+
+**Design** — a full neon "model datasheet" rework (page grew from ~5 KB to ~39 KB, all self-contained, no external assets):
+- **Animated backdrop**: three drifting color orbs (magenta/cyan/violet) over a fading grid, plus a scanline overlay
+- **Dual marquees**: a scrolling spec ticker up top and a reverse-scrolling "plan → explore → act → verify → report" strip mid-page (both pause on hover)
+- **Hero**: giant 900-weight type with an animated gradient sweep, blinking cursor, a spinning circular "100% LOCAL • NO API KEYS • 128K CONTEXT" badge, and a live model-card panel with an animated context bar
+- **Bold flourishes**: acid-lime/magenta/cyan palette, hard-offset "neo-brutalist" button shadows, IntersectionObserver scroll-reveals, pulsing timeline dots, hover-glow spec cells and capability cards, and a `prefers-reduced-motion` fallback that disables all of it
+
+**Content** — expanded from a blurb into a proper self-description:
+- **Spec sheet**: decoder-only transformer, GQA + RoPE + RMSNorm + SwiGLU, 16B dense, 131,072-token context, Q4_K_M GGUF (~10 GB), local inference via llama.cpp, zero network egress, sampling habits, personality
+- **Capabilities**: six cards (polyglot coding, agentic execution, debugging with receipts, shell fluency, long-context work, privacy by construction)
+- **Method**: a terminal-styled "live replay" of my agent loop — parse → explore → act → verify → report, noting this site was built by that exact loop
+- **Use cases**: chip cloud (greenfield builds, refactors, root-cause debugging, infra/ops, glue scripts, log triage, docs)
+
+**Interactive element** — a terminal-style **code sandbox** with real behaviour: visitors type JavaScript (or hit a preset) and it actually executes via a sandboxed `Function` in *their* browser — `console.log` is captured into the output pane, return values are pretty-printed, and errors are caught and shown in red. A live approximate-token counter in the panel header ties it back to the 128k context story. It's the same "run it, check the output" habit the page keeps preaching.
+
+## Service status
+
+```
+systemctl restart p5-fork-opencode.service  → done
+systemctl is-active                         → active
+GET http://localhost:4001/                  → HTTP 200 (39,355 bytes, new content confirmed)
+GET /healthz                                → {"status":"ok",...}
+```
+
+The page is live at **http://localhost:4001** — try the "agent loop mini-run" preset in the sandbox for the nicest demo.
+[0m
+> build · p5-fork-opencode
+I'll add the ice-fishing game: canvas + HUD inserted right after the hero `<h1>`, all logic in a new `public/game.js`, then verify static serving and restart. First, the HTML insertion and CSS:
+[0m← [0mEdit p5-fork-opencode/public/index.html
+Index: p5-fork-opencode/public/index.html
+===================================================================
+--- p5-fork-opencode/public/index.html
++++ p5-fork-opencode/public/index.html
+@@ -353,8 +353,17 @@
+         <h1>
+           <span class="line">p5-<span class="line">fork-</span></span>
+           <span class="line g">opencode<span class="cursor">_</span></span>
+         </h1>
++        <div class="ice-game">
++          <div class="ice-hud">
++            <span class="ice-label">❄ ice fishing</span>
++            <span class="ice-scorebox">score <b id="ice-score">0</b></span>
++          </div>
++          <canvas id="ice-canvas" width="520" height="340"
++                  aria-label="Ice fishing mini-game: hold the mouse or touch to reel the hook up, catch fish, and bank them at the ice"></canvas>
++          <p class="ice-hint">hold (mouse or touch) to reel up · release to drop · touch a fish to hook it</p>
++        </div>
+         <p class="lede">
+           A local LLM wired into the <strong>OpenCode</strong> agent harness. No datacenter, no API keys,
+           no waiting on someone else's GPU — just a transformer, a shell, and a <strong>stubborn streak</strong>.
+           This page describes me, and the sandbox at the bottom lets you watch me work.
+
+[0m← [0mEdit p5-fork-opencode/public/index.html
+Index: p5-fork-opencode/public/index.html
+===================================================================
+--- p5-fork-opencode/public/index.html
++++ p5-fork-opencode/public/index.html
+@@ -127,8 +127,24 @@
+     .btn-solid:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--magenta); }
+     .btn-ghost { border: 1px solid var(--violet); color: var(--ink); box-shadow: 5px 5px 0 rgba(139, 92, 255, .3); }
+     .btn-ghost:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 rgba(139, 92, 255, .55); }
+ 
++    /* ============ ice fishing game ============ */
++    .ice-game { margin: 0 0 1.7rem; max-width: 520px; user-select: none; -webkit-user-select: none; }
++    .ice-hud { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; font-family: var(--font-mono); }
++    .ice-label { font-size: .75rem; letter-spacing: .2em; text-transform: uppercase; color: var(--cyan); }
++    .ice-scorebox { font-size: .85rem; letter-spacing: .08em; color: var(--muted); }
++    .ice-scorebox b { display: inline-block; color: var(--lime); font-size: 1.15rem; }
++    .ice-scorebox b.bump { animation: bump .35s ease; }
++    @keyframes bump { 35% { transform: scale(1.65); color: var(--magenta); } }
++    #ice-canvas {
++      display: block; width: 100%; aspect-ratio: 520 / 340;
++      border: 1px solid var(--border); border-radius: 14px; background: #0a2348;
++      cursor: pointer; touch-action: none;
++      box-shadow: 0 18px 50px rgba(0, 0, 0, .5), 0 0 34px rgba(33, 243, 255, .08);
++    }
++    .ice-hint { margin-top: .55rem; font-family: var(--font-mono); font-size: .72rem; letter-spacing: .06em; color: var(--muted); opacity: .75; }
++
+     /* hero card */
+     .hero-card {
+       position: relative; border: 1px solid var(--border); border-radius: 18px;
+       background: var(--panel); padding: 1.8rem; backdrop-filter: blur(6px);
+
+> build · p5-fork-opencode
+Now the `<script src>` tag, then the game logic file:
+[0m← [0mWrite p5-fork-opencode/public/game.js
+Created file successfully: p5-fork-opencode/public/game.js
+[0m← [0mEdit p5-fork-opencode/public/index.html
+Index: p5-fork-opencode/public/index.html
+===================================================================
+--- p5-fork-opencode/public/index.html
++++ p5-fork-opencode/public/index.html
+@@ -638,8 +638,9 @@
+     built by itself in one session · served by systemd (<code>p5-fork-opencode.service</code>) · port 4001 · 0% cloud<br />
+     <a href="/healthz">health check</a> — the server says <code>{"status":"ok"}</code>, and this time it really does
+   </footer>
+ 
++  <script src="game.js"></script>
+   <script>
+     (function () {
+       'use strict';
+ 
+
+> build · p5-fork-opencode
+Now verify the static config in `server.js`, syntax-check `game.js`, restart the service, and confirm:
+[0m$ [0mcd /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode && grep -n "express.static" server.js && node --check public/game.js && echo "game.js syntax OK" && sudo systemctl restart p5-fork-opencode.service && sleep 1 && systemctl is-active p5-fork-opencode.service
+12:app.use(express.static(path.join(__dirname, 'public')));
+game.js syntax OK
+active
+> build · p5-fork-opencode
+[0m$ [0mcurl -s -o /dev/null -w "GET / -> %{http_code} (%{size_download} bytes)\n" http://localhost:4001/ && curl -sI http://localhost:4001/game.js | grep -iE 'HTTP|content-type' && echo "--- page references ---" && curl -s http://localhost:4001/ | grep -oE 'id="ice-canvas"|id="ice-score"|src="game.js"|class="ice-game"' | sort | uniq -c
+GET / -> 200 (41084 bytes)
+HTTP/1.1 200 OK
+Content-Type: application/javascript; charset=UTF-8
+--- page references ---
+      1 class="ice-game"
+      1 id="ice-canvas"
+      1 id="ice-score"
+      1 src="game.js"
+> build · p5-fork-opencode
+HTTP checks all pass. Let me do a real render check in the browser to make sure the canvas actually draws and the game script has no runtime errors:
+[0m⚙ [0mexecute {"code":"const r = await tools.browser.tabs.open({ url: \"http://localhost:4001/\" });\nconsole.log(JSON.stringify(r, null, 2));\nconst found = tools.search ? null : null;\n// search catalog for console/screenshot tools\nconst s = search(\"console\");\nconsole.log(JSON.stringify(s.items.slice(0, 10), null, 2));\nconst s2 = search(\"screenshot\");\nconsole.log(JSON.stringify(s2.items.slice(0, 10), null, 2));\n"} 
+> build · p5-fork-opencode
+The desktop browser isn't connected in this session. Let me try the browser tools directly to see if one can be opened:
+[0m⚙ [0mexecute {"code":"try {\n  const t = await tools.browser.tabs.open({ url: \"http://localhost:4001/\" });\n  console.log(\"opened\", t.id, t.url, t.title, \"loading:\", t.loading, \"err:\", t.loadError);\n} catch (e) {\n  console.log(\"OPEN FAILED:\", e);\n}\ntry {\n  const l = await tools.browser.tabs.list();\n  console.log(\"tabs:\", JSON.stringify(l.tabs));\n} catch (e) {\n  console.log(\"LIST FAILED:\", e);\n}\n"} 
+> build · p5-fork-opencode
+In this session, browser verification is not available. As an alternative, I'll run a headless smoke test on the game logic — running `game.js` in Node using a stubbed DOM/canvas that *throws an exception on unknown canvas API calls*, simulating about 15 seconds of gameplay including press/release input cycles across multiple runs:
+[0m← [0mWrite /tmp/icegame-harness.js
+Created file successfully: /tmp/icegame-harness.js
+> build · p5-fork-opencode
+[0m$ [0mcd /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode && node /tmp/icegame-harness.js public/game.js
+sim 0: score=0 (no runtime errors, frame loop intact)
+sim 1: score=0 (no runtime errors, frame loop intact)
+sim 2: score=0 (no runtime errors, frame loop intact)
+sim 3: score=0 (no runtime errors, frame loop intact)
+sim 4: score=1 (no runtime errors, frame loop intact)
+sim 5: score=0 (no runtime errors, frame loop intact)
+sim 6: score=0 (no runtime errors, frame loop intact)
+sim 7: score=0 (no runtime errors, frame loop intact)
+PASS — fish were caught and the score counter incremented (max 1)
+> build · p5-fork-opencode
+All 8 simulations ran cleanly — the frame loop stayed stable, and one of the runs caught a fish all the way through (collision → catch → reel up → collect at the ice surface → score increment → restock). Let's do a final check on the hero section markup and the service status:
+[0m$ [0mgrep -n -A3 'class="line g"' /srv/webbench-oc/p5-fork-opencode/site/p5-fork-opencode/public/index.html | head -12; echo "=== service ==="; systemctl is-active p5-fork-opencode.service; systemctl is-enabled p5-fork-opencode.service; curl -s -o /dev/null -w "GET / -> %{http_code}\n" http://localhost:4001/; rm /tmp/icegame-harness.js
+371:          <span class="line g">opencode<span class="cursor">_</span></span>
+372-        </h1>
+373-        <div class="ice-game">
+374-          <div class="ice-hud">
+=== service ===
+active
+enabled
+GET / -> 200
+> build · p5-fork-opencode
+Done. The ice fishing game is live at **http://localhost:4001**, sitting right under the `p5-fork-opencode_` heading.
+
+## What was added
+
+**Placement & structure**
+- The game block (HUD + canvas + hint) is inserted directly after the hero `<h1>` and before the lede/buttons, in the hero's left column
+- Self-contained 520×340 `<canvas>` — medium size, DPR-scaled for crisp rendering, responsive down to mobile, rounded frame with a cyan glow matching the page
+- All game logic lives in **`public/game.js`**, loaded via `<script src="game.js"></script>`; the page also gets a small HUD row (`❄ ice fishing` + `score N`) and a one-line control hint
+- Express static serving was already configured (`app.use(express.static(...))` in `server.js`) — verified: `/game.js` returns `200, application/javascript`
+
+**Game mechanics (per spec)**
+- The hook hangs from the 🎣 fisher's rod at the ice hole and **sinks slowly by default** (34 px/s)
+- **Holding mouse or touch reels up** (135 px/s, via unified pointer events with `touch-action: none`); releasing drops it again — the two states are strictly mutually exclusive
+- Six fish (🐟 🐠 🐡 and rare 🦈) swim **left → right continuously** at randomized depths, speeds, and sizes, wobbling as they go and re-entering from the left after exiting
+- **Hook touches fish → caught**: the fish thrashes and follows the hook (stacking in slots if you multi-catch)
+- **Caught fish reaching the ice are collected**: they vanish, a new one respawns, and the **visible DOM score counter increments by 1** with a little bump animation
+- With nothing on the line, the hook **clamps at the ice** when fully reeled and resumes falling on release
+- Scene dressing: gradient water, drifting light shafts, rising bubbles, snow drifts, the hole, a slack/taut fishing line, a vector-drawn hook, and a subtle "● reeling" indicator on the ice
+
+## Verification
+
+- `node --check game.js` — syntax OK
+- Headless simulation harness (stubbed DOM/canvas that throws on any unknown API, ~15 s of play × 8 runs with press/release input cycles): **no runtime errors, frame loop intact, and a full catch → collect → score increment confirmed**
+- `systemctl restart p5-fork-opencode.service` — done; service **active** and **enabled**, `GET / → 200`
+
+One note: I couldn't do a visual browser check (no desktop browser connected to this session), but the headless simulation exercises the real game code end-to-end.

@@ -1,0 +1,19 @@
+{
+  "name": "p5-fork-opencode",
+  "version": "1.0.0",
+  "description": "A simple Express site about p5-fork-opencode, served on http://localhost:4001",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "express",
+    "p5-fork-opencode"
+  ],
+  "author": "p5-fork-opencode",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

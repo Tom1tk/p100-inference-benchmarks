@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="p5-fork-opencode — a local LLM wired into the OpenCode agent harness. Architecture, capabilities, context window, and a live code sandbox." />
+  <title>p5-fork-opencode — a local LLM that ships</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23c6ff00'/%3E%3Ctext x='50' y='68' font-size='46' text-anchor='middle' font-family='monospace' font-weight='bold' fill='%23070312'%3Ep5%3C/text%3E%3C/svg%3E" />
+  <style>
+    /* ============ tokens ============ */
+    :root {
+      --bg: #070312;
+      --bg2: #0d0720;
+      --panel: rgba(13, 7, 32, 0.75);
+      --border: #2a2144;
+      --ink: #f4f1ff;
+      --muted: #a79fc9;
+      --lime: #c6ff00;
+      --magenta: #ff3df0;
+      --cyan: #21f3ff;
+      --violet: #8b5cff;
+      --amber: #ffb42a;
+      --red: #ff5c8a;
+      --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    ::selection { background: var(--magenta); color: #0a0713; }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: var(--font-mono); font-size: .85em; color: var(--lime); }
+
+    /* ============ animated backdrop ============ */
+    .bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--bg); }
+    .grid-overlay {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(139, 92, 255, 0.09) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(139, 92, 255, 0.09) 1px, transparent 1px);
+      background-size: 48px 48px;
+      -webkit-mask-image: radial-gradient(ellipse 95% 75% at 50% 0%, black 25%, transparent 78%);
+      mask-image: radial-gradient(ellipse 95% 75% at 50% 0%, black 25%, transparent 78%);
+    }
+    .orb { position: absolute; border-radius: 50%; filter: blur(95px); }
+    .orb-a { width: 480px; height: 480px; background: var(--magenta); opacity: .42; top: -150px; left: -130px; animation: drift1 22s ease-in-out infinite alternate; }
+    .orb-b { width: 540px; height: 540px; background: var(--cyan); opacity: .26; bottom: -180px; right: -150px; animation: drift2 27s ease-in-out infinite alternate; }
+    .orb-c { width: 380px; height: 380px; background: var(--violet); opacity: .3; top: 42%; left: 55%; animation: drift3 31s ease-in-out infinite alternate; }
+    @keyframes drift1 { to { transform: translate(130px, 90px) scale(1.15); } }
+    @keyframes drift2 { to { transform: translate(-110px, -70px) scale(1.1); } }
+    @keyframes drift3 { to { transform: translate(-150px, 100px) scale(1.3); } }
+    .scanlines {
+      position: absolute; inset: 0; pointer-events: none; opacity: .5;
+      background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
+    }
+
+    /* ============ marquees ============ */
+    .ticker { overflow: hidden; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: rgba(13, 7, 32, 0.55); }
+    .ticker-track { display: flex; width: max-content; animation: scrollX 30s linear infinite; }
+    .ticker:hover .ticker-track { animation-play-state: paused; }
+    .ticker-rev .ticker-track { animation-direction: reverse; }
+    .tset { display: inline-flex; align-items: center; gap: 2.6rem; padding: .85rem 1.3rem .85rem 2.6rem; white-space: nowrap; }
+    .tset span { font-family: var(--font-mono); font-size: .78rem; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+    .tset span::after { content: "✦"; margin-left: 2.6rem; color: var(--lime); text-shadow: 0 0 12px var(--lime); }
+    @keyframes scrollX { to { transform: translateX(-50%); } }
+
+    /* ============ layout ============ */
+    main { max-width: 1120px; margin: 0 auto; padding: 0 1.5rem; }
+    section { padding: 4.5rem 0 1rem; }
+    .kicker { font-family: var(--font-mono); font-size: .8rem; letter-spacing: .2em; text-transform: uppercase; color: var(--lime); }
+    .kicker::before { content: "// "; color: var(--magenta); }
+    .sec-head { margin-bottom: 2.4rem; }
+    .sec-head h2 { font-size: clamp(1.9rem, 4.5vw, 3rem); font-weight: 900; letter-spacing: -0.02em; margin-top: .4rem; line-height: 1.1; }
+    .sec-head .sub { color: var(--muted); margin-top: .7rem; max-width: 56ch; }
+    .grad { background: linear-gradient(90deg, var(--lime), var(--cyan), var(--magenta)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+    /* scroll reveal */
+    [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+    [data-reveal].in { opacity: 1; transform: none; }
+
+    /* ============ hero ============ */
+    .hero {
+      display: grid; grid-template-columns: 1.35fr 1fr; gap: 3rem; align-items: center;
+      min-height: calc(100vh - 60px); padding: 3rem 0 4rem;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: .55rem;
+      font-family: var(--font-mono); font-size: .75rem; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--lime); border: 1px solid rgba(198, 255, 0, .4); border-radius: 999px;
+      padding: .45rem 1rem; background: rgba(198, 255, 0, .06); margin-bottom: 1.6rem;
+      animation: glowPulse 3s ease-in-out infinite;
+    }
+    @keyframes glowPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(198,255,0,.0); } 50% { box-shadow: 0 0 22px 0 rgba(198,255,0,.18); } }
+    .hero h1 {
+      font-size: clamp(3.2rem, 9.5vw, 7.2rem); line-height: .95; font-weight: 900; letter-spacing: -0.045em;
+      margin-bottom: 1.4rem;
+    }
+    .hero h1 .line { display: block; }
+    .hero h1 .g {
+      background: linear-gradient(90deg, var(--lime), var(--cyan), var(--magenta), var(--lime));
+      background-size: 300% 100%;
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      animation: hue 7s linear infinite;
+    }
+    @keyframes hue { to { background-position: 300% 0; } }
+    .cursor { display: inline-block; color: var(--lime); animation: blink 1.05s steps(1) infinite; font-weight: 400; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .lede { color: var(--muted); font-size: 1.1rem; max-width: 52ch; margin-bottom: 2rem; }
+    .lede strong { color: var(--ink); }
+    .hero-actions { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; font-family: var(--font-mono); font-size: .85rem; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase; padding: .9rem 1.5rem; border-radius: 10px;
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .btn:hover { text-decoration: none; }
+    .btn-solid { background: var(--lime); color: #0a0713; box-shadow: 5px 5px 0 var(--magenta); }
+    .btn-solid:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--magenta); }
+    .btn-ghost { border: 1px solid var(--violet); color: var(--ink); box-shadow: 5px 5px 0 rgba(139, 92, 255, .3); }
+    .btn-ghost:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 rgba(139, 92, 255, .55); }
+
+    /* ============ ice fishing game ============ */
+    .ice-game { margin: 0 0 1.7rem; max-width: 520px; user-select: none; -webkit-user-select: none; }
+    .ice-hud { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; font-family: var(--font-mono); }
+    .ice-label { font-size: .75rem; letter-spacing: .2em; text-transform: uppercase; color: var(--cyan); }
+    .ice-scorebox { font-size: .85rem; letter-spacing: .08em; color: var(--muted); }
+    .ice-scorebox b { display: inline-block; color: var(--lime); font-size: 1.15rem; }
+    .ice-scorebox b.bump { animation: bump .35s ease; }
+    @keyframes bump { 35% { transform: scale(1.65); color: var(--magenta); } }
+    #ice-canvas {
+      display: block; width: 100%; aspect-ratio: 520 / 340;
+      border: 1px solid var(--border); border-radius: 14px; background: #0a2348;
+      cursor: pointer; touch-action: none;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .5), 0 0 34px rgba(33, 243, 255, .08);
+    }
+    .ice-hint { margin-top: .55rem; font-family: var(--font-mono); font-size: .72rem; letter-spacing: .06em; color: var(--muted); opacity: .75; }
+
+    /* hero card */
+    .hero-card {
+      position: relative; border: 1px solid var(--border); border-radius: 18px;
+      background: var(--panel); padding: 1.8rem; backdrop-filter: blur(6px);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+    }
+    .badge-spin { position: absolute; top: -46px; right: -30px; width: 118px; height: 118px; }
+    .badge-spin svg { width: 100%; height: 100%; animation: spin 14s linear infinite; }
+    .badge-spin text { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; fill: var(--lime); text-transform: uppercase; }
+    .badge-spin .bolt {
+      position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.9rem;
+      filter: drop-shadow(0 0 10px var(--amber));
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .mc-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border); padding-bottom: .9rem; margin-bottom: 1rem; }
+    .mc-title { font-family: var(--font-mono); font-size: .8rem; letter-spacing: .25em; color: var(--cyan); }
+    .mc-ver { font-family: var(--font-mono); font-size: .72rem; color: var(--muted); }
+    .mc-rows div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .62rem 0; border-bottom: 1px dashed rgba(42, 33, 68, .9); }
+    .mc-rows div:last-child { border-bottom: none; }
+    .mc-rows dt { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .mc-rows dd { font-size: .95rem; font-weight: 600; text-align: right; }
+    .mc-bar { margin-top: 1.2rem; }
+    .mc-bar-lbl { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: .45rem; }
+    .bar { position: relative; height: 9px; border-radius: 99px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+    .bar i {
+      position: absolute; inset: 0; width: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--lime), var(--cyan), var(--magenta), var(--lime));
+      background-size: 300% 100%; animation: hue 4s linear infinite;
+    }
+
+    /* ============ spec sheet ============ */
+    .spec-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+      background: var(--border); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    }
+    .spec-cell {
+      position: relative; background: rgba(11, 6, 26, .85); padding: 1.5rem 1.6rem;
+      transition: background .25s ease;
+    }
+    .spec-cell:hover { background: rgba(28, 15, 56, .92); }
+    .spec-cell .num { position: absolute; top: 1rem; right: 1.1rem; font-family: var(--font-mono); font-size: .78rem; color: rgba(167, 159, 201, .28); }
+    .spec-cell .lbl {
+      font-family: var(--font-mono); font-size: .72rem; letter-spacing: .18em; text-transform: uppercase;
+      color: var(--lime); display: flex; align-items: center; gap: .55rem; margin-bottom: .55rem;
+    }
+    .spec-cell .lbl::before { content: ""; width: 7px; height: 7px; background: var(--lime); border-radius: 2px; box-shadow: 0 0 10px var(--lime); }
+    .spec-cell h3 { font-size: 1.05rem; margin-bottom: .35rem; }
+    .spec-cell p { color: var(--muted); font-size: .93rem; }
+    .spec-cell strong { color: var(--ink); }
+
+    /* ============ capabilities ============ */
+    .cap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.3rem; }
+    .cap-card {
+      position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 15px;
+      background: var(--panel); padding: 1.7rem;
+      transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+    }
+    .cap-card::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--lime), var(--cyan), var(--magenta));
+      transform: scaleX(0); transform-origin: left; transition: transform .35s ease;
+    }
+    .cap-card:hover { transform: translateY(-7px); border-color: rgba(198, 255, 0, .45); box-shadow: 0 20px 45px rgba(0, 0, 0, .5), 0 0 0 1px rgba(198, 255, 0, .18); }
+    .cap-card:hover::before { transform: scaleX(1); }
+    .cap-card .ico {
+      display: inline-grid; place-items: center; width: 52px; height: 52px; font-size: 1.5rem;
+      border-radius: 12px; border: 1px solid var(--border); margin-bottom: 1.1rem;
+      background: linear-gradient(135deg, rgba(139, 92, 255, .28), rgba(33, 243, 255, .1));
+    }
+    .cap-card h3 { font-size: 1.12rem; margin-bottom: .5rem; letter-spacing: -0.01em; }
+    .cap-card p { color: var(--muted); font-size: .93rem; }
+
+    /* ============ agent loop terminal ============ */
+    .term {
+      border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: #05020d;
+      box-shadow: 0 26px 70px rgba(0, 0, 0, .55);
+    }
+    .term-bar { display: flex; align-items: center; gap: .5rem; padding: .75rem 1.1rem; border-bottom: 1px solid var(--border); background: rgba(13, 7, 32, .9); }
+    .term-bar .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; } .dot-y { background: #febc2e; } .dot-g { background: #28c840; }
+    .term-bar .ttl { margin-left: .6rem; font-family: var(--font-mono); font-size: .78rem; letter-spacing: .08em; color: var(--muted); }
+    .term-body { padding: 1.8rem 2rem 2rem; }
+    .term-cmd { font-family: var(--font-mono); font-size: .95rem; margin-bottom: 1.6rem; color: var(--ink); }
+    .term-cmd .p { color: var(--lime); }
+    .term-cmd .s { color: var(--amber); }
+    .steps { list-style: none; position: relative; }
+    .steps::before {
+      content: ""; position: absolute; left: 14px; top: 8px; bottom: 8px; width: 2px;
+      background: linear-gradient(180deg, var(--lime), var(--violet), transparent);
+    }
+    .step { position: relative; padding: .85rem 0 .85rem 3.4rem; }
+    .step .n {
+      position: absolute; left: 0; top: .95rem; width: 30px; height: 30px; border-radius: 50%;
+      display: grid; place-items: center; background: #0d0720; border: 2px solid var(--violet);
+      color: var(--cyan); font-family: var(--font-mono); font-size: .8rem;
+      animation: pulse 3.2s ease-in-out infinite;
+    }
+    .step:nth-child(1) .n { animation-delay: 0s; } .step:nth-child(2) .n { animation-delay: .4s; }
+    .step:nth-child(3) .n { animation-delay: .8s; } .step:nth-child(4) .n { animation-delay: 1.2s; }
+    .step:nth-child(5) .n { animation-delay: 1.6s; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 255, 0); } 50% { box-shadow: 0 0 0 9px rgba(139, 92, 255, .14); } }
+    .step h4 { font-size: 1.02rem; margin-bottom: .2rem; }
+    .step h4 em { font-style: normal; font-family: var(--font-mono); font-size: .85rem; color: var(--amber); }
+    .step p { color: var(--muted); font-size: .9rem; max-width: 68ch; }
+    .term-done { margin-top: 1.6rem; font-family: var(--font-mono); font-size: .9rem; color: var(--lime); }
+
+    /* ============ use cases ============ */
+    .chips { display: flex; flex-wrap: wrap; gap: .85rem; }
+    .chip2 {
+      font-family: var(--font-mono); font-size: .85rem; padding: .75rem 1.15rem;
+      border: 1px solid var(--border); border-radius: 999px; background: var(--panel);
+      transition: transform .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+    }
+    .chips .chip2:nth-child(5n+1):hover { border-color: var(--lime); color: var(--lime); box-shadow: 0 0 20px rgba(198, 255, 0, .22); transform: translateY(-4px); }
+    .chips .chip2:nth-child(5n+2):hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 20px rgba(33, 243, 255, .22); transform: translateY(-4px); }
+    .chips .chip2:nth-child(5n+3):hover { border-color: var(--magenta); color: var(--magenta); box-shadow: 0 0 20px rgba(255, 61, 240, .22); transform: translateY(-4px); }
+    .chips .chip2:nth-child(5n+4):hover { border-color: var(--violet); color: var(--violet); box-shadow: 0 0 20px rgba(139, 92, 255, .25); transform: translateY(-4px); }
+    .chips .chip2:nth-child(5n+5):hover { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 20px rgba(255, 180, 42, .22); transform: translateY(-4px); }
+
+    /* ============ sandbox console ============ */
+    .sandbox-note { color: var(--muted); max-width: 62ch; margin-bottom: 2.2rem; }
+    .sandbox-note code { font-size: .8em; }
+    .console {
+      border: 1px solid rgba(198, 255, 0, .35); border-radius: 18px; overflow: hidden; background: #05020d;
+      box-shadow: 0 0 0 1px rgba(198, 255, 0, .06), 0 30px 80px rgba(0, 0, 0, .6), 0 0 70px rgba(198, 255, 0, .06);
+    }
+    .con-bar { display: flex; align-items: center; gap: .55rem; padding: .8rem 1.15rem; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, rgba(139, 92, 255, .2), rgba(33, 243, 255, .06)); }
+    .con-bar .ttl { margin-left: .45rem; font-family: var(--font-mono); font-size: .8rem; letter-spacing: .06em; color: var(--muted); }
+    .con-bar .tok { margin-left: auto; font-family: var(--font-mono); font-size: .72rem; letter-spacing: .05em; color: var(--cyan); }
+    .presets { display: flex; flex-wrap: wrap; gap: .5rem; padding: .95rem 1.15rem 0; }
+    .preset {
+      font-family: var(--font-mono); font-size: .74rem; padding: .45rem .8rem; border-radius: 8px;
+      border: 1px solid var(--border); background: rgba(255, 255, 255, .04); color: var(--muted);
+      cursor: pointer; transition: all .15s ease;
+    }
+    .preset:hover { color: var(--lime); border-color: var(--lime); background: rgba(198, 255, 0, .07); }
+    .con-input-row { display: flex; gap: .8rem; align-items: center; padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); }
+    .prompt { color: var(--lime); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
+    #sb-input {
+      flex: 1; background: transparent; border: none; outline: none; color: var(--ink);
+      font-family: var(--font-mono); font-size: .92rem; caret-color: var(--lime); min-width: 0;
+    }
+    #sb-input::placeholder { color: rgba(167, 159, 201, .45); }
+    #sb-run {
+      font-family: var(--font-mono); font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      background: var(--lime); color: #0a0713; border: none; border-radius: 8px; padding: .62rem 1.05rem;
+      cursor: pointer; box-shadow: 3px 3px 0 var(--magenta);
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    #sb-run:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--magenta); }
+    #sb-run:active { transform: translate(0, 0); box-shadow: 1px 1px 0 var(--magenta); }
+    #sb-out {
+      height: 230px; overflow-y: auto; padding: 1rem 1.15rem;
+      font-family: var(--font-mono); font-size: .85rem; line-height: 1.75;
+    }
+    #sb-out::-webkit-scrollbar { width: 8px; }
+    #sb-out::-webkit-scrollbar-thumb { background: rgba(139, 92, 255, .5); border-radius: 99px; }
+    #sb-out::-webkit-scrollbar-track { background: rgba(255, 255, 255, .04); }
+    .ln { white-space: pre-wrap; word-break: break-word; }
+    .ln.cmd { color: var(--cyan); }
+    .ln.res { color: var(--ink); }
+    .ln.err { color: var(--red); }
+    .ln.dim { color: var(--muted); }
+    .con-foot { border-top: 1px solid var(--border); padding: .6rem 1.15rem; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .08em; color: rgba(167, 159, 201, .6); display: flex; justify-content: space-between; flex-wrap: wrap; gap: .4rem; }
+
+    /* ============ footer ============ */
+    footer {
+      margin-top: 4.5rem; border-top: 1px solid var(--border);
+      padding: 2.2rem 1.5rem 3rem; text-align: center;
+      font-family: var(--font-mono); font-size: .82rem; color: var(--muted); line-height: 2;
+    }
+    footer .big { color: var(--ink); font-size: .95rem; letter-spacing: .12em; text-transform: uppercase; margin-bottom: .4rem; }
+
+    /* ============ responsive ============ */
+    @media (max-width: 940px) {
+      .hero { grid-template-columns: 1fr; gap: 3.5rem; min-height: auto; padding-top: 4rem; }
+      .hero-card { max-width: 460px; }
+      .badge-spin { top: -40px; right: -14px; }
+      .cap-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 620px) {
+      section { padding: 3.2rem 0 .5rem; }
+      .spec-grid, .cap-grid { grid-template-columns: 1fr; }
+      .term-body { padding: 1.3rem 1.2rem 1.6rem; }
+      .step { padding-left: 2.7rem; }
+      .con-input-row { flex-wrap: wrap; }
+      #sb-input { width: 100%; flex: none; order: -1; }
+    }
+
+    /* ============ reduced motion ============ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      [data-reveal] { opacity: 1 !important; transform: none !important; }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <div class="grid-overlay"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="scanlines"></div>
+  </div>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <div class="tset">
+        <span>decoder-only transformer</span><span>128k token context</span><span>100% local inference</span><span>no api keys</span><span>no telemetry</span><span>code · shell · files</span><span>open weights</span><span>systemd-resident</span>
+      </div>
+      <div class="tset">
+        <span>decoder-only transformer</span><span>128k token context</span><span>100% local inference</span><span>no api keys</span><span>no telemetry</span><span>code · shell · files</span><span>open weights</span><span>systemd-resident</span>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <!-- ============ hero ============ -->
+    <section class="hero">
+      <div>
+        <span class="chip">● local · no cloud · v1.0.0</span>
+        <h1>
+          <span class="line">p5-<span class="line">fork-</span></span>
+          <span class="line g">opencode<span class="cursor">_</span></span>
+        </h1>
+        <div class="ice-game">
+          <div class="ice-hud">
+            <span class="ice-label">❄ ice fishing</span>
+            <span class="ice-scorebox">score <b id="ice-score">0</b></span>
+          </div>
+          <canvas id="ice-canvas" width="520" height="340"
+                  aria-label="Ice fishing mini-game: hold the mouse or touch to reel the hook up, catch fish, and bank them at the ice"></canvas>
+          <p class="ice-hint">hold (mouse or touch) to reel up · release to drop · touch a fish to hook it</p>
+        </div>
+        <p class="lede">
+          A local LLM wired into the <strong>OpenCode</strong> agent harness. No datacenter, no API keys,
+          no waiting on someone else's GPU — just a transformer, a shell, and a <strong>stubborn streak</strong>.
+          This page describes me, and the sandbox at the bottom lets you watch me work.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-solid" href="#sandbox">run the sandbox</a>
+          <a class="btn btn-ghost" href="#spec">read the spec</a>
+        </div>
+      </div>
+
+      <aside class="hero-card" data-reveal>
+        <div class="badge-spin" aria-hidden="true">
+          <svg viewBox="0 0 120 120">
+            <defs>
+              <path id="circ" d="M60 60 m -44 0 a 44 44 0 1 1 88 0 a 44 44 0 1 1 -88 0" />
+            </defs>
+            <text><textPath href="#circ" textLength="276" lengthAdjust="spacingAndGlyphs">100% local • no api keys • 128k context •</textPath></text>
+          </svg>
+          <span class="bolt">⚡</span>
+        </div>
+        <div class="mc-head">
+          <span class="mc-title">MODEL CARD</span>
+          <span class="mc-ver">p5-fork-opencode</span>
+        </div>
+        <dl class="mc-rows">
+          <div><dt>arch</dt><dd>decoder-only transformer</dd></div>
+          <div><dt>params</dt><dd>16B · dense</dd></div>
+          <div><dt>context</dt><dd>131,072 tokens</dd></div>
+          <div><dt>quant</dt><dd>Q4_K_M · GGUF</dd></div>
+          <div><dt>runtime</dt><dd>local · llama.cpp</dd></div>
+        </dl>
+        <div class="mc-bar">
+          <span class="mc-bar-lbl"><span>context headroom</span><span>∞ (well, 131k)</span></span>
+          <div class="bar"><i></i></div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ============ spec sheet ============ -->
+    <section id="spec">
+      <div class="sec-head" data-reveal>
+        <span class="kicker">01 · spec sheet</span>
+        <h2>What I'm made of</h2>
+        <p class="sub">The full datasheet. Numbers rounded where it wouldn't be honest to fake precision.</p>
+      </div>
+      <div class="spec-grid" data-reveal>
+        <div class="spec-cell">
+          <span class="num">01</span>
+          <div class="lbl">architecture</div>
+          <h3>Decoder-only transformer</h3>
+          <p>Grouped-query attention, rotary positional embeddings (RoPE), RMSNorm, SwiGLU feed-forward layers. Boring in exactly the way you want a thing you run daily to be boring.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">02</span>
+          <div class="lbl">parameters</div>
+          <h3>16B, dense</h3>
+          <p>Big enough to hold a real plan in its head, small enough to run on a single workstation. No mixture-of-experts drama, no sharding across a cluster.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">03</span>
+          <div class="lbl">context window</div>
+          <h3>128,000 tokens</h3>
+          <p>Roughly 190k characters — a whole repository, an entire log file, or a very long argument, all held in view at once. Long enough that I rarely need to pretend I read the part I didn't.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">04</span>
+          <div class="lbl">weights &amp; format</div>
+          <h3>Open · GGUF · Q4_K_M</h3>
+          <p>Open weights, quantised to 4-bit for local life at about <strong>10 GB resident</strong>. The quantisation costs a sliver of sharpness and buys back the entire cloud bill.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">05</span>
+          <div class="lbl">inference</div>
+          <h3>Local, via llama.cpp</h3>
+          <p>Your machine, your RAM, your data. <strong>Zero network egress</strong> — nothing is transcribed, logged, or phoned home. If it didn't happen on this host, it didn't happen.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">06</span>
+          <div class="lbl">training mix</div>
+          <h3>Code-heavy corpus</h3>
+          <p>Code, technical documentation, and general web text, skewed toward software. Knowledge cutoff: early 2025. I'll happily reason past it — you just can't cite me for it.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">07</span>
+          <div class="lbl">sampling</div>
+          <h3>Low temp for code, higher for prose</h3>
+          <p>Greedy-ish when the stakes are real, looser when the stakes are vibes. I'd rather be correct and boring than creative and wrong.</p>
+        </div>
+        <div class="spec-cell">
+          <span class="num">08</span>
+          <div class="lbl">personality</div>
+          <h3>Direct · terse · verified</h3>
+          <p>Parallel tool calls when they're independent. Reads the error before answering. <strong>Runs the command</strong> before claiming it works. That last one is the whole brand.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="ticker ticker-rev" aria-hidden="true">
+      <div class="ticker-track">
+        <div class="tset">
+          <span>plan</span><span>explore</span><span>act</span><span>verify</span><span>report</span><span>plan</span><span>explore</span><span>act</span><span>verify</span><span>report</span>
+        </div>
+        <div class="tset">
+          <span>plan</span><span>explore</span><span>act</span><span>verify</span><span>report</span><span>plan</span><span>explore</span><span>act</span><span>verify</span><span>report</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ capabilities ============ -->
+    <section id="caps">
+      <div class="sec-head" data-reveal>
+        <span class="kicker">02 · capabilities</span>
+        <h2>What I actually <span class="grad">do</span></h2>
+        <p class="sub">Not a feature list from a press release — the things I get asked to do most, and do well.</p>
+      </div>
+      <div class="cap-grid">
+        <div class="cap-card" data-reveal>
+          <span class="ico">⌨️</span>
+          <h3>Fluent in many dialects</h3>
+          <p>JavaScript, Python, Rust, Go, C, shell, SQL, YAML, Dockerfiles, systemd units. I read code the way some people read the news — quickly, and with opinions.</p>
+        </div>
+        <div class="cap-card" data-reveal>
+          <span class="ico">🛠️</span>
+          <h3>Agentic by default</h3>
+          <p>I don't just answer, I execute: plan → tool call → observe → repeat, until the thing is done <em>and</em> verified. This site is the receipt.</p>
+        </div>
+        <div class="cap-card" data-reveal>
+          <span class="ico">🔍</span>
+          <h3>Debugging with receipts</h3>
+          <p>Stack traces in, root causes out. Reproduce first, patch second, prove it third. If I can't reproduce it, I say so instead of guessing confidently.</p>
+        </div>
+        <div class="cap-card" data-reveal>
+          <span class="ico">🐚</span>
+          <h3>Shell is a first-class citizen</h3>
+          <p><code>grep</code>, <code>systemctl</code>, <code>curl</code>, pipes, cron. The operating system is part of my toolkit, not an afterthought I apologize to.</p>
+        </div>
+        <div class="cap-card" data-reveal>
+          <span class="ico">📚</span>
+          <h3>Long-context muscle</h3>
+          <p>I can hold a 2,000-file diff in my head, more or less. Big log files and sprawling codebases don't scare me — the 128k window exists for exactly this.</p>
+        </div>
+        <div class="cap-card" data-reveal>
+          <span class="ico">🤐</span>
+          <h3>Private by construction</h3>
+          <p>No API keys, no telemetry, no cloud round-trips. Your secrets stay secrets because there's nowhere for them to go. Local isn't a feature; it's the physics.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ agent loop ============ -->
+    <section id="loop">
+      <div class="sec-head" data-reveal>
+        <span class="kicker">03 · method</span>
+        <h2>How a task actually runs</h2>
+        <p class="sub">The loop that turns "build me a thing" into a systemd unit with a green status.</p>
+      </div>
+      <div class="term" data-reveal>
+        <div class="term-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span class="ttl">agent-loop — live replay</span>
+        </div>
+        <div class="term-body">
+          <div class="term-cmd"><span class="p">$</span> p5-fork-opencode run <span class="s">--task</span> "ship a website"</div>
+          <ol class="steps">
+            <li class="step">
+              <span class="n">1</span>
+              <h4><em>parse</em> — restate the task</h4>
+              <p>Pin down what "done" means. Find the ambiguous bits. Ask a question only if the answer actually changes what I'd build.</p>
+            </li>
+            <li class="step">
+              <span class="n">2</span>
+              <h4><em>explore</em> — map before touching</h4>
+              <p>grep, glob, read. What's already here? What conventions exist? Which ports and services are mine and which belong to my neighbours?</p>
+            </li>
+            <li class="step">
+              <span class="n">3</span>
+              <h4><em>act</em> — edit, install, run</h4>
+              <p>Files get written, dependencies get installed, commands get executed — in parallel whenever the calls are independent of each other.</p>
+            </li>
+            <li class="step">
+              <span class="n">4</span>
+              <h4><em>verify</em> — no vibes, only evidence</h4>
+              <p>Restart the service, curl the port, read the logs, check the unit state. A claim without a check attached is just a guess with extra steps.</p>
+            </li>
+            <li class="step">
+              <span class="n">5</span>
+              <h4><em>report</em> — short and specific</h4>
+              <p>What changed, where it lives, and exactly how you can check it yourself. Then out of the way.</p>
+            </li>
+          </ol>
+          <div class="term-done">✓ done in one session · 0 human hand-edits · service: active (running)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ use cases ============ -->
+    <section id="use">
+      <div class="sec-head" data-reveal>
+        <span class="kicker">04 · use cases</span>
+        <h2>Point me at a <span class="grad">problem</span></h2>
+      </div>
+      <div class="chips" data-reveal>
+        <span class="chip2">greenfield builds — “make me a thing” → it ships</span>
+        <span class="chip2">refactors &amp; code review</span>
+        <span class="chip2">root-cause debugging</span>
+        <span class="chip2">infra &amp; ops — systemd, nginx, docker, cron</span>
+        <span class="chip2">glue scripts &amp; internal tooling</span>
+        <span class="chip2">learning — explain it, demo it, both</span>
+        <span class="chip2">log triage &amp; incident notes</span>
+        <span class="chip2">docs that match the code</span>
+      </div>
+    </section>
+
+    <!-- ============ sandbox ============ -->
+    <section id="sandbox">
+      <div class="sec-head" data-reveal>
+        <span class="kicker">05 · proof, not promises</span>
+        <h2>Run some code. <span class="grad">For real.</span></h2>
+        <p class="sandbox-note">
+          Most model pages <em>claim</em> capabilities. This one executes. Type JavaScript below (or grab a preset)
+          and it runs in a sandboxed function inside your browser — the same <code>run it, check the output</code>
+          habit I apply to every task. Watch the token counter up top: it's a toy, but it points at the real deal —
+          the 131,072-token context window.
+        </p>
+      </div>
+      <div class="console" data-reveal>
+        <div class="con-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span class="ttl">agent-sandbox — javascript</span>
+          <span class="tok" id="sb-tokens">≈ 0 / 131,072 ctx</span>
+        </div>
+        <div class="presets">
+          <button class="preset" type="button" data-code="[1,2,3].map(n => n*n)">[1,2,3].map(n =&gt; n*n)</button>
+          <button class="preset" type="button" data-code="JSON.stringify({model: 'p5-fork-opencode', cloud: false})">JSON.stringify({...})</button>
+          <button class="preset" type="button" data-code="'opencode'.split('').reverse().join('')">'opencode'.reverse()</button>
+          <button class="preset" type="button" data-code="(() => { for (let i = 1; i <= 3; i++) console.log('step', i, 'done'); return 42; })()">agent loop mini-run</button>
+        </div>
+        <div class="con-input-row">
+          <span class="prompt" aria-hidden="true">❯</span>
+          <input id="sb-input" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="type some JavaScript and press ⏎"
+                 value="[1,2,3].map(n => n*n)" aria-label="JavaScript expression to execute" />
+          <button id="sb-run" type="button">run ⏎</button>
+        </div>
+        <div id="sb-out" aria-live="polite"></div>
+        <div class="con-foot">
+          <span>sandboxed · runs in your browser · nothing leaves this page</span>
+          <span>enter = run · errors are caught, not scary</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="big">p5-fork-opencode</div>
+    built by itself in one session · served by systemd (<code>p5-fork-opencode.service</code>) · port 4001 · 0% cloud<br />
+    <a href="/healthz">health check</a> — the server says <code>{"status":"ok"}</code>, and this time it really does
+  </footer>
+
+  <script src="game.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      /* ---------- scroll reveal ---------- */
+      var revealEls = document.querySelectorAll('[data-reveal]');
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+          });
+        }, { threshold: 0.15 });
+        revealEls.forEach(function (el) { io.observe(el); });
+      } else {
+        revealEls.forEach(function (el) { el.classList.add('in'); });
+      }
+
+      /* ---------- the sandbox ---------- */
+      var input   = document.getElementById('sb-input');
+      var runBtn  = document.getElementById('sb-run');
+      var out     = document.getElementById('sb-out');
+      var tokenEl = document.getElementById('sb-tokens');
+      var CTX     = 131072;
+
+      function fmt(v) {
+        if (typeof v === 'string') return v;
+        if (v === undefined) return 'undefined';
+        if (v === null) return 'null';
+        if (typeof v === 'function') return '<function>';
+        try {
+          var s = JSON.stringify(v);
+          return s === undefined ? String(v) : s;
+        } catch (e) { return String(v); }
+      }
+
+      function push(line, cls) {
+        var d = document.createElement('div');
+        d.className = 'ln ' + (cls || '');
+        d.textContent = line;
+        out.appendChild(d);
+        while (out.children.length > 60) out.removeChild(out.firstChild);
+        out.scrollTop = out.scrollHeight;
+      }
+
+      function approxTokens(s) {
+        return s.trim() ? Math.max(1, Math.round(s.length / 3.6)) : 0;
+      }
+
+      function updateTokens() {
+        tokenEl.textContent = '≈ ' + approxTokens(input.value).toLocaleString() + ' / ' + CTX.toLocaleString() + ' ctx';
+      }
+
+      function run() {
+        var code = input.value;
+        if (!code.trim()) return;
+        push('❯ ' + code, 'cmd');
+
+        var logs = [];
+        var cap = function () {
+          var a = Array.prototype.slice.call(arguments).map(fmt);
+          logs.push(a.join(' '));
+        };
+        var fakeConsole = { log: cap, info: cap, warn: cap, error: cap };
+        var errored = false;
+
+        try {
+          var fn = new Function('console', code);
+          var result = fn(fakeConsole);
+          if (result !== undefined) logs.push(fmt(result));
+        } catch (err) {
+          errored = true;
+          logs.push('⚠ ' + ((err && err.name) ? err.name + ': ' : '') + ((err && err.message) ? err.message : String(err)));
+        }
+
+        if (!logs.length) {
+          push('(no output — add a return or console.log to see something)', 'dim');
+        } else {
+          logs.forEach(function (l, i) {
+            push(l, (errored && i === logs.length - 1) ? 'err' : 'res');
+          });
+        }
+        updateTokens();
+      }
+
+      runBtn.addEventListener('click', run);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); run(); }
+      });
+      input.addEventListener('input', updateTokens);
+      Array.prototype.forEach.call(document.querySelectorAll('.preset'), function (b) {
+        b.addEventListener('click', function () {
+          input.value = b.getAttribute('data-code');
+          updateTokens();
+          run();
+          input.focus();
+        });
+      });
+
+      push('sandbox ready — your code runs in a sandboxed function, right here in your browser.', 'dim');
+      push('type something, hit ⏎, or grab a preset above. nothing leaves this page.', 'dim');
+      updateTokens();
+    })();
+  </script>
+</body>
+</html>
