@@ -5,3 +5,13 @@ cap: 200.00 W 200.00 W
 label  mean_kld  p99_kld   p999_kld   same_top_pct
 ud     0.059484  0.369257  19.035103  96.618
 lms    0.088339  0.936434  17.940186  94.951
+pushed
+=== h62-lms-16k === (idle 51C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-Q4_K_M-lms.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 49s | VRAM 11293/11293 MiB
+  rep1: decode 47.69 t/s | prefill 369.50 t/s | accept 267/394 = 67.8% | peak 63C
+  rep2: decode 47.12 t/s | prefill 398.20 t/s | accept 268/391 = 68.5% | peak 66C
+  rep3: decode 47.95 t/s | prefill 397.92 t/s | accept 268/391 = 68.5% | peak 66C
+power-capped over 186s wall: gpu0 0s gpu1 0s
+h56-rebase-16k: decode 46.84, accept 73.8%, 67.96 ms/target-step (n=3)
+h62-lms-16k: decode 47.59, accept 68.3%, 63.52 ms/target-step (n=3)
