@@ -252,3 +252,6 @@ h57-rebase-1card,none,none,default,3,18.50,222.12,400,0,0,,13161,259,68,182,ok
 h62-lms-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,47.69,369.50,400,394,267,67.8,11293,11293,63,49,ok
 h62-lms-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,47.12,398.20,400,391,268,68.5,11293,11293,66,49,ok
 h62-lms-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,47.95,397.92,400,391,268,68.5,11293,11293,66,49,ok
+h62-lms-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,35.23,286.81,400,403,264,65.5,13709,13709,69,360,ok
+h62-lms-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,34.82,290.46,400,403,264,65.5,13709,13709,70,360,ok
+h62-lms-98k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,35.28,290.50,400,403,264,65.5,13709,13709,70,360,ok

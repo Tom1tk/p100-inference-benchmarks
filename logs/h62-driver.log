@@ -15,3 +15,27 @@ loaded in 49s | VRAM 11293/11293 MiB
 power-capped over 186s wall: gpu0 0s gpu1 0s
 h56-rebase-16k: decode 46.84, accept 73.8%, 67.96 ms/target-step (n=3)
 h62-lms-16k: decode 47.59, accept 68.3%, 63.52 ms/target-step (n=3)
+pushed
+cooling: hottest card 59C
+=== h62-lms-98k === (idle 53C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-Q4_K_M-lms.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 100000 -b 2048 -ub 2048 -np 1 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 360s | VRAM 13709/13709 MiB
+  rep1: decode 35.23 t/s | prefill 286.81 t/s | accept 264/403 = 65.5% | peak 69C
+  rep2: decode 34.82 t/s | prefill 290.46 t/s | accept 264/403 = 65.5% | peak 70C
+  rep3: decode 35.28 t/s | prefill 290.50 t/s | accept 264/403 = 65.5% | peak 70C
+power-capped over 1410s wall: gpu0 0s gpu1 0s
+r10s-fork-100k: decode 33.07, accept 64.9%, 88.28 ms/target-step (n=9)
+h62-lms-98k: decode 35.11, accept 65.5%, 83.77 ms/target-step (n=3)
+r10s-fork-100k  1   32.96  287.62  64.9  13573  13573  ok
+r10s-fork-100k  2   32.98  288.24  64.9  13573  13573  ok
+r10s-fork-100k  3   33.16  288.24  64.9  13573  13573  ok
+r10s-fork-100k  4   33.13  288.15  64.9  13573  13573  ok
+r10s-fork-100k  5   33.09  288.15  64.9  13573  13573  ok
+r10s-fork-100k  6   33.12  288.18  64.9  13573  13573  ok
+r10s-fork-100k  7   33.04  288.07  64.9  13573  13573  ok
+r10s-fork-100k  8   33.05  288.29  64.9  13573  13573  ok
+r10s-fork-100k  9   33.12  288.34  64.9  13573  13573  ok
+r10s-fork-100k  10                       13573  13573  FAILED(request)
+h56-rebase-16k  1   46.93  326.48  74.3  11157  11157  ok
+h56-rebase-16k  2   46.82  396.47  73.5  11157  11157  ok
+h56-rebase-16k  3   46.77  397.35  73.5  11157  11157  ok
