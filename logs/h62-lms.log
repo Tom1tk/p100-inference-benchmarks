@@ -1,0 +1,72 @@
+0.00.855.790 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.671.069 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.671.083 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.671.100 W model has unused tensor blk.64.attn_q.weight (size = 35389440 bytes) -- ignoring
+0.01.671.106 W model has unused tensor blk.64.attn_k.weight (size = 2949120 bytes) -- ignoring
+0.01.671.112 W model has unused tensor blk.64.attn_v.weight (size = 4300800 bytes) -- ignoring
+0.01.671.133 W model has unused tensor blk.64.attn_output.weight (size = 17694720 bytes) -- ignoring
+0.01.671.139 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.671.145 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.671.151 W model has unused tensor blk.64.ffn_gate.weight (size = 50135040 bytes) -- ignoring
+0.01.671.157 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.671.163 W model has unused tensor blk.64.ffn_up.weight (size = 50135040 bytes) -- ignoring
+0.01.671.170 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 29491200 bytes) -- ignoring
+0.01.671.176 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.671.182 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.671.205 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+5.30.382.506 I cmn          init: llama threadpool init, n_threads = 14
+5.31.660.266 I 
+5.31.660.663 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+5.31.776.085 I kl_divergence: computing over 8 chunks, n_ctx=512, batch_size=512, n_seq=1
+5.40.235.418 I kl_divergence: 8.46 seconds per pass - ETA 1.12 minutes
+
+chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              Δp RMS            Same top p
+   1       4.5629 ±    0.9395       0.15000 ±    0.10839       0.55846 ±    0.16635    15.834 ±  2.299 %    87.059 ±  2.106 %
+   2       3.0426 ±    0.3471       0.07867 ±    0.05463       0.28727 ±    0.08397    11.635 ±  1.582 %    91.569 ±  1.232 %
+   3       2.6198 ±    0.2146       0.05034 ±    0.03728       0.20233 ±    0.05617    10.440 ±  1.233 %    93.595 ±  0.886 %
+   4       2.3767 ±    0.1575       0.04490 ±    0.02822       0.15603 ±    0.04220     9.306 ±  1.042 %    94.804 ±  0.695 %
+   5       2.2287 ±    0.1253       0.03954 ±    0.02271       0.12916 ±    0.03380     8.790 ±  0.892 %    95.059 ±  0.607 %
+   6       2.3514 ±    0.1197       0.03660 ±    0.01910       0.11004 ±    0.02819     8.124 ±  0.806 %    94.837 ±  0.566 %
+   7       2.3567 ±    0.1081       0.03184 ±    0.01651       0.09688 ±    0.02418     7.714 ±  0.730 %    95.014 ±  0.515 %
+   8       2.3850 ±    0.1021       0.02948 ±    0.01466       0.08834 ±    0.02117     7.416 ±  0.666 %    94.951 ±  0.485 %
+
+====== Perplexity statistics ======
+Mean PPL(Q)                   :   2.385032 ±   0.102074
+Mean PPL(base)                :   2.315742 ±   0.095710
+Cor(ln(PPL(Q)), ln(PPL(base))):  93.98%
+Mean ln(PPL(Q)/PPL(base))     :   0.029483 ±   0.014662
+Mean PPL(Q)/PPL(base)         :   1.029921 ±   0.015100
+Mean PPL(Q)-PPL(base)         :   0.069290 ±   0.034869
+
+====== KL divergence statistics ======
+Mean    KLD:   0.088339 ±   0.021166
+Maximum KLD:  24.390528
+99.9%   KLD:  17.940186
+99.0%   KLD:   0.936434
+95.0%   KLD:   0.123257
+90.0%   KLD:   0.064654
+Median  KLD:   0.001598
+10.0%   KLD:   0.000013
+ 5.0%   KLD:   0.000003
+ 1.0%   KLD:   0.000000
+ 0.1%   KLD:  -0.000013
+Minimum KLD:  -0.000030
+
+====== Token probability statistics ======
+Mean    Δp: -0.429 ± 0.164 %
+Maximum Δp: 99.924%
+99.9%   Δp: 65.540%
+99.0%   Δp: 18.817%
+95.0%   Δp:  5.135%
+90.0%   Δp:  2.129%
+75.0%   Δp:  0.094%
+Median  Δp: -0.003%
+25.0%   Δp: -0.394%
+10.0%   Δp: -3.495%
+ 5.0%   Δp: -7.880%
+ 1.0%   Δp: -23.209%
+ 0.1%   Δp: -82.183%
+Minimum Δp: -92.079%
+RMS Δp    :  7.416 ± 0.666 %
+Same top p: 94.951 ± 0.485 %
+
