@@ -1539,3 +1539,8 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 
 - Docs closed out: README status and objective table, the RUNBOOK queue, the H51 row. The serve command in README is final (fork ≥ 5542bf9, 2 env vars).
 - Still open in RUNBOOK §7, for anyone who picks this up again: 1-card IQ3_S matvec (item 3) and concurrency (item 6).
+
+## 2026-10-17 — reopened for Round 4 (user call)
+
+- Reviewed the Kmic-68 P100 fork. It overlaps ours on single-column matvec and prefill, and adds verify kernels and MTP sampling work. Pre-registered H58–H64 (HYPOTHESES "Round 4").
+- Found their model: lmstudio-community `Qwen3.8-27B-Q6_K.gguf`. Our UD-Q4_K_M is a seven-type mix; H62 tests a standard two-type Q4_K_M (downloading `/root/Qwen3.8-27B-Q4_K_M-lms.gguf`).

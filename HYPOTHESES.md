@@ -68,6 +68,13 @@ run label so the evidence is traceable.
 | H56 | Fork tidy-up (refuted levers removed, adopted levers default-on for sm_60) + rebase onto mainline 7182ef7 changes nothing: with no Pascal env vars, 2-card 16k and 1-card 16k decode/prefill ≥ 98% of control, output identical | **PASS (revised by H56b, H57)**: tidy neutral; the rebase flips greedy text (upstream), per-step decode +0.7%, prefill +1.4% |
 | H57 | Rebased fork (7182ef7 + tidy) keeps quality: 100k haystack 19/19 with the serve config (as `p8-final-f16`); 1-card IQ3_S 16k ≥ 98% of `h39r-1card-staged` | **PASS** 2026-10-17: haystack 19/19; 1-card 1.006× / 0.997×; "−1.5% decode" is MTP acceptance on the flipped text, per step 0.7% faster |
 | H54 | A split-KV (flash-decoding) FA kernel for sm_60 decode (nb ≤ 5, f16 KV, D256, GQA 6) cuts the 98k step ≥5%, output identical / KLD within noise | **REFUTED** 2026-10-16: the tile kernel already splits KV; the real waste was GQA 6 packed as GQA 2 (K/V read 3×). Fork `GGML_PASCAL_FA_GQA6=1` packs all 6 heads: micro 98k nb4 −26%, but served 98k step only 88.1 → 85.4 ms (−3.0%), and the changed greedy text drafted worse (acceptance 263/405 → 256/425), so decode 32.97 → 32.51 (−1.4%). 1-card 16k 18.39 → 18.56 (+0.9%, output identical). Not adopted; opt-in in the fork |
+| H58 | Hand-scheduled fp16 multi-column verify kernels (2–8 columns, per quant type, fp32 folds) remove the n=4→5 step cliff (H55), so draft length 4 lifts 16k decode ≥3% over n=3 | **Pre-registered** 2026-10-17. Port source: Kmic-68 fork `mmvq-f16.cu` |
+| H59 | Sampled MTP drafts + the speculative-sampling acceptance rule + block verify raise acceptance under opencode's sampling (Phase 5: 66% vs ~75% greedy), lifting real-task decode ≥5% with the output distribution unchanged | **Pre-registered** 2026-10-17. Step 0 (no GPU): log the sampling params opencode sends |
+| H60 | CUDA graphs on the MTP draft steps only lift MTP decode ≥3% (H27 tested drafter-free decode only) | **Pre-registered** 2026-10-17. Kmic reports +6.7% spec path, −2% plain |
+| H61 | Prefill: overlapping the TP exchange with chunked matmuls, fusing FFN gate/up/SwiGLU and a one-kernel P2P add lift 16k/100k prefill ≥4% | **Pre-registered** 2026-10-17. Low priority: Phase 5 was 98.8% cache hits, so this mostly helps the cold load |
+| H62 | A homogeneous quant decodes faster than the UD zoo: standard Q4_K_M (Q4_K + Q6_K only) beats UD-Q4_K_M (7 weight types) by ≥3% within the Phase 8 gate | **Pre-registered** 2026-10-17. Model: lmstudio-community `Qwen3.8-27B-Q4_K_M.gguf` (15.66 GiB) |
+| H63 | Q6_K as a quality upgrade: lmstudio `Qwen3.8-27B-Q6_K.gguf` (20.89 GiB, Kmic's model) with q8_0 KV fits 100k and decodes within 10% of the serve command | **Pre-registered** 2026-10-17. Only after H58/H62 (needs fast q6_K verify) |
+| H64 | No cross-stream race in our P2P / duplex AllReduce: repeated unsynchronised runs with injected delay keep output byte-identical | **Pre-registered** 2026-10-17. Kmic shipped this race class past the op suite; ours shows no symptoms |
 
 ---
 
@@ -3009,3 +3016,28 @@ Same rebased base, **without** the tidy commits (fork `59acd5b`, worktree build)
 **The 2-card "−1.5% decode" is acceptance, not speed.** The text flip changes the MTP acceptance on this one prompt: control 277/365 accepted (123 target steps for 400 tokens), rebased 274–275 / 370–373 (125–126 steps). Per target step the rebased build is **0.7% faster** (67.96 ms vs 68.41 ms; H56b 67.95). The 1-card arm, which has no drafter, is +0.6% on decode. No upstream perf regression, so no bisect (rule zero). On real opencode traffic, acceptance averages over many texts.
 
 **H56 verdict, revised:** the tidy is neutral, the rebase keeps quality and speed, and the new controls are `h56-rebase-16k` (2-card) and `h57-rebase-1card` (1-card).
+
+
+## Round 4 (H58–H64) — what the Kmic-68 P100 fork suggests (2026-10-17)
+
+**Source.** [Kmic-68/llama.cpp `p100-optimizations`](https://github.com/Kmic-68/llama.cpp/tree/p100-optimizations) (MIT, merged with upstream f46bc30, docs in `p100-docs/`, full record in `OPTLOG.md`). Same rig class: 2 × P100-PCIE-16GB, `-sm tensor`, Qwen3.8-27B, 175 W. Their serving model is lmstudio-community `Qwen3.8-27B-Q6_K.gguf` (20.88 GiB, built-in MTP head) with q4_0 KV at 262k.
+
+**Their headline numbers aren't comparable to ours as published.** The MTP figures (54–81 t/s) use draft length 4, sampled drafts and short, predictable prompts (85–87% acceptance). Our numbers are 16k/100k deep, greedy, draft length 3. Their own depth table (55 t/s at 32k, 44 at 92k, Q6_K) against ours (47.5 at 16k, 33.1 at 100k, UD-Q4_K_M) still puts them ahead at depth.
+
+**Overlap with our fork.**
+
+| Area | Ours | Theirs | Port? |
+|---|---|---|---|
+| Single-column decode matvec | mmvh: half2, exact fp16 subnormals, ~370–410 GB/s (Q4_K/Q5_K) | int path with the q8_1 activation staged in shared memory, ~408/416 GB/s | **Overlap.** Same ceiling by different routes; keep ours |
+| Multi-column (verify) matvec | mmvh up to 8 columns; n=5 cliff unfixed (H55) | hand-scheduled fp16 per type, 2–16 columns, fp32 folds | **Additive** (H58) |
+| Prefill weight GEMM | cuBLAS ALGO3 fp16 (H33/H35) | custom fp16 GEMM with fp32 folds; cuBLAS ALGO6 | Overlap; theirs is more accurate at similar speed |
+| Prefill attention | cuBLAS GEMM FA (H46) | custom fold kernels, SASS-tuned for 260k | Overlap; theirs targets q4_0 KV at 262k |
+| AllReduce payload | F16 partials (H31), duplex copies (H36) | F16 partials on a copy stream, one-kernel P2P add, compute overlap | Partly additive (H61) |
+| MTP | trimmed head96k drafter (H45), greedy, n=3 | draft-vocab copy, sampled drafts, block verify, depth-adaptive draft length, CUDA graphs on draft steps | **Additive** (H59, H60) |
+| q4_0 KV FA, compact mask, chunked GDN | — | yes | Not needed at 100k with f16 KV |
+
+**Precision.** Kmic multiplies in fp16 and folds sums into fp32 every few dozen terms, measuring as accurate as fp32 at fp16 speed. The [sm_60 FAST_FP16 gist](https://gist.github.com/apollo-mg/9218d50a209d70a85f033bf182657818) proposes the full fp32 carve-out instead; that is our H17, which cost 12–13% prefill here, and H30 found its quality effect small next to the quant step. Any port (H58, H61) keeps the fp32 folds.
+
+**Quant mix (H62).** `UD-Q4_K_M` is a seven-type zoo by bytes: Q5_K 29.4%, IQ4_XS 28.9%, Q4_K 25.6%, Q6_K 11.0%, plus IQ4_NL, Q3_K and IQ3_S. Every type runs its own matvec at its own efficiency. Standard Q4_K_M uses only Q4_K and Q6_K, the two best-tuned paths in both forks. Gate: Phase 8 tier 1 (KLD vs the Q5_K_M FP32 reference, within +0.005 of UD-Q4_K_M) and tier 2 (haystack ≥ 18/19), then 16k REPS=3.
+
+**Order.** H59 step 0 (free) → H62 (download only, then one KLD + one 16k arm) → H60 → H58 (largest port) → H63 → H61. H64 runs whenever the cards are free; it costs minutes.
