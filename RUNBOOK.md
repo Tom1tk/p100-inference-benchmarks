@@ -297,6 +297,7 @@ command today. Re-open only on the stated unblock.
 | TurboPrefill (H16) | Forces `-sm layer`, −35% decode. User call |
 | TurboQuant KV (H4/H7) | −14.3% decode for 788 MiB. **Dropped from the queue, user call 2026-10-15** |
 | `buun` as an engine | Its prefill deficit was the H17 fix; its only exclusive feature is TurboQuant |
+| Straight Q4_0 main model | Not in mmvh, and sm_60 has no dp4a for the stock path; quality below Q4_K_M, which already failed the KLD gate (H62). Byte ceiling ~5–6%. **User call, 2026-10-17**: keep UD, speed up its types instead (H65) |
 | DFlash2 as the drafter (H8) | Layer-only; tensor + MTP beats layer + DFlash2 by +71% decode. Still an arm in Phase 8 Sweep D |
 | Q8 drafters (H9) | Accept less, same speed, +0.87 GiB |
 | AllReduce tuning (H10) | Only the butterfly path runs on Pascal |

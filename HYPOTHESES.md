@@ -75,6 +75,7 @@ run label so the evidence is traceable.
 | H62 | A homogeneous quant decodes faster than the UD zoo: standard Q4_K_M (Q4_K + Q6_K only) beats UD-Q4_K_M (7 weight types) by ≥3% within the Phase 8 gate | **FAIL (quality)** 2026-10-17. Faster: 16k 63.52 vs 67.96 ms/target-step (−6.5%), 98k 83.77 vs 88.28 (−5.1%), prefill flat at 98k. But KLD 0.0883 vs UD 0.0595 (gate ≤0.0645), same-top 94.95% vs 96.62%. Haystack skipped. See Round 4 |
 | H63 | Q6_K as a quality upgrade: lmstudio `Qwen3.8-27B-Q6_K.gguf` (20.89 GiB, Kmic's model) with q8_0 KV fits 100k and decodes within 10% of the serve command | **Pre-registered** 2026-10-17. Only after H58/H62 (needs fast q6_K verify) |
 | H64 | No cross-stream race in our P2P / duplex AllReduce: repeated unsynchronised runs with injected delay keep output byte-identical | **Pre-registered** 2026-10-17. Kmic shipped this race class past the op suite; ours shows no symptoms |
+| H65 | The UD mix's slow matvec paths (Q5_K, IQ4_XS: 58% of bytes) can be brought up to Q4_K's effective bandwidth in mmvh, lifting 16k decode ≥3% on UD-Q4_K_M with KLD unchanged | **Pre-registered** 2026-10-17 (user call: keep UD for quality, make its types faster). Ceiling ~6% (H62). Step 0 free: `test-backend-ops perf -o MUL_MAT` n=1 GB/s per type |
 
 ---
 
@@ -3059,4 +3060,11 @@ gain is matvec efficiency per type, not bytes. Quality fails the tier 1 gate by 
 haystack was skipped and UD-Q4_K_M stays. Lesson for H58/H60: the slow paths in the UD mix (IQ4_XS, Q5_K) are
 where a kernel gain is worth ~6%, without changing the quant.
 
-**Order.** H59 step 0 (free) → H62 (download only, then one KLD + one 16k arm) → H60 → H58 (largest port) → H63 → H61. H64 runs whenever the cards are free; it costs minutes.
+**Order.** H59 step 0 (free) → H62 (download only, then one KLD + one 16k arm) → H60 → H58 (largest port) → H63 → H61.
+
+**H65 (added after H62).** H62 shows a two-type file 2% larger than UD-Q4_K_M runs 5–6.5% faster per target step,
+so per-type kernel efficiency is worth that much. User call: keep UD (KLD goal), make its slow types faster; straight
+Q4_0 is closed (no mmvh path, no dp4a on sm_60, quality below Q4_K_M which already failed). Step 0 (no model load,
+minutes): `test-backend-ops perf -o MUL_MAT` at n=1 for Q4_K, Q5_K, IQ4_XS, Q6_K on one card, GB/s per type. Only the
+types well below Q4_K get kernel work. Then UD-Q4_K_M 16k REPS=3 vs h56-rebase-16k, plus the KLD arm (must match
+0.0595 within noise). Fits after H60, before H58. H64 runs whenever the cards are free; it costs minutes.
