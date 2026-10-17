@@ -19,6 +19,7 @@ that command."
 | 100k context | **Met** (H26) — 12,147 MiB/card, 4,122 MiB spare |
 | Highest decode | **47.5 t/s at 16k, 33.1 t/s at 100k** (final report, `r10s-fork-*`, 200 W): +65.6% and +58.5% vs the stock build (28.7 / 20.9) |
 | Highest prefill / TTFT | **288 t/s, ~340 s TTFT at 100k; 392 t/s at 16k** (final report, 200 W): +34.4% and +23.2% vs stock (214 / 318) |
+| Real task, end to end | **35.6 min** for the 3-stage opencode web build, cold load included; decode-bound (41.8 t/s avg), 98.8% prompt-cache hits (Phase 5) |
 | Output quality indistinguishable from baseline | **Met**: 19/19 on the 100k haystack with the final f16-KV command (`p8-final-f16`; H32 19/19 with q8_0) vs 18/19 for the Q5_K_M FP32 reference; KLD 0.057 mean, mostly the quant step (H30) |
 
 Quality is the binding constraint: it is why PFlash and DFlash v1 are excluded,
@@ -63,8 +64,8 @@ Every lever behind that line, and every number, is in
 |---|---|
 | 0 smoke · 1 engine baseline · 2 drafters · 6 transport/placement | Done |
 | 3 quant sweep | Folded into Phase 8 |
-| 4 hypothesis tests | Ongoing — status table in [HYPOTHESES.md](HYPOTHESES.md) |
-| 5 agentic web build | Tooling ready, `fork` engine added. First run aborted (pi read the repo CLAUDE.md and pushed a commit); fixed, re-run `scripts/run-p5-fork.sh` pending ([WEB_BENCH.md](WEB_BENCH.md)) |
+| 4 hypothesis tests | Done (H1–H57) — status table in [HYPOTHESES.md](HYPOTHESES.md) |
+| 5 agentic web build | Done 2026-10-17 on opencode v2 with the serve command: **2136 s end to end** (cold load included), 3/3 stages, one-shot, 98.8% prompt-cache hits ([RESULTS.md](RESULTS.md) Phase 5) |
 | 7 prefill / TTFT / 100k | Done: H13, H14, H24, H26, H19 (cache reuse confirmed at defaults), H46 (GEMM FA), H15 (power cap: 200 W chosen) |
 | 8 quality gate | Tier 1 (H30 KLD) and tier 2 (H32 100k haystack) passed ([QUALITY-PLAN.md](QUALITY-PLAN.md)) |
 
@@ -75,7 +76,7 @@ Every lever behind that line, and every number, is in
 | [RUNBOOK.md](RUNBOOK.md) | **Start here.** Procedure, safety, failure modes, git protocol, **work queue** (§7: open / parked / closed) |
 | [RESULTS.md](RESULTS.md) | **All the data.** Table A (`llama-bench`), Table B (`llama-server`), Table C (lever verdicts) |
 | [METHODOLOGY.md](METHODOLOGY.md) | Hardware, engines, models, fixed parameters, flag syntax per engine |
-| [HYPOTHESES.md](HYPOTHESES.md) | H1–H47: claim, reasoning, test, result. The narrative behind every verdict |
+| [HYPOTHESES.md](HYPOTHESES.md) | H1–H57: claim, reasoning, test, result. The narrative behind every verdict |
 | [RUNLOG.md](RUNLOG.md) | Chronological: what ran, what broke, what changed |
 | [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 procedure: port scheme, metrics, quality scoring |
 | [QUALITY-PLAN.md](QUALITY-PLAN.md) | Phase 8 plan: quant sweep, drafter equivalence check, abort rules |

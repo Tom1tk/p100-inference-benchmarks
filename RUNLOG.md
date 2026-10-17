@@ -1534,3 +1534,8 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - All 3 stages pass WEB_BENCH §4. No questions asked, no malformed tool calls. The site is up on :4001.
 - Decode falls 44.9 → 41.4 → 37.5 t/s as context grows. MTP acceptance is 66.0%. Prompt-cache hit rate is 98.8% (H51 passes).
 - Hottest card 65 °C, no warnings.
+
+## 2026-10-17 — project wrapped (user call)
+
+- Docs closed out: README status and objective table, the RUNBOOK queue, the H51 row. The serve command in README is final (fork ≥ 5542bf9, 2 env vars).
+- Still open in RUNBOOK §7, for anyone who picks this up again: 1-card IQ3_S matvec (item 3) and concurrency (item 6).
