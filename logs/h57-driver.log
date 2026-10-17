@@ -1,0 +1,24 @@
+cap: 200.00 W 200.00 W
+GGML_CUDA_ALLREDUCE=none
+GGML_CUDA_P2P=1
+h57-rebase-f16 L1 d10 HIT  '131765' prompt_n=97759 338s
+h57-rebase-f16 L1 d25 HIT  '581436' prompt_n=41 2s
+h57-rebase-f16 L1 d50 HIT  '611078' prompt_n=41 2s
+h57-rebase-f16 L1 d75 HIT  '575143' prompt_n=42 2s
+h57-rebase-f16 L1 d90 HIT  '509445' prompt_n=42 2s
+h57-rebase-f16 L2 d 5 HIT  'llama_adapter_lora_init' prompt_n=62 2s
+h57-rebase-f16 L2 d24 HIT  'llama_batch_allocr::ubatch_reserve' prompt_n=49 2s
+h57-rebase-f16 L2 d25 HIT  'llama_batch_allocr::split_equal' prompt_n=62 2s
+h57-rebase-f16 L2 d30 HIT  'llama_batch_init' prompt_n=60 2s
+h57-rebase-f16 L2 d32 HIT  'llm_chat_detect_template' prompt_n=48 2s
+h57-rebase-f16 L2 d48 HIT  'llama_context::resolve_fused_ops' prompt_n=64 2s
+h57-rebase-f16 L2 d52 HIT  'llama_context::output_resolve_row' prompt_n=59 2s
+h57-rebase-f16 L2 d58 HIT  'llama_context::process_ubatch' prompt_n=54 2s
+h57-rebase-f16 L2 d66 HIT  'llama_context::output_reserve' prompt_n=47 2s
+h57-rebase-f16 L2 d72 HIT  'llama_context::graph_get_cb' prompt_n=68 2s
+h57-rebase-f16 L2 d80 HIT  'llama_context::state_write_data' prompt_n=54 2s
+h57-rebase-f16 L2 d87 HIT  'llama_get_logits_ith' prompt_n=50 2s
+h57-rebase-f16 L2 d92 HIT  'llama_perf_context_print' prompt_n=66 2s
+h57-rebase-f16 L2 d95 HIT  'print_rule_binary' prompt_n=49 2s
+--- h57-rebase-f16 rc=0 peak 70C, VRAM  ---
+haystack: 19/19 (p8-final-f16 19/19, p8-ref 18/19)
