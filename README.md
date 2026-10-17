@@ -64,7 +64,7 @@ Every lever behind that line, and every number, is in
 |---|---|
 | 0 smoke · 1 engine baseline · 2 drafters · 6 transport/placement | Done |
 | 3 quant sweep | Folded into Phase 8 |
-| 4 hypothesis tests | Done (H1–H57) — status table in [HYPOTHESES.md](HYPOTHESES.md) |
+| 4 hypothesis tests | H1–H57 done; **Round 4 (H58–H64) open** — status table in [HYPOTHESES.md](HYPOTHESES.md) |
 | 5 agentic web build | Done 2026-10-17 on opencode v2 with the serve command: **2136 s end to end** (cold load included), 3/3 stages, one-shot, 98.8% prompt-cache hits ([RESULTS.md](RESULTS.md) Phase 5) |
 | 7 prefill / TTFT / 100k | Done: H13, H14, H24, H26, H19 (cache reuse confirmed at defaults), H46 (GEMM FA), H15 (power cap: 200 W chosen) |
 | 8 quality gate | Tier 1 (H30 KLD) and tier 2 (H32 100k haystack) passed ([QUALITY-PLAN.md](QUALITY-PLAN.md)) |
@@ -76,7 +76,7 @@ Every lever behind that line, and every number, is in
 | [RUNBOOK.md](RUNBOOK.md) | **Start here.** Procedure, safety, failure modes, git protocol, **work queue** (§7: open / parked / closed) |
 | [RESULTS.md](RESULTS.md) | **All the data.** Table A (`llama-bench`), Table B (`llama-server`), Table C (lever verdicts) |
 | [METHODOLOGY.md](METHODOLOGY.md) | Hardware, engines, models, fixed parameters, flag syntax per engine |
-| [HYPOTHESES.md](HYPOTHESES.md) | H1–H57: claim, reasoning, test, result. The narrative behind every verdict |
+| [HYPOTHESES.md](HYPOTHESES.md) | H1–H64: claim, reasoning, test, result. The narrative behind every verdict |
 | [RUNLOG.md](RUNLOG.md) | Chronological: what ran, what broke, what changed |
 | [WEB_BENCH.md](WEB_BENCH.md) | Phase 5 procedure: port scheme, metrics, quality scoring |
 | [QUALITY-PLAN.md](QUALITY-PLAN.md) | Phase 8 plan: quant sweep, drafter equivalence check, abort rules |
