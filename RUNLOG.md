@@ -1527,3 +1527,10 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 - **1-card IQ3_S 16k (REPS=3):** decode 18.50 (1.006×), prefill 219.75 (0.997×). The text flips at char 435, which points at an upstream numerics change, not the meta backend.
 - **2-card decode "−1.5%" explained:** acceptance on the flipped text is 274/373 vs 277/365, so 2–3 more target steps. Per step the rebased build is 0.7% faster (67.96 vs 68.41 ms). No bisect.
 - New controls: `h56-rebase-16k` (2-card), `h57-rebase-1card` (1-card). The fork force-push waits for the user.
+
+## 2026-10-17 — Phase 5 on opencode v2 (`p5-fork-opencode`, index 1, 200 W)
+
+- Fork 5542bf9, README serve command (f16 KV, 100k, MTP head96k, 2 env vars). **2136 s end to end**: 322 s cold load, then stages 364 / 689 / 759 s.
+- All 3 stages pass WEB_BENCH §4. No questions asked, no malformed tool calls. The site is up on :4001.
+- Decode falls 44.9 → 41.4 → 37.5 t/s as context grows. MTP acceptance is 66.0%. Prompt-cache hit rate is 98.8% (H51 passes).
+- Hottest card 65 °C, no warnings.

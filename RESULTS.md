@@ -216,5 +216,18 @@ stale aggregate that stops at Phase 1; use it only to grep which labels exist.
 | Context depth | 2k … **100k end to end** | Serves at 100k with 4,122 MiB/card spare | H13, H26 |
 | Sustained thermals | 2 × ~8 min 100k prefill | 70 °C peak. Not a constraint at 175 W | H26 |
 
-Phase 5 (agentic web build) has no rows yet; its results go in
-`results/web-bench.csv` and are scored per [WEB_BENCH.md](WEB_BENCH.md) §4.
+Phase 5 (agentic web build, opencode v2, fork at 5542bf9, README serve command with f16 KV and 100k ctx, 200 W).
+Scored per [WEB_BENCH.md](WEB_BENCH.md) §4. Raw numbers are in `results/web-bench.csv` and `results/web/p5-fork-opencode.json`.
+
+| | Stage 1 | Stage 2 | Stage 3 | Total |
+|---|---|---|---|---|
+| Wall time | 364 s | 689 s | 759 s | **2136 s** (35.6 min, includes the 322 s cold load) |
+| Requests | 14 | 3 | 10 | 27 |
+| Generated tokens | 12237 | 29832 | 27427 | 69496 |
+| Prompt-cache hit rate | 93.0% | 99.7% | 99.9% | 98.8% |
+| Decode t/s (avg) | 44.9 | 41.4 | 37.5 | 41.8 (31.5–51.9) |
+| Prefill t/s (avg) | 127.9 | 65.5 | 67.7 | 98.7 |
+| Quality | serves, service active | restyle + working JS widget | `game.js` via `<script src>`, hold-to-reel, catch, score | 3/3, one-shot, 0 malformed tool calls |
+
+MTP acceptance over the run: 66.0% (46149/69960). Hottest card 65 °C. Prefill averages are low because
+most requests re-prefill only a few hundred uncached tokens. The run is decode-bound.

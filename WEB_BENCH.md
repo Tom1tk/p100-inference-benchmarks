@@ -164,7 +164,7 @@ Update this table when a run claims an index. Never reuse one.
 
 | Index | Site port | Label | Engine / model / split | Status |
 |---|---|---|---|---|
-| 1 | 4001 | p5-fork-opencode | fork / Q4_K_M + MTP head96k / tensor, README serve command, **opencode v2** harness | Reserved, not run (waiting on the user's go) |
+| 1 | 4001 | p5-fork-opencode | fork / Q4_K_M + MTP head96k / tensor, README serve command, **opencode v2** harness | **Done 2026-10-17:** 2136 s end to end (322 s load + stages 364 / 689 / 759 s), all 3 stages pass, one-shot, no malformed tool calls. Site left up |
 | 0 | 4000 | p5-fork-serve | fork (Tom1tk/llama.cpp-Pascal) / Q4_K_M + MTP head96k / tensor, README serve command (q8_0 KV, 100k ctx) | **Aborted 2026-10-15** after stage 1 (387 s, site OK): pi loaded the repo's CLAUDE.md and committed + pushed the site to this repo (36b6850). Contaminated; fixed with `--no-context-files`. Site left up |
 
 ---
