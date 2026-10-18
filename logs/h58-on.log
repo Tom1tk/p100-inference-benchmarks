@@ -1,3 +1,72 @@
-ggml_cuda_init: found 2 CUDA devices (Total VRAM: 32538 MiB):
-  Device 0: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
-  Device 1: Tesla P100-PCIE-16GB, compute capability 6.0, VMM: yes, VRAM: 16269 MiB
+0.00.512.744 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.01.356.132 W model has unused tensor blk.64.attn_norm.weight (size = 20480 bytes) -- ignoring
+0.01.356.144 W model has unused tensor blk.64.post_attention_norm.weight (size = 20480 bytes) -- ignoring
+0.01.356.160 W model has unused tensor blk.64.attn_q.weight (size = 51609600 bytes) -- ignoring
+0.01.356.166 W model has unused tensor blk.64.attn_k.weight (size = 5570560 bytes) -- ignoring
+0.01.356.172 W model has unused tensor blk.64.attn_v.weight (size = 5570560 bytes) -- ignoring
+0.01.356.194 W model has unused tensor blk.64.attn_output.weight (size = 25804800 bytes) -- ignoring
+0.01.356.200 W model has unused tensor blk.64.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.01.356.206 W model has unused tensor blk.64.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.01.356.212 W model has unused tensor blk.64.ffn_gate.weight (size = 73113600 bytes) -- ignoring
+0.01.356.218 W model has unused tensor blk.64.ffn_down.weight (size = 73113600 bytes) -- ignoring
+0.01.356.224 W model has unused tensor blk.64.ffn_up.weight (size = 73113600 bytes) -- ignoring
+0.01.356.230 W model has unused tensor blk.64.nextn.eh_proj.weight (size = 43008000 bytes) -- ignoring
+0.01.356.237 W model has unused tensor blk.64.nextn.enorm.weight (size = 20480 bytes) -- ignoring
+0.01.356.243 W model has unused tensor blk.64.nextn.hnorm.weight (size = 20480 bytes) -- ignoring
+0.01.356.266 W model has unused tensor blk.64.nextn.shared_head_norm.weight (size = 20480 bytes) -- ignoring
+0.18.606.342 I cmn          init: llama threadpool init, n_threads = 14
+0.18.958.910 I 
+0.18.959.483 I system_info: n_threads = 14 (n_threads_batch = 14) / 12 | CUDA : ARCHS = 600 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.19.047.802 I kl_divergence: computing over 8 chunks, n_ctx=512, batch_size=512, n_seq=1
+0.25.308.777 I kl_divergence: 6.26 seconds per pass - ETA 0.83 minutes
+
+chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              Δp RMS            Same top p
+   1       4.2025 ±    0.8944       0.06771 ±    0.08798       0.39031 ±    0.15084    11.447 ±  2.347 %    91.765 ±  1.725 %
+   2       2.9287 ±    0.3444       0.04051 ±    0.04424       0.20038 ±    0.07582     8.388 ±  1.611 %    94.902 ±  0.975 %
+   3       2.5675 ±    0.2172       0.03019 ±    0.02991       0.13881 ±    0.05064     7.458 ±  1.237 %    95.817 ±  0.724 %
+   4       2.3316 ±    0.1584       0.02575 ±    0.02258       0.10640 ±    0.03802     6.642 ±  1.044 %    96.373 ±  0.586 %
+   5       2.1817 ±    0.1253       0.01824 ±    0.01815       0.08772 ±    0.03044     6.226 ±  0.898 %    96.706 ±  0.500 %
+   6       2.3033 ±    0.1192       0.01591 ±    0.01518       0.07420 ±    0.02537     5.749 ±  0.811 %    96.471 ±  0.472 %
+   7       2.3137 ±    0.1074       0.01345 ±    0.01312       0.06520 ±    0.02176     5.588 ±  0.722 %    96.751 ±  0.420 %
+   8       2.3484 ±    0.1018       0.01399 ±    0.01159       0.05893 ±    0.01904     5.472 ±  0.654 %    96.667 ±  0.398 %
+
+====== Perplexity statistics ======
+Mean PPL(Q)                   :   2.348375 ±   0.101798
+Mean PPL(base)                :   2.315742 ±   0.095710
+Cor(ln(PPL(Q)), ln(PPL(base))):  96.36%
+Mean ln(PPL(Q)/PPL(base))     :   0.013994 ±   0.011593
+Mean PPL(Q)/PPL(base)         :   1.014092 ±   0.011757
+Mean PPL(Q)-PPL(base)         :   0.032634 ±   0.027310
+
+====== KL divergence statistics ======
+Mean    KLD:   0.058934 ±   0.019043
+Maximum KLD:  22.195759
+99.9%   KLD:  17.836243
+99.0%   KLD:   0.382136
+95.0%   KLD:   0.060215
+90.0%   KLD:   0.028569
+Median  KLD:   0.000735
+10.0%   KLD:   0.000006
+ 5.0%   KLD:   0.000002
+ 1.0%   KLD:  -0.000000
+ 0.1%   KLD:  -0.000004
+Minimum KLD:  -0.000093
+
+====== Token probability statistics ======
+Mean    Δp: -0.085 ± 0.121 %
+Maximum Δp: 94.170%
+99.9%   Δp: 46.656%
+99.0%   Δp: 12.989%
+95.0%   Δp:  3.707%
+90.0%   Δp:  1.829%
+75.0%   Δp:  0.106%
+Median  Δp: -0.001%
+25.0%   Δp: -0.205%
+10.0%   Δp: -1.929%
+ 5.0%   Δp: -4.673%
+ 1.0%   Δp: -13.213%
+ 0.1%   Δp: -45.584%
+Minimum Δp: -85.691%
+RMS Δp    :  5.472 ± 0.654 %
+Same top p: 96.667 ± 0.398 %
+

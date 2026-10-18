@@ -6,3 +6,10 @@ cap: 200.00 W 200.00 W
 pp4: off 76.53 on 80.45 (+5.1%)
 tg32: off 32.00 on 32.02 (+0.1%)
 GO
+pushed
+--- ref-q5-fp32 rc=0 ---
+--- off rc=0 ---
+--- on rc=0 ---
+label  mean_kld  p99_kld   p999_kld   same_top_pct
+off    0.059194  0.374261  18.813158  96.618
+on     0.058934  0.382136  17.836243  96.667
