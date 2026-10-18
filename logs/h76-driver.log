@@ -1,0 +1,13 @@
+cap: 200.00 W 200.00 W
+=== h76-on-16k === (idle 50C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 11s | VRAM 11157/11157 MiB
+  rep1: decode 51.87 t/s | prefill 398.55 t/s | accept 277/365 = 75.9% | peak 62C
+  rep2: decode 51.85 t/s | prefill 400.27 t/s | accept 277/365 = 75.9% | peak 66C
+  rep3: decode 51.94 t/s | prefill 399.95 t/s | accept 277/365 = 75.9% | peak 66C
+power-capped over 141s wall: gpu0 0s gpu1 0s
+ggml_cuda_try_fuse: conv state cpy batch fired (10 copies)
+ERROR: lever did not fire
+h75-on-16k: decode 51.46, accept 75.9%, 63.20 ms/target-step (n=3)
+h76-on-16k: decode 51.89, accept 75.9%, 62.68 ms/target-step (n=3)
+h75-on-16k h76-on-16k identical (1224,1224 chars)
