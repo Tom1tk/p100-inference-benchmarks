@@ -6,3 +6,14 @@ off: n_prompt=0 n_gen=32 avg_ts=33.01 sd=0.24
 tg32: off 33.01 on 34.73 (+5.2%)
 pp4: off 82.75 on 82.56 (-0.2%)
 GO
+pushed
+=== h75-on-16k === (idle 52C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 10s | VRAM 11157/11157 MiB
+  rep1: decode 51.38 t/s | prefill 398.80 t/s | accept 277/365 = 75.9% | peak 63C
+  rep2: decode 51.47 t/s | prefill 400.41 t/s | accept 277/365 = 75.9% | peak 65C
+  rep3: decode 51.53 t/s | prefill 399.55 t/s | accept 277/365 = 75.9% | peak 66C
+power-capped over 140s wall: gpu0 0s gpu1 0s
+h74-on-16k: decode 50.89, accept 75.9%, 63.91 ms/target-step (n=3)
+h75-on-16k: decode 51.46, accept 75.9%, 63.20 ms/target-step (n=3)
+h74-on-16k h75-on-16k identical (1224,1224 chars)
