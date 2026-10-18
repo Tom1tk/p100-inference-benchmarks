@@ -1580,3 +1580,6 @@ H71a (shared-memory staging around mainline's Q6_K vec_dot): tg32 31.99 → 31.6
 
 ## 2026-10-18 — H72 launch-count fusions: failed (marginal), kept default on
 Four reference-build graph-op fusions in one lever (`GGML_PASCAL_FUSE_LAUNCH`). llama-bench -r 5: tg32 31.88 → 32.26 (+1.2%), pp4 78.59 → 78.81. Gate was +2%; stopped before 16k. All fusions fire (−271 launches/token in nsys), so launch count alone is worth ~1.3 µs per launch. Host CPU sampling puts the remaining gap in host work per token (driver time over more launches, fusion matching). Kept on pending H73 (CUDA graphs re-test).
+
+## 2026-10-18 — H73 CUDA graphs re-test: refuted, reverted
+`GGML_PASCAL_GRAPHS=1` on the current stack, llama-bench -r 5: tg32 32.23 → 31.69 (−1.7%), pp4 79.09 → 76.16 (−3.7%). Stopped at the +3% gate; fork commit reverted. Same verdict as H27. Together with H70 this says host enqueue is not what holds decode back.
