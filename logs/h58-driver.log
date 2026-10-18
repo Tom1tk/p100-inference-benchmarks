@@ -1,0 +1,8 @@
+cap: 200.00 W 200.00 W
+./scripts/run-h58-f16verify.sh: line 25: 1165996 Aborted                 CUDA_VISIBLE_DEVICES=0 $FORK/test-backend-ops test -o MUL_MAT -b CUDA0 -p 'type_a=(q4_K|q5_K|q6_K|q2_K|iq4_xs)' > logs/h58-tbo.log 2>&1
+#8  0x00005ce2a2928d47 in test_backend(ggml_backend*, ggml_backend_device*, test_mode, char const*, char const*, printer*, char const*, int)::{lambda(ggml_backend*, ggml_backend*)#1}::operator()(ggml_backend*, ggml_backend*) const ()
+#9  0x00005ce2a28d2c4a in main ()
+[Inferior 1 (process 1165996) detached]
+pp4: off 76.53 on 80.45 (+5.1%)
+tg32: off 32.00 on 32.02 (+0.1%)
+GO
