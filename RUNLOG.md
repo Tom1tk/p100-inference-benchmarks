@@ -1597,3 +1597,11 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - 16k serve REPS=3 vs banked h75-on-16k: 63.20 → 62.68 ms/target-step (−0.8%), decode 51.46 → 51.89 t/s, output byte-identical, haystack skipped.
 - Driver gate required both fire logs; only the batch half can fire in serving (n_rs_seq > 0), so the ERROR line in `logs/h76-driver.log` is a false alarm. Concat half fire-checked separately under llama-bench.
 - Correction to the pre-registration rationale: over one steady-state eval window each card is ~94% kernel-busy at pp4 (46.8 of 49.8 ms), so pp4 is kernel-bound, not launch-bound; the earlier whole-trace normalisation was off. Launch savings still pay through kernel time (each tiny kernel ~4–6 µs).
+
+## 2026-10-18 — H77/H78 host dispatch overhead (REFUTED, code kept)
+
+- Levers (fork, no env switch, exact): H77 early-out in `ggml_cuda_can_fuse` when `nodes[i]->op != ops[0]`; H78 skip the per-launch PDL cache lookup (mutex + hash + `cudaGetDevice`) unless a device is Hopper or newer (`GGML_CUDA_PDL` still overrides).
+- Why: host CPU sampling of graphs-off decode put ~6% of our decode wall in fusion matching vs ~2.5% in the reference build.
+- llama-bench -r 5, same session: tg32 H76 build 34.95±0.31, H76 + `GGML_CUDA_PDL=0` 34.94±0.31, new build 34.74±0.53 (inside noise); pp4 81.38±2.96 / 82.78±3.23 / 85.99±0.16 (controls too noisy). Gate STOP, serve skipped.
+- Lesson: the host-gap reading came from nsys-traced runs, where tracing inflates host time. Untraced, plain decode is GPU-bound (card ~27 of ~28.6 ms/token busy), so host savings don't show. The remaining tg gap to the reference is GPU kernel time.
+- Logs: `logs/h77-*.csv`, `logs/h77-driver.log`, `results/h77-bench.txt`.
