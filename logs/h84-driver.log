@@ -1,0 +1,11 @@
+cap: 200.00 W 200.00 W
+=== h84-kvonly-16k === (idle 52C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 10s | VRAM 11157/11157 MiB
+  rep1: decode 57.95 t/s | prefill 397.01 t/s | accept 277/365 = 75.9% | peak 64C
+  rep2: decode 57.97 t/s | prefill 399.77 t/s | accept 277/365 = 75.9% | peak 67C
+  rep3: decode 57.87 t/s | prefill 399.11 t/s | accept 277/365 = 75.9% | peak 67C
+power-capped over 138s wall: gpu0 0s gpu1 0s
+h83-splitstate-16k: decode 57.40, accept 75.9%, 56.66 ms/target-step (n=3)
+h84-kvonly-16k: decode 57.93, accept 75.9%, 56.14 ms/target-step (n=3)
+h83-splitstate-16k h84-kvonly-16k identical (1224,1224 chars)

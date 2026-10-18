@@ -9,3 +9,6 @@ power-capped over 139s wall: gpu0 0s gpu1 0s
 h82-prefilter-16k: decode 56.43, accept 75.9%, 57.63 ms/target-step (n=3)
 h83-splitstate-16k: decode 57.40, accept 75.9%, 56.66 ms/target-step (n=3)
 h82-prefilter-16k h83-splitstate-16k identical (1224,1224 chars)
+pushed
+output identical: haystack skipped
+=== H83 done ===
