@@ -6,3 +6,5 @@ on: n_prompt=0 n_gen=32 avg_ts=31.65 sd=0.26
 tg32: off 31.99 on 31.65 (-1.1%)
 pp4: off 78.74 on 78.92 (+0.2%)
 STOP
+pushed
+STOP: tg32 gain < 1.5%
