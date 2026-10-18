@@ -76,6 +76,8 @@ run label so the evidence is traceable.
 | H63 | Q6_K as a quality upgrade: lmstudio `Qwen3.8-27B-Q6_K.gguf` (20.89 GiB, Kmic's model) with q8_0 KV fits 100k and decodes within 10% of the serve command | **Pre-registered** 2026-10-17. Only after H58/H62 (needs fast q6_K verify) |
 | H64 | No cross-stream race in our P2P / duplex AllReduce: repeated unsynchronised runs with injected delay keep output byte-identical | **Pre-registered** 2026-10-17. Kmic shipped this race class past the op suite; ours shows no symptoms |
 | H65 | The UD mix's slow matvec paths (Q5_K, IQ4_XS: 58% of bytes) can be brought up to Q4_K's effective bandwidth in mmvh, lifting 16k decode ≥3% on UD-Q4_K_M with KLD unchanged | **Pre-registered** 2026-10-17 (user call: keep UD for quality, make its types faster). Ceiling ~6% (H62). Step 0 free: `test-backend-ops perf -o MUL_MAT` n=1 GB/s per type |
+| H66 | A one-kernel P2P AllReduce for decode-sized exchanges (≤256 KiB: each card sums its half of both partials over direct peer loads and writes both) replaces memcpyPeer + ADD and lifts 2-card decode ≥3% (tg32 and 16k MTP) | **Pre-registered** 2026-10-18. Port source: Kmic-68 `k_ar_p2p_f32`. Lever `GGML_PASCAL_AR_P2P` (default on sm_60). Sums in fp32, so text may move vs the f16 wire (F16_REDUCE): haystack gate |
+| H67 | Fusing the residual add + RMS norm + weight mul into one kernel (decode-sized rows) cuts launches and lifts 2-card decode ≥2% | **Pre-registered** 2026-10-18. Port source: Kmic-68 `add_rms_norm_mul_f32` (norm.cu). Upstream already fuses rms_norm+mul; this adds the add |
 
 ---
 
@@ -3059,6 +3061,14 @@ The speed half of the hypothesis holds: the two-type file is *larger* yet 5–6.
 gain is matvec efficiency per type, not bytes. Quality fails the tier 1 gate by a wide margin (KLD +48%), so the
 haystack was skipped and UD-Q4_K_M stays. Lesson for H58/H60: the slow paths in the UD mix (IQ4_XS, Q5_K) are
 where a kernel gain is worth ~6%, without changing the quant.
+
+**Decode profile (2026-10-18, before H66).** nsys on llama-bench tg32 and pp4, UD-Q4_K_M, 2-card tensor. Plain
+decode is idle-bound, not kernel-bound: per-card kernel time matches a reference build with the same weight
+bandwidth while our token takes ~17% longer (tg32 30.98 t/s without the profiler). Each exchange is two peer copies,
+two waits and an ADD; the reference does it in one small kernel per card and also fuses add + rms_norm + mul
+(~21% fewer launches). CUDA graphs on plain decode stay neutral (H27 holds). So the decode order becomes H66 (P2P
+AllReduce, small port) → H67 (add + rms_norm + mul fusion) → H58 (verify kernels: pp4 kernel time ~11% above the
+reference) → H65. H61's P2P add moves to H66; the rest of H61 stays a prefill item.
 
 **Order.** H59 step 0 (free) → H62 (download only, then one KLD + one 16k arm) → H60 → H58 (largest port) → H63 → H61.
 
