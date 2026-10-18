@@ -1568,3 +1568,6 @@ KLD both improve; the acceptance swing needs a multi-prompt run (opencode harnes
 ## 2026-10-18 — H68 mmvh activation cache: failed, reverted
 
 llama-bench -p 4 -n 32 -r 5, `GGML_PASCAL_MMVH_YCACHE` off vs on: tg32 31.99 → 32.37 (+1.2%), pp4 78.25 → 78.35. Below the pre-registered +2% gate; the driver stopped before the 16k arm. Fork commit reverted. Cutting ~390 `mmvh_convert_y` launches per token saved only ~0.4 ms, so the host-side decode gap is per-node CPU work in graph evaluation, not the launch count itself. Log: `logs/h68-driver.log`.
+
+## 2026-10-18 — H69 IQ4_XS on mmvq at verify widths: failed, reverted
+Kernel trace of a 4-token batch at 16k depth (session-only) put IQ4_XS on mmvh as the largest remaining verify-step difference to the reference build. Routing IQ4_XS above 1 column to mainline mmvq: test-backend-ops clean; llama-bench pp4 78.38 → 78.11 (−0.3%), tg32 31.96 → 32.02; stopped at the +3% gate. Kernel perf shows mainline mmvq only 11% faster than mmvh at n=4, so the gain is within pp4 noise. Fork commit reverted.
