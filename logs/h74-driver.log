@@ -27,3 +27,6 @@ h58-f16v-16k: decode 45.82, accept 66.8%, 65.15 ms/target-step (n=3)
 h74-off-16k: decode 49.73, accept 75.9%, 65.39 ms/target-step (n=3)
 h74-on-16k: decode 50.89, accept 75.9%, 63.91 ms/target-step (n=3)
 h74-off-16k h74-on-16k identical (1224,1224 chars)
+pushed
+output identical: haystack skipped
+=== H74 done ===

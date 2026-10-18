@@ -1583,3 +1583,6 @@ Four reference-build graph-op fusions in one lever (`GGML_PASCAL_FUSE_LAUNCH`). 
 
 ## 2026-10-18 — H73 CUDA graphs re-test: refuted, reverted
 `GGML_PASCAL_GRAPHS=1` on the current stack, llama-bench -r 5: tg32 32.23 → 31.69 (−1.7%), pp4 79.09 → 76.16 (−3.7%). Stopped at the +3% gate; fork commit reverted. Same verdict as H27. Together with H70 this says host enqueue is not what holds decode back.
+
+## 2026-10-18 — H74 GDN state gather: confirmed, default on
+Port of the reference build's state-gather skip (`GGML_PASCAL_GDN_GATHER`): the delta net and the conv-state concat read the recurrent-state rows through the index, so the GET_ROWS copy (711 µs/token) is not launched. llama-bench -r 5: tg32 32.31 → 33.04 (+2.3%), pp4 79.50 → 81.44 (+2.4%). 16k serve REPS=3: decode 49.73 → 50.89 t/s, byte-identical output. Two runs before it didn't count: in run 1 the skip never fired (fixed in the matcher), and run 2 aborted on a fire check that couldn't see the log line.
