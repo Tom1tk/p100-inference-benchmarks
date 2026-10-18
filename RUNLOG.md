@@ -1628,3 +1628,10 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - Why: ~13% of CPU samples in the card-0 idle gaps between MTP draft passes were in `ggml_backend_meta_get_split_state`.
 - 16k serve REPS=3 vs banked h82-prefilter-16k: 57.63 → 56.66 ms/target-step, decode 56.43 → 57.40 t/s (57.35 / 57.44 / 57.41), accept 75.9% both, output byte-identical.
 - Logs: `logs/h83-driver.log`, `results/h11-placement.csv` rows `h83-splitstate-16k`.
+
+## 2026-10-18 — H84 KV-only MTP catch-up (PARTIAL, −0.9% per step, kept)
+
+- Lever (fork `src/models/qwen35.cpp`, default on): `GGML_PASCAL_MTP_KV_ONLY`. The MTP catch-up pass requests no outputs, so it now only writes K/V and returns, skipping attention, FFN and LM head. Exact. Ported from the reference build.
+- 16k serve REPS=3 vs banked h83-splitstate-16k: 56.66 → 56.14 ms/target-step, decode 57.40 → 57.93 t/s, accept 75.9% both, output byte-identical. Below the predicted ≥ 1%; reps don't overlap, so kept.
+- Round 4 serve so far (H82–H84, 16k): 62.69 → 56.14 ms/target-step (−10.4%), decode 51.88 → 57.93 t/s.
+- Logs: `logs/h84-driver.log`, `results/h11-placement.csv` rows `h84-kvonly-16k`.
