@@ -1564,3 +1564,7 @@ test-backend-ops MUL_MAT clean. llama-bench pp4 76.53 → 80.45 (+5.1%), tg32 fl
 on 0.0589. 16k REPS=3: 65.15 ms/target-step vs h66 67.04 (−2.8%, just under the 3% gate); output diverges at char 486,
 acceptance 73.8 → 66.8% on this prompt, decode 47.48 → 45.82 t/s. Haystack 19/19. 98k skipped. Kept: kernel time and
 KLD both improve; the acceptance swing needs a multi-prompt run (opencode harness) to judge.
+
+## 2026-10-18 — H68 mmvh activation cache: failed, reverted
+
+llama-bench -p 4 -n 32 -r 5, `GGML_PASCAL_MMVH_YCACHE` off vs on: tg32 31.99 → 32.37 (+1.2%), pp4 78.25 → 78.35. Below the pre-registered +2% gate; the driver stopped before the 16k arm. Fork commit reverted. Cutting ~390 `mmvh_convert_y` launches per token saved only ~0.4 ms, so the host-side decode gap is per-node CPU work in graph evaluation, not the launch count itself. Log: `logs/h68-driver.log`.
