@@ -279,3 +279,6 @@ h79-gpugaps-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,52.48,395.
 h82-prefilter-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,56.44,394.50,400,365,277,75.9,11157,11157,63,20,ok
 h82-prefilter-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,56.39,395.69,400,365,277,75.9,11157,11157,66,20,ok
 h82-prefilter-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,56.46,395.10,400,365,277,75.9,11157,11157,67,20,ok
+h83-splitstate-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,57.35,393.19,400,365,277,75.9,11157,11157,65,10,ok
+h83-splitstate-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,57.44,397.76,400,365,277,75.9,11157,11157,66,10,ok
+h83-splitstate-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,57.41,397.20,400,365,277,75.9,11157,11157,67,10,ok

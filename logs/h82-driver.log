@@ -9,3 +9,6 @@ power-capped over 150s wall: gpu0 0s gpu1 0s
 h79-gpugaps-16k: decode 51.88, accept 75.9%, 62.69 ms/target-step (n=3)
 h82-prefilter-16k: decode 56.43, accept 75.9%, 57.63 ms/target-step (n=3)
 h79-gpugaps-16k h82-prefilter-16k identical (1224,1224 chars)
+pushed
+output identical: haystack skipped
+=== H82 done ===

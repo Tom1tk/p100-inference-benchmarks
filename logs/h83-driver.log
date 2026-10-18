@@ -1,0 +1,11 @@
+cap: 200.00 W 200.00 W
+=== h83-splitstate-16k === (idle 50C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 10s | VRAM 11157/11157 MiB
+  rep1: decode 57.35 t/s | prefill 393.19 t/s | accept 277/365 = 75.9% | peak 65C
+  rep2: decode 57.44 t/s | prefill 397.76 t/s | accept 277/365 = 75.9% | peak 66C
+  rep3: decode 57.41 t/s | prefill 397.20 t/s | accept 277/365 = 75.9% | peak 67C
+power-capped over 139s wall: gpu0 0s gpu1 0s
+h82-prefilter-16k: decode 56.43, accept 75.9%, 57.63 ms/target-step (n=3)
+h83-splitstate-16k: decode 57.40, accept 75.9%, 56.66 ms/target-step (n=3)
+h82-prefilter-16k h83-splitstate-16k identical (1224,1224 chars)
