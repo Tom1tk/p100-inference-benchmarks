@@ -261,3 +261,6 @@ h66-arp2p-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,47.32,398.16
 h58-f16v-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,45.83,391.13,400,398,266,66.8,11157,11157,64,31,ok
 h58-f16v-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,45.73,398.51,400,398,266,66.8,11157,11157,65,31,ok
 h58-f16v-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,45.90,397.95,400,398,266,66.8,11157,11157,66,31,ok
+h74-off-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,49.40,394.90,400,365,277,75.9,11157,11157,63,23,ok
+h74-off-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,50.09,398.83,400,365,277,75.9,11157,11157,66,23,ok
+h74-off-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,49.71,399.08,400,365,277,75.9,11157,11157,66,23,ok
