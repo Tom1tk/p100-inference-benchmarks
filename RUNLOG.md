@@ -1571,3 +1571,6 @@ llama-bench -p 4 -n 32 -r 5, `GGML_PASCAL_MMVH_YCACHE` off vs on: tg32 31.99 →
 
 ## 2026-10-18 — H69 IQ4_XS on mmvq at verify widths: failed, reverted
 Kernel trace of a 4-token batch at 16k depth (session-only) put IQ4_XS on mmvh as the largest remaining verify-step difference to the reference build. Routing IQ4_XS above 1 column to mainline mmvq: test-backend-ops clean; llama-bench pp4 78.38 → 78.11 (−0.3%), tg32 31.96 → 32.02; stopped at the +3% gate. Kernel perf shows mainline mmvq only 11% faster than mmvh at n=4, so the gain is within pp4 noise. Fork commit reverted.
+
+## 2026-10-18 — H70 parallel dispatch re-test: refuted, reverted
+H40's per-card dispatch threads restored on the current stack (mmvq-f16 cache map locked for two dispatch threads). llama-bench -r 5: tg32 31.99 → 32.01, pp4 78.59 → 78.64. Stopped at the +3% gate; fork commit reverted. Confirms H40: AllReduce-adjacent idle gaps in nsys CUDA traces are tracing overhead, not an untraced bottleneck.
