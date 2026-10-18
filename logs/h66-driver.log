@@ -8,3 +8,14 @@ on: n_prompt=0 n_gen=32 avg_ts=32.00 sd=0.27
 tg32: off 30.84 on 32.00 (+3.7%)
 pp4: off 75.64 on 76.72 (+1.4%)
 GO
+pushed
+=== h66-arp2p-16k === (idle 52C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 32s | VRAM 11157/11157 MiB
+  rep1: decode 47.74 t/s | prefill 391.10 t/s | accept 275/370 = 74.3% | peak 62C
+  rep2: decode 47.38 t/s | prefill 398.77 t/s | accept 274/373 = 73.5% | peak 66C
+  rep3: decode 47.32 t/s | prefill 398.16 t/s | accept 274/373 = 73.5% | peak 67C
+power-capped over 165s wall: gpu0 0s gpu1 0s
+h56-rebase-16k: decode 46.84, accept 73.8%, 67.96 ms/target-step (n=3)
+h66-arp2p-16k: decode 47.48, accept 73.8%, 67.04 ms/target-step (n=3)
+h56-rebase-16k h66-arp2p-16k identical (1273,1273 chars)
