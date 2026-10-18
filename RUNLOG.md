@@ -1551,3 +1551,9 @@ Day-by-day detail for these lives in each hypothesis's Result section in HYPOTHE
 
 lmstudio Q4_K_M vs UD-Q4_K_M on the rebased fork. 5–6.5% faster per target step (16k and 98k), prefill flat at 98k,
 but KLD 0.0883 vs 0.0595 fails the tier 1 gate. UD-Q4_K_M stays. Details in HYPOTHESES Round 4.
+
+## 2026-10-18 — H66 P2P AllReduce kernel: partial, kept
+
+One-kernel 2-card AllReduce for decode-sized exchanges (`GGML_PASCAL_AR_P2P`, default on). tg32 +3.7%, 16k serve
++1.4% per target step, byte-identical output, haystack 19/19. Below the 3% serve bar but free, so it stays on.
+98k arm skipped. Next: H67 (add + rms_norm + mul fusion).
