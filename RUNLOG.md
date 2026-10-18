@@ -1557,3 +1557,10 @@ but KLD 0.0883 vs 0.0595 fails the tier 1 gate. UD-Q4_K_M stays. Details in HYPO
 One-kernel 2-card AllReduce for decode-sized exchanges (`GGML_PASCAL_AR_P2P`, default on). tg32 +3.7%, 16k serve
 +1.4% per target step, byte-identical output, haystack 19/19. Below the 3% serve bar but free, so it stays on.
 98k arm skipped. Next: H67 (add + rms_norm + mul fusion).
+
+## 2026-10-18 — H58 fp16 verify kernels: partial, kept
+Kmic-68's `mmvq-f16.cu` ported as-is ahead of mmvh (fork 70ec7c1, `GGML_PASCAL_MMVQ_F16`, default on sm_60).
+test-backend-ops MUL_MAT clean. llama-bench pp4 76.53 → 80.45 (+5.1%), tg32 flat. KLD 8x512 at ub 4: off 0.0592,
+on 0.0589. 16k REPS=3: 65.15 ms/target-step vs h66 67.04 (−2.8%, just under the 3% gate); output diverges at char 486,
+acceptance 73.8 → 66.8% on this prompt, decode 47.48 → 45.82 t/s. Haystack 19/19. 98k skipped. Kept: kernel time and
+KLD both improve; the acceptance swing needs a multi-prompt run (opencode harness) to judge.

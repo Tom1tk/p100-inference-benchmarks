@@ -48,3 +48,5 @@ h58-f16v-f16 L2 d92 HIT  'llama_perf_context_print' prompt_n=66 2s
 h58-f16v-f16 L2 d95 HIT  'print_rule_binary' prompt_n=49 2s
 --- h58-f16v-f16 rc=0 peak 69C, VRAM  ---
 haystack: 19/19 (h66 19/19)
+pushed
+=== H58 done ===
