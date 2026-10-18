@@ -1577,3 +1577,6 @@ H40's per-card dispatch threads restored on the current stack (mmvq-f16 cache ma
 
 ## 2026-10-18 — H71 staged one-column Q6_K matvec: a −1.1%, b +1.47% (under gate), kept opt-in
 H71a (shared-memory staging around mainline's Q6_K vec_dot): tg32 31.99 → 31.65. H71b (adds the reference build's vdr-4 integer dot product and hoisted addressing; microbench m=4096 k=14336 145 → 123 µs vs mmvh): tg32 31.96 → 32.43 (+1.47%), pp4 79.04 → 78.88. Gate was +1.5%; stopped before 16k and haystack. Kernel left in the fork behind `GGML_PASCAL_MMVQ_STAGE=1`, off by default.
+
+## 2026-10-18 — H72 launch-count fusions: failed (marginal), kept default on
+Four reference-build graph-op fusions in one lever (`GGML_PASCAL_FUSE_LAUNCH`). llama-bench -r 5: tg32 31.88 → 32.26 (+1.2%), pp4 78.59 → 78.81. Gate was +2%; stopped before 16k. All fusions fire (−271 launches/token in nsys), so launch count alone is worth ~1.3 µs per launch. Host CPU sampling puts the remaining gap in host work per token (driver time over more launches, fusion matching). Kept on pending H73 (CUDA graphs re-test).
