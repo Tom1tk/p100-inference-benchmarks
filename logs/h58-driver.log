@@ -13,3 +13,15 @@ pushed
 label  mean_kld  p99_kld   p999_kld   same_top_pct
 off    0.059194  0.374261  18.813158  96.618
 on     0.058934  0.382136  17.836243  96.667
+pushed
+KLD off 0.0592 on 0.0589
+=== h58-f16v-16k === (idle 52C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 31s | VRAM 11157/11157 MiB
+  rep1: decode 45.83 t/s | prefill 391.13 t/s | accept 266/398 = 66.8% | peak 64C
+  rep2: decode 45.73 t/s | prefill 398.51 t/s | accept 266/398 = 66.8% | peak 65C
+  rep3: decode 45.90 t/s | prefill 397.95 t/s | accept 266/398 = 66.8% | peak 66C
+power-capped over 165s wall: gpu0 0s gpu1 0s
+h66-arp2p-16k: decode 47.48, accept 73.8%, 67.04 ms/target-step (n=3)
+h58-f16v-16k: decode 45.82, accept 66.8%, 65.15 ms/target-step (n=3)
+h66-arp2p-16k h58-f16v-16k differ@486 (1273,1488 chars)
