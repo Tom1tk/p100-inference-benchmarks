@@ -26,8 +26,9 @@ for r in csv.DictReader(open(f'logs/h74-{l}.csv')):
 PY
     return $rc; }
 
-bench off GGML_PASCAL_GDN_GATHER=0; bench on
+bench on  # first, so a skip that does not fire costs one arm
 grep -q "GDN state gather skipped" logs/h74-on.log || { echo "ERROR: gather skip did not fire"; fin nofire; exit 1; }
+bench off GGML_PASCAL_GDN_GATHER=0
 python3 - <<'PY' > results/h74-bench.txt
 import csv
 g = {l: {('pp4' if r['n_gen']=='0' else 'tg32'): float(r['avg_ts']) for r in csv.DictReader(open(f'logs/h74-{l}.csv'))} for l in ('off','on')}
