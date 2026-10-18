@@ -1,0 +1,8 @@
+cap: 200.00 W 200.00 W
+off: n_prompt=4 n_gen=0 avg_ts=80.44 sd=3.07
+off: n_prompt=0 n_gen=32 avg_ts=32.32 sd=0.25
+on: n_prompt=4 n_gen=0 avg_ts=80.01 sd=2.82
+on: n_prompt=0 n_gen=32 avg_ts=32.33 sd=0.23
+tg32: off 32.32 on 32.33 (+0.0%)
+pp4: off 80.44 on 80.01 (-0.5%)
+STOP
