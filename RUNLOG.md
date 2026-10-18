@@ -1621,3 +1621,10 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - 16k serve REPS=3 vs banked h79-gpugaps-16k: 62.69 → 57.63 ms/target-step, decode 51.88 → 56.43 t/s (reps 56.44 / 56.39 / 56.46), accept 75.9% both, output byte-identical, haystack skipped.
 - Next: H83 meta split-state cache (the next-largest host-gap item).
 - Logs: `logs/h82-driver.log`, `results/h11-placement.csv` rows `h82-prefilter-16k`.
+
+## 2026-10-18 — H83 meta split-state cache (CONFIRMED, −1.7% per step)
+
+- Lever (fork `ggml-backend-meta.cpp`, no switch): split-state cache and simple-tensor map hashed instead of ordered; source-state vectors pooled per recursion depth. Ported from the reference build. Exact.
+- Why: ~13% of CPU samples in the card-0 idle gaps between MTP draft passes were in `ggml_backend_meta_get_split_state`.
+- 16k serve REPS=3 vs banked h82-prefilter-16k: 57.63 → 56.66 ms/target-step, decode 56.43 → 57.40 t/s (57.35 / 57.44 / 57.41), accept 75.9% both, output byte-identical.
+- Logs: `logs/h83-driver.log`, `results/h11-placement.csv` rows `h83-splitstate-16k`.
