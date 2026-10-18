@@ -286,6 +286,8 @@ command today. Re-open only on the stated unblock.
 | IQ1_S on mmvh | 0.3% of 1-card bytes | Nothing bigger left on the matvec list |
 | P2 chunked-GEMM comms overlap (fork plan) | Ceiling ≤ +4–5% at 16k and lower at 98k, where attention grows the compute per ubatch and comms stays fixed. Needs a side copy stream plus GEMM splitting. H36 (duplex) took the cheap half | A fresh pp2048 trace showing 2-card idle > 5% |
 | H46 follow-up: GEMM-FA softmax/combine/convert | ~7 of 48 ms per FA call, ≤ ~2–4% of 98k prefill | Prefill becoming the binding target |
+| H60 — CUDA graphs on MTP draft steps | Knob ablation on the reference build: ~0 on the 16k serve path (2026-10-18). H27 already found graphs neutral on plain decode | A trace showing draft-step launch gaps > 5% |
+| H67 — add + rms_norm + mul fusion | Same ablation: ~0 on the 16k serve path (2026-10-18) | Launch overhead becoming the binding cost after H58 |
 | P3 leftovers: dequant pass + F16↔F32 converts | H39 staged dequant: 2-card +1.0% (noise), already on the 220 W list. HGEMM is at ~90% of FP16 peak with ALGO3 (H33) | H15 (220 W) |
 
 ### Closed — do not spend runs here

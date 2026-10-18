@@ -68,16 +68,16 @@ run label so the evidence is traceable.
 | H56 | Fork tidy-up (refuted levers removed, adopted levers default-on for sm_60) + rebase onto mainline 7182ef7 changes nothing: with no Pascal env vars, 2-card 16k and 1-card 16k decode/prefill ≥ 98% of control, output identical | **PASS (revised by H56b, H57)**: tidy neutral; the rebase flips greedy text (upstream), per-step decode +0.7%, prefill +1.4% |
 | H57 | Rebased fork (7182ef7 + tidy) keeps quality: 100k haystack 19/19 with the serve config (as `p8-final-f16`); 1-card IQ3_S 16k ≥ 98% of `h39r-1card-staged` | **PASS** 2026-10-17: haystack 19/19; 1-card 1.006× / 0.997×; "−1.5% decode" is MTP acceptance on the flipped text, per step 0.7% faster |
 | H54 | A split-KV (flash-decoding) FA kernel for sm_60 decode (nb ≤ 5, f16 KV, D256, GQA 6) cuts the 98k step ≥5%, output identical / KLD within noise | **REFUTED** 2026-10-16: the tile kernel already splits KV; the real waste was GQA 6 packed as GQA 2 (K/V read 3×). Fork `GGML_PASCAL_FA_GQA6=1` packs all 6 heads: micro 98k nb4 −26%, but served 98k step only 88.1 → 85.4 ms (−3.0%), and the changed greedy text drafted worse (acceptance 263/405 → 256/425), so decode 32.97 → 32.51 (−1.4%). 1-card 16k 18.39 → 18.56 (+0.9%, output identical). Not adopted; opt-in in the fork |
-| H58 | Hand-scheduled fp16 multi-column verify kernels (2–8 columns, per quant type, fp32 folds) remove the n=4→5 step cliff (H55), so draft length 4 lifts 16k decode ≥3% over n=3 | **Pre-registered** 2026-10-17. Port source: Kmic-68 fork `mmvq-f16.cu` |
+| H58 | Hand-scheduled fp16 multi-column verify kernels (2–8 columns, q4_K/q5_K/q6_K, fp32 folds) ahead of mmvh lift 16k MTP decode ≥3% at the current draft settings (n-max 3, 4-column verify), output within KLD noise | **Pre-registered** 2026-10-17, **re-worded 2026-10-18** (was: n=4 beats n=3; ablation shows these kernels are the one large lever). Port source: Kmic-68 fork `mmvq-f16.cu`, file ported as-is, knob `GGML_PASCAL_MMVQ_F16` |
 | H59 | Sampled MTP drafts + the speculative-sampling acceptance rule + block verify raise acceptance under opencode's sampling (Phase 5: 66% vs ~75% greedy), lifting real-task decode ≥5% with the output distribution unchanged | **Pre-registered** 2026-10-17. Step 0 (no GPU): log the sampling params opencode sends |
-| H60 | CUDA graphs on the MTP draft steps only lift MTP decode ≥3% (H27 tested drafter-free decode only) | **Pre-registered** 2026-10-17. Kmic reports +6.7% spec path, −2% plain |
+| H60 | CUDA graphs on the MTP draft steps only lift MTP decode ≥3% (H27 tested drafter-free decode only) | **Parked** 2026-10-18 (rule zero: knob ablation on the reference build shows ~0 on the 16k serve path). Kmic reports +6.7% spec path, −2% plain |
 | H61 | Prefill: overlapping the TP exchange with chunked matmuls, fusing FFN gate/up/SwiGLU and a one-kernel P2P add lift 16k/100k prefill ≥4% | **Pre-registered** 2026-10-17. Low priority: Phase 5 was 98.8% cache hits, so this mostly helps the cold load |
 | H62 | A homogeneous quant decodes faster than the UD zoo: standard Q4_K_M (Q4_K + Q6_K only) beats UD-Q4_K_M (7 weight types) by ≥3% within the Phase 8 gate | **FAIL (quality)** 2026-10-17. Faster: 16k 63.52 vs 67.96 ms/target-step (−6.5%), 98k 83.77 vs 88.28 (−5.1%), prefill flat at 98k. But KLD 0.0883 vs UD 0.0595 (gate ≤0.0645), same-top 94.95% vs 96.62%. Haystack skipped. See Round 4 |
 | H63 | Q6_K as a quality upgrade: lmstudio `Qwen3.8-27B-Q6_K.gguf` (20.89 GiB, Kmic's model) with q8_0 KV fits 100k and decodes within 10% of the serve command | **Pre-registered** 2026-10-17. Only after H58/H62 (needs fast q6_K verify) |
 | H64 | No cross-stream race in our P2P / duplex AllReduce: repeated unsynchronised runs with injected delay keep output byte-identical | **Pre-registered** 2026-10-17. Kmic shipped this race class past the op suite; ours shows no symptoms |
 | H65 | The UD mix's slow matvec paths (Q5_K, IQ4_XS: 58% of bytes) can be brought up to Q4_K's effective bandwidth in mmvh, lifting 16k decode ≥3% on UD-Q4_K_M with KLD unchanged | **Pre-registered** 2026-10-17 (user call: keep UD for quality, make its types faster). Ceiling ~6% (H62). Step 0 free: `test-backend-ops perf -o MUL_MAT` n=1 GB/s per type |
 | H66 | A one-kernel P2P AllReduce for decode-sized exchanges (≤256 KiB: each card sums its half of both partials over direct peer loads and writes both) replaces memcpyPeer + ADD and lifts 2-card decode ≥3% (tg32 and 16k MTP) | **PARTIAL — kept, default on** 2026-10-18. tg32 30.84 → 32.00 (+3.7%), pp4 +1.4%; 16k serve 67.96 → 67.04 ms/target-step (+1.4%, below the 3% bar); output byte-identical to h56-rebase-16k; haystack 19/19. 98k skipped (fixed ~1 ms/step saving ≈ 1% of an 88 ms step). Fork commit on main |
-| H67 | Fusing the residual add + RMS norm + weight mul into one kernel (decode-sized rows) cuts launches and lifts 2-card decode ≥2% | **Pre-registered** 2026-10-18. Port source: Kmic-68 `add_rms_norm_mul_f32` (norm.cu). Upstream already fuses rms_norm+mul; this adds the add |
+| H67 | Fusing the residual add + RMS norm + weight mul into one kernel (decode-sized rows) cuts launches and lifts 2-card decode ≥2% | **Parked** 2026-10-18 (rule zero: knob ablation on the reference build shows ~0 on the 16k serve path). Port source: Kmic-68 `add_rms_norm_mul_f32` (norm.cu). Upstream already fuses rms_norm+mul; this adds the add |
 
 ---
 
@@ -3069,6 +3069,12 @@ two waits and an ADD; the reference does it in one small kernel per card and als
 (~21% fewer launches). CUDA graphs on plain decode stay neutral (H27 holds). So the decode order becomes H66 (P2P
 AllReduce, small port) → H67 (add + rms_norm + mul fusion) → H58 (verify kernels: pp4 kernel time ~11% above the
 reference) → H65. H61's P2P add moves to H66; the rest of H61 stays a prefill item.
+
+**Ablation (2026-10-18, after H66).** Turning the reference build's knobs off one at a time on the 16k MTP serve
+path (REPS=3): CUDA graphs on draft steps, add + rms_norm fusion and gate/up+SwiGLU fusion each move ms/target-step
+by under 0.5%; the fp16 verify kernels alone account for most of its lead. H60 and H67 are parked, H58 is re-worded
+to our current draft settings and goes next, then H65. Caveat: with its fp16 kernels off the reference falls back to
+stock mmvq, not our mmvh, so our gain from H58 will be smaller than its ablation delta.
 
 **Order.** H59 step 0 (free) → H62 (download only, then one KLD + one 16k arm) → H60 → H58 (largest port) → H63 → H61.
 
