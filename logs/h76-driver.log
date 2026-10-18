@@ -11,3 +11,6 @@ ERROR: lever did not fire
 h75-on-16k: decode 51.46, accept 75.9%, 63.20 ms/target-step (n=3)
 h76-on-16k: decode 51.89, accept 75.9%, 62.68 ms/target-step (n=3)
 h75-on-16k h76-on-16k identical (1224,1224 chars)
+pushed
+output identical: haystack skipped
+=== H76 done ===
