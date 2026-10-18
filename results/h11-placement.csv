@@ -273,3 +273,6 @@ h75-on-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,51.53,399.55,40
 h76-on-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,51.87,398.55,400,365,277,75.9,11157,11157,62,11,ok
 h76-on-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,51.85,400.27,400,365,277,75.9,11157,11157,66,11,ok
 h76-on-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,51.94,399.95,400,365,277,75.9,11157,11157,66,11,ok
+h79-gpugaps-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,51.18,391.71,400,365,277,75.9,11157,11157,65,10,ok
+h79-gpugaps-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,51.97,396.27,400,365,277,75.9,11157,11157,66,10,ok
+h79-gpugaps-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,52.48,395.48,400,365,277,75.9,11157,11157,67,10,ok
