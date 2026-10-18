@@ -1613,3 +1613,11 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - llama-bench -r 5, one lever added per arm: tg32 34.97 → 35.20 → 35.48 → 35.67 (+0.65 / +0.79 / +0.54%, stack +2.0%). pp4 controls ±3, unreadable.
 - 16k serve REPS=3 vs banked h76-on-16k: 62.68 → 62.69 ms/target-step, decode 51.89 → 51.88, output byte-identical, haystack skipped. The serve path is the n=4 verify plus the MTP draft, where these kernels barely run.
 - Logs: `logs/h79-*`, `results/h79-bench.txt`.
+
+## 2026-10-18 — H82 top-k sampler prefilter (CONFIRMED, −8.1% per step)
+
+- Lever (fork `common/sampling.cpp`, default on): `GGML_PASCAL_SAMPLER_PREFILTER`. When nothing ahead of top_k in the chain can change the logits (no-op penalties/DRY/top-n-sigma, no logit bias, mirostat off, top_k ≤ 128), select the k largest logits directly with an SSE2 threshold scan instead of building the 248k-entry candidate array. Exact. Ported from the reference build.
+- Why: served 16k traces put card 0 idle 1398 ms vs the reference's 594 ms per 400 tokens, in host gaps between MTP draft passes; `common_sampler_sample` was 34% of CPU samples in those gaps.
+- 16k serve REPS=3 vs banked h79-gpugaps-16k: 62.69 → 57.63 ms/target-step, decode 51.88 → 56.43 t/s (reps 56.44 / 56.39 / 56.46), accept 75.9% both, output byte-identical, haystack skipped.
+- Next: H83 meta split-state cache (the next-largest host-gap item).
+- Logs: `logs/h82-driver.log`, `results/h11-placement.csv` rows `h82-prefilter-16k`.
