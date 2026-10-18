@@ -1574,3 +1574,6 @@ Kernel trace of a 4-token batch at 16k depth (session-only) put IQ4_XS on mmvh a
 
 ## 2026-10-18 — H70 parallel dispatch re-test: refuted, reverted
 H40's per-card dispatch threads restored on the current stack (mmvq-f16 cache map locked for two dispatch threads). llama-bench -r 5: tg32 31.99 → 32.01, pp4 78.59 → 78.64. Stopped at the +3% gate; fork commit reverted. Confirms H40: AllReduce-adjacent idle gaps in nsys CUDA traces are tracing overhead, not an untraced bottleneck.
+
+## 2026-10-18 — H71 staged one-column Q6_K matvec: a −1.1%, b +1.47% (under gate), kept opt-in
+H71a (shared-memory staging around mainline's Q6_K vec_dot): tg32 31.99 → 31.65. H71b (adds the reference build's vdr-4 integer dot product and hoisted addressing; microbench m=4096 k=14336 145 → 123 µs vs mmvh): tg32 31.96 → 32.43 (+1.47%), pp4 79.04 → 78.88. Gate was +1.5%; stopped before 16k and haystack. Kernel left in the fork behind `GGML_PASCAL_MMVQ_STAGE=1`, off by default.
