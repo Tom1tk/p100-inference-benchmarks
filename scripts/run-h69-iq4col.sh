@@ -17,7 +17,7 @@ echo "cap: $cap"; [[ "$cap" == "200.00 W 200.00 W" ]] || { echo "ERROR: expected
 cool() { for _ in $(seq 1 30); do
     t=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | sort -n | tail -1)
     [[ "$t" -le 55 ]] && return; echo "cooling: hottest card ${t}C"; sleep 20; done; }
-fin() { git add -A results logs scripts/run-h69-iq4colerify.sh
+fin() { git add -A results logs scripts/run-h69-iq4col.sh
     git commit -q -m "bench: H69 fp16 verify kernels ($1)" && { git push -q && echo pushed || echo "WARNING: push failed" >&2; }; }
 steps() { awk -F, -v l="$1" '$1==l && $16=="ok"{d+=$6; n++; s+=($8-$10); t+=$8/$6; a+=$11} END{if(n) printf "%s: decode %.2f, accept %.1f%%, %.2f ms/target-step (n=%d)\n", l, d/n, a/n, 1000*t/s, n}' results/h11-placement.csv; }
 
