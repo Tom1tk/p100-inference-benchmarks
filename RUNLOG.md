@@ -1589,3 +1589,11 @@ Port of the reference build's state-gather skip (`GGML_PASCAL_GDN_GATHER`): the 
 
 ## 2026-10-18 — H75 reference mmvq for one-column matvec: confirmed, default on
 The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q8_1 activation cache) is vendored as `mmvq-ref.cu` (`GGML_PASCAL_MMVQ_REF`) for Q3_K/Q4_K/Q5_K/Q6_K/IQ4_XS at n=1. llama-bench -r 5: tg32 33.01 → 34.73 (+5.2%), pp4 flat. 16k serve REPS=3 against banked h74-on-16k: 50.89 → 51.46 t/s (+1.1%), byte-identical output. Serve decode is mostly 4-wide verify, which is the next target.
+
+## 2026-10-18 — H76 conv state copies in one launch (CONFIRMED)
+
+- Lever: `GGML_PASCAL_CONV_STATE_CPY` (fork, default on sm_60): CONCAT -> CPY of its tail fused; K rollback snapshot CPYs batched into one launch. Ported from the reference build.
+- Why: graphs-off pp4 traces show per-card kernel time is not behind the reference build; launch count was (1789 vs 1686 per eval), largest extra = the per-layer conv state `cpy_scalar`.
+- 16k serve REPS=3 vs banked h75-on-16k: 63.20 → 62.68 ms/target-step (−0.8%), decode 51.46 → 51.89 t/s, output byte-identical, haystack skipped.
+- Driver gate required both fire logs; only the batch half can fire in serving (n_rs_seq > 0), so the ERROR line in `logs/h76-driver.log` is a false alarm. Concat half fire-checked separately under llama-bench.
+- Correction to the pre-registration rationale: over one steady-state eval window each card is ~94% kernel-busy at pp4 (46.8 of 49.8 ms), so pp4 is kernel-bound, not launch-bound; the earlier whole-trace normalisation was off. Launch savings still pay through kernel time (each tiny kernel ~4–6 µs).
