@@ -1605,3 +1605,11 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - llama-bench -r 5, same session: tg32 H76 build 34.95±0.31, H76 + `GGML_CUDA_PDL=0` 34.94±0.31, new build 34.74±0.53 (inside noise); pp4 81.38±2.96 / 82.78±3.23 / 85.99±0.16 (controls too noisy). Gate STOP, serve skipped.
 - Lesson: the host-gap reading came from nsys-traced runs, where tracing inflates host time. Untraced, plain decode is GPU-bound (card ~27 of ~28.6 ms/token busy), so host savings don't show. The remaining tg gap to the reference is GPU kernel time.
 - Logs: `logs/h77-*.csv`, `logs/h77-driver.log`, `results/h77-bench.txt`.
+
+## 2026-10-18 — H79-H81 GPU kernel gaps (plain decode +2.0%, serve neutral)
+
+- Levers (fork, default on sm_60): H79 `GGML_PASCAL_CPY_FASTDIV` fastdiv `cpy_scalar` (ported from the reference build); H80 `GGML_PASCAL_MMVQ_REF_IQ4NL` IQ4_NL one-column matvec on the reference mmvq (IQ3_S stays on mmvh, faster there); H81 `GGML_PASCAL_GDN_COL1` delta net with one state column per warp at S_v 128.
+- Why: untraced decode is GPU-bound (H77); graphs-off tg traces put our card-0 kernel time ~0.9 ms/token over the reference's, mostly in these three kernels.
+- llama-bench -r 5, one lever added per arm: tg32 34.97 → 35.20 → 35.48 → 35.67 (+0.65 / +0.79 / +0.54%, stack +2.0%). pp4 controls ±3, unreadable.
+- 16k serve REPS=3 vs banked h76-on-16k: 62.68 → 62.69 ms/target-step, decode 51.89 → 51.88, output byte-identical, haystack skipped. The serve path is the n=4 verify plus the MTP draft, where these kernels barely run.
+- Logs: `logs/h79-*`, `results/h79-bench.txt`.

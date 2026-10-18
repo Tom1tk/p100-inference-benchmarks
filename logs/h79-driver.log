@@ -15,3 +15,6 @@ power-capped over 141s wall: gpu0 0s gpu1 0s
 h76-on-16k: decode 51.89, accept 75.9%, 62.68 ms/target-step (n=3)
 h79-gpugaps-16k: decode 51.88, accept 75.9%, 62.69 ms/target-step (n=3)
 h76-on-16k h79-gpugaps-16k identical (1224,1224 chars)
+pushed
+output identical: haystack skipped
+=== H79 done ===
