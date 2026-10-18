@@ -1586,3 +1586,6 @@ Four reference-build graph-op fusions in one lever (`GGML_PASCAL_FUSE_LAUNCH`). 
 
 ## 2026-10-18 — H74 GDN state gather: confirmed, default on
 Port of the reference build's state-gather skip (`GGML_PASCAL_GDN_GATHER`): the delta net and the conv-state concat read the recurrent-state rows through the index, so the GET_ROWS copy (711 µs/token) is not launched. llama-bench -r 5: tg32 32.31 → 33.04 (+2.3%), pp4 79.50 → 81.44 (+2.4%). 16k serve REPS=3: decode 49.73 → 50.89 t/s, byte-identical output. Two runs before it didn't count: in run 1 the skip never fired (fixed in the matcher), and run 2 aborted on a fire check that couldn't see the log line.
+
+## 2026-10-18 — H75 reference mmvq for one-column matvec: confirmed, default on
+The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q8_1 activation cache) is vendored as `mmvq-ref.cu` (`GGML_PASCAL_MMVQ_REF`) for Q3_K/Q4_K/Q5_K/Q6_K/IQ4_XS at n=1. llama-bench -r 5: tg32 33.01 → 34.73 (+5.2%), pp4 flat. 16k serve REPS=3 against banked h74-on-16k: 50.89 → 51.46 t/s (+1.1%), byte-identical output. Serve decode is mostly 4-wide verify, which is the next target.
