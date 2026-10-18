@@ -14,3 +14,16 @@ loaded in 23s | VRAM 11157/11157 MiB
   rep2: decode 50.09 t/s | prefill 398.83 t/s | accept 277/365 = 75.9% | peak 66C
   rep3: decode 49.71 t/s | prefill 399.08 t/s | accept 277/365 = 75.9% | peak 66C
 power-capped over 154s wall: gpu0 0s gpu1 0s
+pushed
+cooling: hottest card 60C
+=== h74-on-16k === (idle 53C)
+CUDA_VISIBLE_DEVICES=0\,1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/Qwen3.8-27B-UD-Q4_K_M.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm tensor -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/mtp-Qwen3.8-27B-Q4_0-head96k.gguf 
+loaded in 10s | VRAM 11157/11157 MiB
+  rep1: decode 50.84 t/s | prefill 396.91 t/s | accept 277/365 = 75.9% | peak 64C
+  rep2: decode 50.79 t/s | prefill 399.42 t/s | accept 277/365 = 75.9% | peak 66C
+  rep3: decode 51.03 t/s | prefill 399.50 t/s | accept 277/365 = 75.9% | peak 66C
+power-capped over 141s wall: gpu0 0s gpu1 0s
+h58-f16v-16k: decode 45.82, accept 66.8%, 65.15 ms/target-step (n=3)
+h74-off-16k: decode 49.73, accept 75.9%, 65.39 ms/target-step (n=3)
+h74-on-16k: decode 50.89, accept 75.9%, 63.91 ms/target-step (n=3)
+h74-off-16k h74-on-16k identical (1224,1224 chars)
