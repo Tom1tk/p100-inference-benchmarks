@@ -285,3 +285,4 @@ h83-splitstate-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,57.41,3
 h84-kvonly-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,1,57.95,397.01,400,365,277,75.9,11157,11157,64,10,ok
 h84-kvonly-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,2,57.97,399.77,400,365,277,75.9,11157,11157,67,10,ok
 h84-kvonly-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,57.87,399.11,400,365,277,75.9,11157,11157,67,10,ok
+g1-gemma4-12b-mtp-16k,draft-mtp,mtp-gemma-4-12B-it.gguf,default,1,44.64,396.14,400,402,264,65.7,0,10243,65,20,ok

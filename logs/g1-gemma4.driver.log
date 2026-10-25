@@ -1,0 +1,7 @@
+cap: 200.00 W 200.00 W
+ready: gemma-4-12b-it-qat-q4_0.gguf
+=== g1-gemma4-12b-mtp-16k === (idle 49C)
+CUDA_VISIBLE_DEVICES=1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/gemma4/gemma-4-12b-it-qat-q4_0.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm none -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/gemma4/mtp-gemma-4-12B-it.gguf 
+loaded in 20s | VRAM 0/10243 MiB
+  rep1: decode 44.64 t/s | prefill 396.14 t/s | accept 264/402 = 65.7% | peak 65C
+power-capped over 66s wall: gpu0 0s gpu1 0s
