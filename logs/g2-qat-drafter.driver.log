@@ -5,3 +5,11 @@ CUDA_VISIBLE_DEVICES=1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -
 loaded in 90s | VRAM 0/10309 MiB
   rep1: decode 43.48 t/s | prefill 399.82 t/s | accept 263/405 = 64.9% | peak 65C
 power-capped over 136s wall: gpu0 0s gpu1 0s
+pushed
+ready: gemma-4-E4B_q4_0-it.gguf
+cooling: card 1 58C
+=== g2-gemma4-e4b-qatmtp-16k === (idle 53C)
+CUDA_VISIBLE_DEVICES=1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -m /root/gemma4/gemma-4-E4B_q4_0-it.gguf --host 127.0.0.1 --port 8300 -ngl 99 -fa 1 -t 8 -ctk f16 -ctv f16 -sm none -c 16384 -b 2048 -ub 2048 --spec-type draft-mtp -md /root/gemma4/mtp-qat-gemma-4-E4B-it-Q4_0.gguf 
+loaded in 30s | VRAM 0/4215 MiB
+  rep1: decode 80.89 t/s | prefill 1052.00 t/s | accept 255/430 = 59.3% | peak 61C
+power-capped over 49s wall: gpu0 0s gpu1 0s

@@ -288,3 +288,4 @@ h84-kvonly-16k,draft-mtp,mtp-Qwen3.8-27B-Q4_0-head96k.gguf,default,3,57.87,399.1
 g1-gemma4-12b-mtp-16k,draft-mtp,mtp-gemma-4-12B-it.gguf,default,1,44.64,396.14,400,402,264,65.7,0,10243,65,20,ok
 g1-gemma4-e4b-mtp-16k,draft-mtp,mtp-gemma-4-E4B-it.gguf,default,1,84.25,1053.90,400,430,255,59.3,0,4197,59,10,ok
 g2-gemma4-12b-qatmtp-16k,draft-mtp,mtp-qat-gemma-4-12B-it-Q4_0.gguf,default,1,43.48,399.82,400,405,263,64.9,0,10309,65,90,ok
+g2-gemma4-e4b-qatmtp-16k,draft-mtp,mtp-qat-gemma-4-E4B-it-Q4_0.gguf,default,1,80.89,1052.00,400,430,255,59.3,0,4215,61,30,ok
