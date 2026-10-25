@@ -1644,3 +1644,17 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - Drafters: Unsloth's `mtp-gemma-4-*-it.gguf` (G1), and Google's QAT assistants converted with the fork's converter and quantized to Q4_0 (G2).
 - Harness: `scripts/run-spec-placement.sh` gains `CVD` (CUDA_VISIBLE_DEVICES, default `0,1`, so existing drivers are unchanged).
 - Downloads were slow (shared line). The drivers wait for each file before loading.
+
+## 2026-10-25 — G1 and G2: Gemma 4 baselines and drafter choice
+
+Card 1, 16k, ~11k-token depth prompt, 400 tokens, one run per row.
+
+| Label | Decode t/s | Prefill t/s | Accept | VRAM |
+|---|---|---|---|---|
+| g1-gemma4-12b-mtp-16k (Unsloth drafter) | 44.64 | 396.1 | 65.7% | 10.2 GB |
+| g2-gemma4-12b-qatmtp-16k (QAT Q4_0 drafter) | 43.48 | 399.8 | 64.9% | 10.3 GB |
+| g1-gemma4-e4b-mtp-16k (Unsloth drafter) | 84.25 | 1053.9 | 59.3% | 4.2 GB |
+| g2-gemma4-e4b-qatmtp-16k (QAT Q4_0 drafter) | 80.89 | 1052.0 | 59.3% | 4.2 GB |
+
+- The QAT drafter does not beat Unsloth on either model, so **the Unsloth drafter stays**. The 12B prefill (396 t/s) is the next lever to tune.
+- No power-capped seconds, peak 65 °C.

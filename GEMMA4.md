@@ -65,8 +65,8 @@ are 16k ctx, f16 KV, `-fa 1`, `-b/-ub 2048`, `-sm none`, card 1.
 
 | Run | Question | Pre-registered expectation | Result |
 |---|---|---|---|
-| G1 | Baselines: Google Q4_0 + Unsloth drafter, 12B then E4B, one run each (`scripts/run-g1-gemma4.sh`) | Loads and serves on one card; decode well above the Qwen 2-card 57.9 t/s | pending |
-| G2 | One lever vs G1: the drafter file, Unsloth → our QAT conversion (`scripts/run-g2-qat-drafter.sh`) | QAT drafter acceptance ≥ Unsloth's on the same output; the faster drafter goes in the serve command | pending |
+| G1 | Baselines: Google Q4_0 + Unsloth drafter, 12B then E4B, one run each (`scripts/run-g1-gemma4.sh`) | Loads and serves on one card; decode well above the Qwen 2-card 57.9 t/s | **12B: 44.6 t/s decode, 396 t/s prefill, accept 65.7%, 10.2 GB. E4B: 84.3 / 1054 t/s, 59.3%, 4.2 GB.** Both serve on one card. The 12B is below the Qwen 2-card decode, and its prefill is the obvious lever |
+| G2 | One lever vs G1: the drafter file, Unsloth → our QAT conversion (`scripts/run-g2-qat-drafter.sh`) | QAT drafter acceptance ≥ Unsloth's on the same output; the faster drafter goes in the serve command | **No win; keep Unsloth.** 12B: 43.5 / 400 t/s, 64.9% (vs 44.6 / 396, 65.7%). E4B: 80.9 / 1052 t/s, 59.3% (same 255/430 accepted, about 4% slower decode). Single runs; the gaps are noise or slightly against QAT |
 
 **Next, once a drafter is chosen:**
 - 100k ctx on one card (VRAM, prefill, decode).
