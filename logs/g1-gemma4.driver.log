@@ -12,3 +12,5 @@ CUDA_VISIBLE_DEVICES=1 /root/llama.cpp-Pascal/build-cuda-p100/bin/llama-server -
 loaded in 10s | VRAM 0/4197 MiB
   rep1: decode 84.25 t/s | prefill 1053.90 t/s | accept 255/430 = 59.3% | peak 59C
 power-capped over 29s wall: gpu0 0s gpu1 0s
+pushed
+=== G1 done ===
