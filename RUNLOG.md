@@ -1635,3 +1635,12 @@ The reference build's mmvq (P100 dot products, staged q8_1, per-type geometry, q
 - 16k serve REPS=3 vs banked h83-splitstate-16k: 56.66 → 56.14 ms/target-step, decode 57.40 → 57.93 t/s, accept 75.9% both, output byte-identical. Below the predicted ≥ 1%; reps don't overlap, so kept.
 - Round 4 serve so far (H82–H84, 16k): 62.69 → 56.14 ms/target-step (−10.4%), decode 51.88 → 57.93 t/s.
 - Logs: `logs/h84-driver.log`, `results/h11-placement.csv` rows `h84-kvonly-16k`.
+
+## 2026-10-25 — Gemma 4 QAT experiment opened (G1, G2 queued)
+
+- New experiment: Gemma 4 12B and E4B QAT, decode and prefill, single card (card 1), 16k first. Full detail in [GEMMA4.md](GEMMA4.md).
+- Card 0 held 9.3 GB from the user's Laya `system-one` service (`laya.service` :8081, `laya-ui.service` :8082). Both are stopped and disabled at the user's request.
+- Targets are Google's official Q4_0 QAT GGUFs. Unsloth UD-Q4_K_XL targets were dropped and deleted. Neither Google GGUF has a built-in drafter.
+- Drafters: Unsloth's `mtp-gemma-4-*-it.gguf` (G1), and Google's QAT assistants converted with the fork's converter and quantized to Q4_0 (G2).
+- Harness: `scripts/run-spec-placement.sh` gains `CVD` (CUDA_VISIBLE_DEVICES, default `0,1`, so existing drivers are unchanged).
+- Downloads were slow (shared line). The drivers wait for each file before loading.

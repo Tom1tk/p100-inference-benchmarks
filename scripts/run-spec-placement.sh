@@ -144,9 +144,9 @@ elif [[ "$DRAFTER" != none ]]; then
     [[ "$PLACEMENT" != default ]] && SERVER_CMD+=( -devd "$PLACEMENT" )
 fi
 
-printf '%q ' CUDA_VISIBLE_DEVICES=0,1 "${SERVER_CMD[@]}"; echo
+printf '%q ' CUDA_VISIBLE_DEVICES="${CVD:-0,1}" "${SERVER_CMD[@]}"; echo
 START=$(date +%s)
-CUDA_VISIBLE_DEVICES=0,1 "${SERVER_CMD[@]}" > "$SERVER_LOG" 2>&1 &
+CUDA_VISIBLE_DEVICES="${CVD:-0,1}" "${SERVER_CMD[@]}" > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 OUTCOME=""

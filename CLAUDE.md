@@ -37,6 +37,8 @@ restates the rules that must never be re-derived from context.
 - **Single card is dropped (user call, 2026-10-17).** It is not the use case: no
   1-card arms, no 1-card hypotheses. Earlier 1-card results (`UD-IQ3_S`, `-sm none`)
   stay in the record as history.
+- **Gemma 4 QAT experiment (user call, 2026-10-25)** is separate from the Qwen objective: G-series runs,
+  single card allowed (card 1), all other rules apply. See [GEMMA4.md](GEMMA4.md).
 - **This repo is for benchmarks only.** Fork plans and design docs live in the
   fork repo (`docs/pascal/`), never here.
 
